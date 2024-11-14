@@ -1,0 +1,38 @@
+<div #myImageContainer [ngStyle]="{ 'aspect-ratio':  width/height }" class="h-[256px]" [ngClass]="{
+    'relative w-full': !isFullscreen,
+    'fixed h-full max-w-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black z-50 box-shadow':
+      isFullscreen
+  }">
+
+    <div class="relative">
+        <canvas #imageCanvas id="image" class="absolute w-full min-w-[128px]" (wheel)="zoom($event)"
+            (mousedown)="startDrag($event)" (mouseup)="endDrag()" (mousemove)="drag($event)" (mouseleave)="endDrag()"
+            [width]="width" [height]="height">
+        </canvas>
+
+        <canvas #labelCanvas class="absolute aspect-square w-full min-w-[128px] pointer-events-none"
+            [ngClass]="{'invisible': !this.displayLabel}" [width]="width" [height]="height">
+        </canvas>
+        <ng-content></ng-content>
+
+        <img #image [ngSrc]="_srcImg" (load)="drawOnLoad()" class="hidden relative" loading="eager" fill>
+    </div>
+
+    <div class=" skeleton w-full h-full absolute z-50" [ngClass]="{ 'invisible': !isLoading, 'visible': !isLoading }">
+    </div>
+
+    <div class="flex items-center justify-start">
+        <button class="btn btn-circle" mat-icon-button (click)="switchFullScreen()">
+            <mat-icon *ngIf="!isFullscreen">fullscreen</mat-icon>
+            <mat-icon *ngIf="isFullscreen">fullscreen_exit</mat-icon>
+        </button>
+        <div class="tooltip" data-tip="Réinitialiser la vue (R)" *ngIf="canPan || canZoom">
+            <button class="btn btn-circle" mat-icon-button (click)="resetZoomAndPan(true, true)">
+                <mat-icon>refresh</mat-icon>
+            </button>
+        </div>
+        <div class="tooltip ml-auto" data-tip="Afficher/Masquer les marqueurs">
+            <input type="checkbox" class="toggle" [(ngModel)]="this.displayLabel" />
+        </div>
+    </div>
+</div>

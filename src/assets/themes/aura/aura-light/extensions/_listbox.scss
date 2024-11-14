@@ -1,0 +1,18 @@
+.p-listbox {
+    box-shadow: $inputShadow;
+
+    &.p-disabled {
+        opacity: 1;
+        background-color: $disabledInputBg;
+
+        .p-listbox-list {    
+            .p-listbox-item {
+                color: $textSecondaryColor;
+            }
+        }
+    }
+
+    .p-listbox-header:has(.p-checkbox) {
+        padding: 0.5rem 1rem 0 1rem;
+    }
+}

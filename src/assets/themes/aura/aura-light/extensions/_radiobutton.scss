@@ -1,0 +1,26 @@
+.p-radiobutton {
+    .p-radiobutton-box {
+        box-shadow: $inputShadow;
+
+        &.p-focus {
+            outline-offset: $focusOutlineOffset;
+
+            &.p-highlight {
+                border-color: $checkboxActiveBorderColor;
+            }
+        }
+    }
+
+    &.p-radiobutton-disabled {
+        opacity: 1;
+
+        .p-radiobutton-box {
+            border: $inputBorder;
+            background-color: $disabledInputBg;
+
+            .p-radiobutton-icon {
+                background-color: $textSecondaryColor;
+            }
+        }
+    }
+}

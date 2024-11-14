@@ -1,0 +1,78 @@
+<div class="w-1/2 m-auto card">
+    <p-panel header="Project Configuration" class="flex flex-col grow items-stretch w-full">
+        <p-divider align="left" type="solid"><b>Configure project</b></p-divider>
+
+        <div class="flex flex-column gap-2 flex-col">
+            <p-floatLabel>
+                <input pInputText [ngClass]="{'ng-invalid ng-dirty': !isNameValid}" id="projectName"
+                    aria-describedby="projectName-help" [(ngModel)]="projectService.projectName" />
+                <label for="projectName">Project name</label>
+
+            </p-floatLabel>
+
+            <small id="projectName-help">
+                Give a name to your annotation project.
+            </small>
+        </div>
+
+        <p-divider align="left" type="solid"><b>Configure paths</b></p-divider>
+
+        <p-fieldset legend="Input" [toggleable]="true">
+            <div class="flex flex-col items-stretch gap-2">
+                <p-floatLabel>
+                    <input pInputText id="inputPath" aria-describedby="inputPath-help"
+                        [(ngModel)]="projectService.inputFolder" [ngClass]="{'ng-invalid ng-dirty': !isInputValid}" />
+                    <label for="inputPath">Input path</label>
+                </p-floatLabel>
+
+                <p-button (click)="openInputFolder()">Choose folder</p-button>
+                <small id="inputPath-help">
+                    Enter the path manually or open the explorer.
+                </small>
+                <div class="flex flex-row justify-evenly gap-2">
+                    <div class="flex flex-col">
+                        <p-inputSwitch id="recursiveLoad" ariaLabelledBy="recursiveLoad" [(ngModel)]="recursiveLoad" />
+                        <small>
+                            <label for="recursiveLoad" id="recursiveLoad">Recursive loading</label>
+                        </small>
+                    </div>
+                    <p-floatLabel>
+                        <input pInputText id="fileExtension" aria-describedby="fileExtension-help"
+                            [(ngModel)]="inputRegex" />
+                        <label for="fileExtension">regex</label>
+                    </p-floatLabel>
+                </div>
+            </div>
+        </p-fieldset>
+
+        <p-fieldset legend="Output" [toggleable]="true" [collapsed]="false">
+            <div class="flex flex-col items-stretch gap-2">
+                <p-floatLabel>
+                    <input pInputText id="outputPath" aria-describedby="outputPath-help"
+                        [(ngModel)]="projectService.outputFolder" [ngClass]="{'ng-invalid ng-dirty': !isOutputValid}" />
+                    <label for="outputPath">Output path</label>
+                </p-floatLabel>
+
+                <p-button (click)="openOutputFolder()">Choose folder</p-button>
+                <small id="outputPath-help">
+                    Enter the path manually or open the explorer.
+                </small>
+            </div>
+        </p-fieldset>
+
+        <p-fieldset legend="Advanced options" [toggleable]="true" [collapsed]="true">
+            <div class="flex flex-col items-stretch gap-2">
+                <p-inputSwitch id="generateThumbnails" ariaLabelledBy="generateThumbnails"
+                    [(ngModel)]="generateThumbnails" />
+                <small>
+                    <label for="generateThumbnails" id="generateThumbnails">Create thumbnails</label>
+                </small>
+            </div>
+
+        </p-fieldset>
+        <p-divider align="center" type="solid"> <b>Start</b></p-divider>
+
+        <p-button class="w-full" label="Start" (click)="startProject()"></p-button>
+    </p-panel>
+
+</div>

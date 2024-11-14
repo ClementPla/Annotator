@@ -1,0 +1,21 @@
+<mat-toolbar>
+    <span>Annotator</span>
+
+
+
+</mat-toolbar>
+
+<div>
+    <button type="button" mat-raised-button (click)="openLoading()">Choose File</button>
+    <span class="file-name">{{selectedFile?.name}}</span>
+
+</div>
+<div class="flex justify-center gap-4">
+    <app-drawable-canvas class="w-1/2"></app-drawable-canvas>
+
+    <app-biomarkers-list>
+
+    </app-biomarkers-list>
+    <app-list-images></app-list-images>
+
+</div>

@@ -1,1 +1,20 @@
-/* You can add global styles to this file, and also import other style files */
+@layer tailwind-base, primeng, tailwind-utilities, my-app;
+
+@import "assets/themes/material/material-light/compact/indigo/theme.scss";
+@import "primeng/resources/primeng";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+html,
+body {
+    height: 100%;
+    width: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: Roboto, "Helvetica Neue", sans-serif;
+}
