@@ -1,14 +1,18 @@
 import { Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ViewService {
 
+
   isLoading: boolean = false;
   loadingStatus: string = '';
+  thumbnailsSize: number = 128;
 
-  constructor() { }
+
+  constructor(private router: Router) { }
 
   setLoading(status: boolean, message: string) {
     this.isLoading = status;
@@ -19,4 +23,15 @@ export class ViewService {
     this.isLoading = false;
     this.loadingStatus = '';
   }
+
+  navigateToGallery() {
+    this.router.navigate(['/gallery']);
+  }
+
+  navigateToEditor() {
+    this.router.navigate(['/editor']);
+  }
+
+
+  
 }

@@ -1,38 +1,56 @@
-<div #myImageContainer [ngStyle]="{ 'aspect-ratio':  width/height }" class="h-[256px]" [ngClass]="{
+<div #myImageContainer [ngStyle]="{ 'aspect-ratio':  width/height }" [ngClass]="{
     'relative w-full': !isFullscreen,
     'fixed h-full max-w-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black z-50 box-shadow':
       isFullscreen
   }">
 
     <div class="relative">
-        <canvas #imageCanvas id="image" class="absolute w-full min-w-[128px]" (wheel)="zoom($event)"
-            (mousedown)="startDrag($event)" (mouseup)="endDrag()" (mousemove)="drag($event)" (mouseleave)="endDrag()"
-            [width]="width" [height]="height">
-        </canvas>
 
-        <canvas #labelCanvas class="absolute aspect-square w-full min-w-[128px] pointer-events-none"
-            [ngClass]="{'invisible': !this.displayLabel}" [width]="width" [height]="height">
-        </canvas>
-        <ng-content></ng-content>
+    </div>
+    <canvas #imageCanvas id="image" class="absolute w-full min-w-[128px] cursor-none" (wheel)="wheel($event)"
+        (mousedown)="mouseDown($event)" (mouseup)="mouseUp($event)" (mousemove)="mouseMove($event)" (mouseleave)="mouseUp($event)"
+        [width]="width" [height]="height">
+    </canvas>
 
-        <img #image [ngSrc]="_srcImg" (load)="drawOnLoad()" class="hidden relative" loading="eager" fill>
+    <canvas #drawCanvas class="absolute w-full min-w-[128px] pointer-events-none noAntialiasing" [width]="width" [height]="height">
+    </canvas>
+
+    <canvas #classesCanvas class="absolute w-full min-w-[128px] hidden pointer-events-none noAntialiasing" [width]="width"
+        [height]="height" *ngFor="let class of labelService.listSegmentationLabels">
+    </canvas>
+
+    <svg #svgCanvas class="absolute w-full min-w-[128px] pointer-events-none z-50">
+
+        <polygon class="lassoPolygon" [attr.points]="getLassoPointsToPolygon() "
+        [attr.fill]="labelService.activeLabel?.color + '20'" [attr.stroke]="labelService.activeLabel?.color" [attr.stroke-width]="2" />
+        />
+    </svg>
+
+    
+    <img #image class="hidden relative">
+
+
+    <div class="cursor" *ngIf="cursor"
+        [ngStyle]="{ 'left.px': cursor?.x, 'top.px': cursor?.y, 'width.px': getCursorSize(), 'border-color': labelService.activeLabel?.color}"
+        
+        >
     </div>
 
-    <div class=" skeleton w-full h-full absolute z-50" [ngClass]="{ 'invisible': !isLoading, 'visible': !isLoading }">
+
+
+    <div class=" skeleton w-full h-full absolute z-50" [ngClass]="{ 'invisible': !viewService.isLoading, 'visible': viewService.isLoading }">
     </div>
 
-    <div class="flex items-center justify-start">
-        <button class="btn btn-circle" mat-icon-button (click)="switchFullScreen()">
-            <mat-icon *ngIf="!isFullscreen">fullscreen</mat-icon>
-            <mat-icon *ngIf="isFullscreen">fullscreen_exit</mat-icon>
-        </button>
-        <div class="tooltip" data-tip="Réinitialiser la vue (R)" *ngIf="canPan || canZoom">
-            <button class="btn btn-circle" mat-icon-button (click)="resetZoomAndPan(true, true)">
-                <mat-icon>refresh</mat-icon>
-            </button>
-        </div>
-        <div class="tooltip ml-auto" data-tip="Afficher/Masquer les marqueurs">
-            <input type="checkbox" class="toggle" [(ngModel)]="this.displayLabel" />
-        </div>
+    <div class="flex items-center justify-start absolute">
+        <p-button pRipple [rounded]="true" [raised]="true" (click)="switchFullScreen()" *ngIf="!isFullscreen"
+            icon="pi pi-window-maximize" severity="help">
+        </p-button>
+        <p-button pButton pRipple [rounded]="true" [raised]="true" (click)="switchFullScreen()" *ngIf="isFullscreen"
+            icon="pi pi-window-minimize" severity="help">
+        </p-button>
+
+        <p-button [rounded]="true" [raised]="true" (click)="resetZoomAndPan(true, true)" icon="pi pi-refresh"
+            severity="help">
+        </p-button>
     </div>
 </div>

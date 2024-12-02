@@ -1,6 +1,6 @@
 import { XMLParser, XMLBuilder, XMLValidator } from "fast-xml-parser";
 
-import { LoadSaveFormat } from "./customFormat";
+import { LoadSaveFormat } from "./formats";
 
 
 export class SaveAndLoad {

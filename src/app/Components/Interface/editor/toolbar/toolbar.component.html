@@ -1,0 +1,38 @@
+<p-toolbar class="py-0">
+    <ng-template pTemplate="start">
+    </ng-template>
+    <ng-template pTemplate="center">
+        <div class="flex flex-wrap align-items-center gap-6 justify-center items-center">
+
+            <p-selectButton [options]="tools" [(ngModel)]="drawService.selectedTool" optionLabel="name">
+                <ng-template let-tool>
+                    <i [class]="tool.icon"></i>
+                </ng-template>
+
+            </p-selectButton>
+
+            <p *ngIf="drawService.isToolWithBrushSize()">
+                <input type="text" pInputText [(ngModel)]="drawService.lineWidth" class="w-full mb-3" />
+                <p-slider [(ngModel)]="drawService.lineWidth" class="w-full" />
+
+            </p>
+
+            <app-labelled-switch [(checked)]="drawService.swapMarkers" *ngIf="drawService.isDrawingTool()"> Swap existing markers</app-labelled-switch>
+            <app-labelled-switch [(checked)]="drawService.eraseAll" *ngIf="drawService.isEraser()"> Erase all labels</app-labelled-switch>
+
+           
+            
+            <app-labelled-switch [(checked)]="drawService.autoPostProcess"> Post-process drawing</app-labelled-switch>
+
+            <P>
+                <button pButton pRipple icon='pi pi-undo' (onClick)="drawService.requestUndo()">
+                </button>
+                <p-button icon='pi pi-refresh' (onClick)="drawService.requestRedo()">
+                </p-button>
+            </P>
+
+        </div>
+    </ng-template>
+    <ng-template pTemplate="end">
+    </ng-template>
+</p-toolbar>

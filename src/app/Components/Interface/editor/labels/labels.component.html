@@ -1,0 +1,40 @@
+<p-panel header="Classes">
+<p-fieldset legend="Segmentation" [toggleable]="true">
+<p-tree #tree [value]="(labelsService.getTreeNode() )" (selectionChange)="changeActiveLabel($event)"
+selectionMode=single>
+    <ng-template let-node pTemplate="default" class="w-full">
+
+        <div class="flex flex-row items-center gap-3">
+            <ng-container *ngIf="!hasChild(node)">
+               
+                <p-button icon="pi pi-eye" (click)="changeVisibility(node)" [rounded]="true" *ngIf="node.data.isVisible; else eyeClose"></p-button>
+                <ng-template #eyeClose>
+                    <p-button #eyeClose icon="pi pi-eye-slash" (click)="changeVisibility(node)" [rounded]="true"></p-button>
+                </ng-template>
+
+                <p-colorPicker [(ngModel)]="node.data.color" [appendTo]="colorPicker"
+                (onChange)="drawService.requestCanvasRedraw()"
+                />
+                
+
+                <b>
+                    {{node.label}}
+                </b>
+
+                <p-button icon="pi pi-trash" class="smallButton" (click)="clearCanvas(node)" severity="danger"></p-button>
+
+            </ng-container>
+
+            <b *ngIf="hasChild(node)">
+                {{node.label}}
+            </b>
+
+            
+        </div>
+    </ng-template>
+</p-tree>
+</p-fieldset>
+</p-panel>
+<div #colorPicker class="aspect-auto w-12">
+
+</div>

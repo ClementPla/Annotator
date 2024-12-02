@@ -3,12 +3,9 @@
 
 fn main() {
     std::env::set_var(
-    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-    "--ignore-gpu-blocklist",
-  );
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--ignore-gpu-blocklist",
+    );
 
     app_lib::run();
-
-
 }
-

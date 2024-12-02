@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { ProgressBarModule } from 'primeng/progressbar';
-import { ViewService } from '../../../Services/view.service';
+import { ViewService } from '../../../Services/UI/view.service';
 import { NgIf } from '@angular/common';
 
 @Component({

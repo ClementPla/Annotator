@@ -1,20 +1,43 @@
-@layer tailwind-base, primeng, tailwind-utilities, my-app;
+@import "primeicons/primeicons.css";
+@import "primeng/resources/themes/bootstrap4-dark-purple/theme.css";
 
-@import "assets/themes/material/material-light/compact/indigo/theme.scss";
 @import "primeng/resources/primeng";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@layer tailwind-base, primeng, tailwind-utilities;
+        
+@layer tailwind-base {
+    @tailwind base;
+}
 
+@layer tailwind-utilities {
+    @tailwind components;
+    @tailwind utilities;
+}
+
+
+@layer reset, primeng;
 
 html,
 body {
     height: 100%;
     width: 100%;
+    max-height: 100vh;
+    font-size: 14px;
 }
 
 body {
     margin: 0;
     font-family: Roboto, "Helvetica Neue", sans-serif;
+}
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+
+.p-colorpicker-panel .p-colorpicker-color {
+	background: transparent url("assets/imgs/black_white_gradient.png") no-repeat left top
+}
+
+
+.p-colorpicker-panel .p-colorpicker-hue {
+	background: transparent url("assets/imgs/hue_gradient.png") no-repeat left top !important;
 }

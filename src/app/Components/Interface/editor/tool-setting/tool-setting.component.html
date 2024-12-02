@@ -1,0 +1,13 @@
+<p-panel header="Advanced settings">
+
+    <p-fieldset legend="Auto-postprocessing" [toggleable]="true">
+        <div class="flex flex-wrap gap-2">
+            <app-labelled-switch [(checked)]="drawService.useInverse">Use inverse image</app-labelled-switch>
+            <app-labelled-switch [(checked)]="drawService.autoPostProcessOpening">Morph-smooth</app-labelled-switch>
+            <app-labelled-switch [(checked)]="drawService.enforceConnectivity">Force connectivity</app-labelled-switch>
+        </div>
+    </p-fieldset>
+
+
+
+</p-panel>

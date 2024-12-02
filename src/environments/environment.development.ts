@@ -1,5 +1,6 @@
 export const environment = {
-    defaultProjectName: 'New Project',
-    defaultInputFolder: '/home/clement/Documents/Projets/Annotator/test/input/',
-    defaultOutputFolder: '/home/clement/Documents/Projets/Annotator/test/output/',
+    defaultProjectName: 'Test',
+    defaultInputFolder: "C:/Users/cleme/Documents/tmp/input/",
+    defaultOutputFolder: "C:/Users/cleme/Documents/tmp/output/",
+    defaultRegex: '.(gif|jpe?g|tiff?|png|webp|bmp)$',	
 };

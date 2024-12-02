@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { BiomarkersListComponent } from './biomarkers-list.component';
+import { LabelledSwitchComponent } from './labelled-switch.component';
 
-describe('BiomarkersListComponent', () => {
-  let component: BiomarkersListComponent;
-  let fixture: ComponentFixture<BiomarkersListComponent>;
+describe('LabelledSwitchComponent', () => {
+  let component: LabelledSwitchComponent;
+  let fixture: ComponentFixture<LabelledSwitchComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [BiomarkersListComponent]
+      imports: [LabelledSwitchComponent]
     })
     .compileComponents();
     
-    fixture = TestBed.createComponent(BiomarkersListComponent);
+    fixture = TestBed.createComponent(LabelledSwitchComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

@@ -1,25 +1,29 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnInit, Output, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, NgZone, OnInit, Output, QueryList, ViewChild, ViewChildren } from '@angular/core';
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { ImageZoomPan } from '../../../Core/zoomPan';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
-import { LabelCanvas } from '../../../Core/interface';
+import { DrawCanvasUtility } from '../../../Core/canvases/draw';
+import { DrawingService } from '../../../Services/UI/drawing.service';
+import { ViewService } from '../../../Services/UI/view.service';
+import { LabelsService } from '../../../Services/Project/labels.service';
+import { from, Observable, of } from 'rxjs';
+import { Point2D, SegLabel } from '../../../Core/interface';
+import { inject } from '@angular/core';
+import { Button } from 'primeng/button';
 
 @Component({
   selector: 'app-drawable-canvas',
   standalone: true,
-  imports: [CommonModule, MatIconModule, MatButtonModule, NgOptimizedImage, FormsModule],
+  imports: [CommonModule, NgOptimizedImage, FormsModule, Button],
   templateUrl: './drawable-canvas.component.html',
   styleUrl: './drawable-canvas.component.scss'
 })
-export class DrawableCanvasComponent extends ImageZoomPan implements OnInit, AfterViewInit {
+export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit{
 
   title = 'Annotator';
-  @Input() pathImage: string | null = "assets/imgs/image_01.png";
   @Input() width: number = 256;
   @Input() height: number = 256;
+  @Input() lineWidth: number = 10;
 
   @Input() override canZoom: boolean = true;
   @Input() override canPan: boolean = true;
@@ -27,40 +31,103 @@ export class DrawableCanvasComponent extends ImageZoomPan implements OnInit, Aft
 
   @ViewChild('image') imageElement: ElementRef<HTMLImageElement>;
   @ViewChild('imageCanvas') imgCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('drawCanvas') drawCanvas: ElementRef<HTMLCanvasElement>;
 
-  @ViewChild('labelCanvas') labelCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('svgCanvas') svgCanvas: ElementRef<SVGElement>;
 
   @Output() panAndZommed = new EventEmitter<{ scale: number, offsetX: number, offsetY: number }>();
 
-  private image: HTMLImageElement;
+  
+  private ngZone = inject(NgZone)
   isFullscreen: boolean = false;
-  _srcImg: string = 'assets/imgs/image_01.png';
+  srcImg$: Observable<string>;
   displayLabel: boolean = true;
-  isLoading: boolean = true;
-  labelImage: HTMLImageElement;
 
-  ctxLabel: CanvasRenderingContext2D;
-  constructor() {
-    super();
-    this.labelImage = new Image();
+  cursor: Point2D | null = {x: 0, y: 0};  
+  classes$: Observable<SegLabel[]>;
 
+
+  constructor(public override drawService: DrawingService, public viewService: ViewService, public override labelService: LabelsService) {
+    super(drawService, labelService);
   }
   ngOnInit(): void {
-    this.loadImage();
-    // this.addCanvasLabel();
+
+    this.labelService.listSegmentationLabels.forEach((label) => {
+      this.classesCanvas.push(new OffscreenCanvas(this.width, this.height));
+    });
+  }
+
+  getCursorSize() {
+    if (!this.ctxDraw) {
+      return 0;
+    }
+    const rect = this.ctxDraw.canvas.getBoundingClientRect();
+    return this.drawService.lineWidth * rect.width / this.width * this.scale;
+  }
+
+  mouseMove(event: MouseEvent) {
+
+    const rect = this.ctxDraw.canvas.getBoundingClientRect();
+    // Transform mouse coordinates to canvas coordinates
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    this.cursor = { x: mouseX, y: mouseY };
+    if (this.drawService.canPan())
+      this.drag(event);
+    else {
+      this.ngZone.runOutsideAngular(()=>{
+        this.draw(event)
+      })
+    }
 
   }
-  ngAfterViewInit(): void {
+  mouseDown(event: MouseEvent) {
+    if (event.button == 1) {
+      this.drawService.activatePanMode();
+    }
+    if (this.drawService.canPan())
+      this.startDrag();
+    else {
+
+      this.startDraw();
+      this.draw(event);
+    }
+  }
+
+  mouseUp($event: MouseEvent) {
+    if ($event.button == 1) {
+      this.drawService.restoreLastTool();
+    }
+    if (this.drawService.canPan())
+      this.endDrag();
+    else {
+      this.endDraw();
+    }
+    this.isDrawing = false;
+  }
+
+  reload(): void {
 
     this.image = this.imageElement.nativeElement;
     this.ctx = this.imgCanvas.nativeElement.getContext('2d', { alpha: false })!;
-    this.ctxLabel = this.labelCanvas.nativeElement.getContext('2d', { alpha: true })!;
-
+    this.ctxDraw = this.drawCanvas.nativeElement.getContext('2d', { alpha: true })!;
+    this.ctxDraw.imageSmoothingEnabled = false;
+    this.ctx.imageSmoothingEnabled = false;
+    
+    this.srcImg$.subscribe((src) => {
+      this.image.src = src;
+    });
+    this.image.onload = () => {
+      this.drawOnLoad();
+      this.viewService.endLoading();
+    }
   }
 
   redrawAllCanvas() {
     // Redraw the main image
     requestAnimationFrame(() => {
+
       if (!this.image.complete || this.image.naturalWidth === 0) {
         console.error("Image is not fully loaded or is invalid");
         return;
@@ -70,61 +137,65 @@ export class DrawableCanvasComponent extends ImageZoomPan implements OnInit, Aft
       if (this.ctx == null) {
         this.ctx = this.imgCanvas.nativeElement.getContext('2d', { alpha: false })!;
       }
-
       if (!this.ctx) {
         console.error("Failed to get 2D context");
         return;
       }
 
 
-
+      // This is the canvas with the main image
+      this.ctx.resetTransform();
       this.clearCanvas(this.ctx);
-      this.ctx.save();
-      this.ctx.translate(this.offsetX, this.offsetY);
+      this.ctx.translate(this.offset.x, this.offset.y);
       this.ctx.scale(this.scale, this.scale);
       this.ctx.drawImage(this.image, 0, 0, this.width, this.height);
-      this.ctx.restore();
 
 
-      this.ctxLabel.save();
-      this.ctxLabel.translate(this.offsetX, this.offsetY);
-      this.ctxLabel.scale(this.scale, this.scale);
-      // this.ctxLabel.drawImage(this.image, 0, 0, this.width, this.height);
-      this.ctxLabel.restore();
+      // This is the canvas with the marker drawings
+      this.ctxDraw.resetTransform();
+      this.ctxDraw.imageSmoothingEnabled = false
+      this.clearCanvas(this.ctxDraw);
+      this.ctxDraw.translate(this.offset.x, this.offset.y);
+      this.ctxDraw.scale(this.scale, this.scale);
+
+      // Redraw the labels
+      this.classesCanvas.forEach((canvas, index) => {
+        if (this.labelService.listSegmentationLabels[index].isVisible) {
+          this.ctxDraw.drawImage(canvas, 0, 0);
+        }
+      });
 
 
-      this.isLoading = false;
-      this.panAndZommed.emit({ scale: this.targetScale, offsetX: this.targetOffsetX, offsetY: this.targetOffsetY });
+      this.panAndZommed.emit({ scale: this.targetScale, offsetX: this.targetOffset.x, offsetY: this.targetOffset.y });
     });
   }
 
-  clearCanvas(ctx: CanvasRenderingContext2D) {
-    ctx.clearRect(0, 0, this.width, this.height);
+
+  loadImage(image: Promise<string>) {
+    this.srcImg$ = from(image);
+    this.reload();
   }
 
-  loadImage() {
-    this.isLoading = true;
-    this._srcImg = this.pathImage!;
-  }
 
   drawOnLoad() {
     this.width = this.image.naturalWidth;
     this.height = this.image.naturalHeight;
     this.imgCanvas.nativeElement.width = this.width;
     this.imgCanvas.nativeElement.height = this.height;
-    this.labelCanvas.nativeElement.width = this.width;
-    this.labelCanvas.nativeElement.height = this.height;
-    this.labelImage.width = this.width;
-    this.labelImage.height = this.height;
+    this.drawCanvas.nativeElement.width = this.width;
+    this.drawCanvas.nativeElement.height = this.height;
 
+    this.classesCanvas.forEach((canvas) => {
+      canvas.width = this.width;
+      canvas.height = this.height;
+    });
 
+    // Set viewbox for SVG
+    this.svgCanvas.nativeElement.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
     requestAnimationFrame(() => {
       this.redrawAllCanvas();
 
-      this.isLoading = false;
-
     });
-
   }
 
   switchFullScreen() {
@@ -134,5 +205,18 @@ export class DrawableCanvasComponent extends ImageZoomPan implements OnInit, Aft
     else {
       this.resetZoomAndPan(true, true)
     }
+  }
+
+  getLassoPointsToPolygon() {
+
+    if (this.lassoPoints.length < 3) {
+      return ""
+    }
+    let points = "";
+    for (let i = 0; i < this.lassoPoints.length; i++) {
+      points += this.lassoPoints[i].x + "," + this.lassoPoints[i].y + " ";
+    }
+    return points
+
   }
 }

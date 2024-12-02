@@ -1,21 +1,11 @@
-<mat-toolbar>
-    <span>Annotator</span>
+<app-toolbar></app-toolbar>
 
+<div class="flex justify-center m-4 gap-2">
 
+    <app-labels *ngIf="projectService.isSegmentation" class="w-fit"></app-labels>
+    <app-drawable-canvas class="w-3/4 h-fit drop-shadow-2xl rounded-2xl overflow-hidden"></app-drawable-canvas>
 
-</mat-toolbar>
-
-<div>
-    <button type="button" mat-raised-button (click)="openLoading()">Choose File</button>
-    <span class="file-name">{{selectedFile?.name}}</span>
-
-</div>
-<div class="flex justify-center gap-4">
-    <app-drawable-canvas class="w-1/2"></app-drawable-canvas>
-
-    <app-biomarkers-list>
-
-    </app-biomarkers-list>
-    <app-list-images></app-list-images>
-
+    <div class="flex flex-col gap-4">
+        <app-tool-setting></app-tool-setting>
+    </div>
 </div>

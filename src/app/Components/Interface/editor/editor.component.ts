@@ -1,49 +1,75 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { DrawableCanvasComponent } from '../../Core/drawable-canvas/drawable-canvas.component';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { ListImagesComponent } from '../list-images/list-images.component';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIcon } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatButton } from '@angular/material/button';
-import { BiomarkersListComponent } from "../biomarkers-list/biomarkers-list.component";
-import { invoke } from '@tauri-apps/api/core'
 
-import { open } from '@tauri-apps/plugin-dialog';
-
+import { ToolbarComponent } from './toolbar/toolbar.component';
+import { LabelsComponent } from "./labels/labels.component";
+import { ProjectService } from '../../../Services/Project/project.service';
+import { NgIf } from '@angular/common';
+import { HostListener } from '@angular/core';
+import { DrawingService } from '../../../Services/UI/drawing.service';
+import { Tools } from '../../../Core/canvases/tools';
+import { ToolSettingComponent } from "./tool-setting/tool-setting.component";
+import { LabelsService } from '../../../Services/Project/labels.service';
+import { ViewService } from '../../../Services/UI/view.service';
 
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [DrawableCanvasComponent, ListImagesComponent, MatToolbarModule, MatIcon, MatFormFieldModule, MatInputModule, MatButton, BiomarkersListComponent],
+  imports: [DrawableCanvasComponent, ListImagesComponent, ToolbarComponent, LabelsComponent, NgIf, ToolSettingComponent],
   templateUrl: './editor.component.html',
   styleUrl: './editor.component.scss'
 })
-export class EditorComponent {
+export class EditorComponent implements OnInit, AfterViewInit {
 
-  @ViewChild('fileInput', { static: false }) fileInput: ElementRef;
+  @ViewChild(DrawableCanvasComponent) canvas: DrawableCanvasComponent;
+
+  constructor(public projectService: ProjectService, 
+    private drawService: DrawingService, 
+    private labelService: LabelsService, 
+    private viewService: ViewService) { }
 
 
-  selectedFile: any = null;
-
-  onFileSelected(event: any): void {
-
-    console.log(event);
-    this.selectedFile = event.target.files[0] ?? null;
+  ngOnInit(): void {
+    this.labelService.rebuildTreeNodes()
 
   }
+  ngAfterViewInit(): void {
+    this.canvas.loadImage(this.projectService.activeImage!);    
 
-  openLoading() {
-
-    const file = open({ directory: true, });
-    file.then((value) => {
-      invoke('list_files_in_folder', { folder: value }).then((value: any) => {
-        console.log(value);
-      });
-    });
+  }
+  @HostListener('window:keydown.control.z', ['$event'])
+  undo(event: KeyboardEvent) {
+    this.drawService.requestUndo();
+  }
+  @HostListener('window:keydown.control.y', ['$event'])
+  redo(event: KeyboardEvent) {
+    this.drawService.requestRedo();
   }
 
+  @HostListener('window:keydown.e')
+  changeToEraser() {
+    this.drawService.selectedTool = Tools.ERASER;
+  }
+  @HostListener('window:keydown.l')
+  changeToLasso() {
+    this.drawService.selectedTool = Tools.LASSO;
+  }
+
+  @HostListener('window:keydown.shift.l')
+  changeToLassoEraser() {
+    this.drawService.selectedTool = Tools.LASSO_ERASER;
+  }
+
+  @HostListener('window:keydown.g')
+  changeToPan() {
+    this.drawService.selectedTool = Tools.PAN;
+  }
+
+  @HostListener('window:keydown.p')
+  changeToPencil() {
+    this.drawService.selectedTool = Tools.PEN;
+  }
 }
-
 
 
