@@ -44,14 +44,18 @@ export class AppComponent implements AfterViewInit, OnInit{
 
   async debug(){
 
-    this.labelService.addSegLabel( { label: "Foreground", color: "#209fb5", isVisible: true });
-    this.labelService.addSegLabel( { label: "Example1/Class 1", color: "#df8e1d" , isVisible: true });
-    this.labelService.addSegLabel( { label: "Example1/Class 2", color: "#8839ef" , isVisible: true });
-    this.labelService.addSegLabel( { label: "Example2/Class 3", color: "#d20f39" , isVisible: true });
 
+    this.labelService.addSegLabel( { label: "Foreground", color: "#209fb5", isVisible: true, shades: null});
+    this.labelService.addSegLabel( { label: "Example1/Class 1", color: "#df8e1d" , isVisible: true, shades: null });
+    this.labelService.addSegLabel( { label: "Example1/Class 2", color: "#8839ef" , isVisible: true, shades: null });
+    this.labelService.addSegLabel( { label: "Example2/Class 3", color: "#d20f39" , isVisible: true, shades: null });
+    this.projectService.isInstanceSegmentation = true
     let isStarted$ = this.projectService.startProject(environment.defaultRegex, true);
     isStarted$.then(() => {
       this.projectService.openEditor(1);
+      this.drawService.useProcessing = true;
+
+
 
     });
     

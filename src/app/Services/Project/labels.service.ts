@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ClassLabel, SegLabel } from '../../Core/interface';
+import { ClassLabel, SegInstance, SegLabel } from '../../Core/interface';
 import { constructLabelTreeNode } from './labelTreeNode';
 import { TreeNode } from 'primeng/api';
 
@@ -14,7 +14,9 @@ export class LabelsService {
 
   private _treeNode: TreeNode[] | null = null;
   activeLabel: SegLabel | null = null;
-
+  
+  activeSegInstance: SegInstance | null = null;
+  showAllLabels: boolean = true;
 
   constructor() {
   }
@@ -63,6 +65,12 @@ export class LabelsService {
     this._treeNode = constructLabelTreeNode(this.listSegmentationLabels); 
   }
 
+  switchVisibilityAllSegLabels() {
+    this.showAllLabels = !this.showAllLabels;
+    this.listSegmentationLabels.forEach((label) => {
+      label.isVisible = this.showAllLabels;
+    })
+  }
 
 
 }

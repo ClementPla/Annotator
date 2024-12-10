@@ -16,8 +16,9 @@
     translate: -50% -50%;
 }
 
-.noAntialiasing{
+.noAntialiasing {
     image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 
 .cursor::before {
@@ -70,15 +71,15 @@
 .path {
     stroke-dasharray: 100;
     animation: dash 5s linear;
-  }
-  
-  @keyframes dash {
-    to {
-      stroke-dashoffset: 1000;
-    }
-  }
+}
 
-.lassoPolygon{
+@keyframes dash {
+    to {
+        stroke-dashoffset: 1000;
+    }
+}
+
+.lassoPolygon {
     stroke-width: 1;
     stroke-dasharray: 10;
     animation: dash 20s linear;
@@ -87,6 +88,6 @@
 
 @keyframes dash {
     to {
-      stroke-dashoffset: 1000;
+        stroke-dashoffset: 1000;
     }
-  }
+}

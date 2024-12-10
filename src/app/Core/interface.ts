@@ -4,8 +4,15 @@ export interface SegLabel {
     label: string;
     color: string;
     isVisible: boolean;
+    shades: string[] | null;
 
 
+}
+
+export interface SegInstance{
+    label: SegLabel;
+    instance: number;
+    shade: string;
 }
 
 export interface ClassLabel {

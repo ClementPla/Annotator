@@ -125,6 +125,7 @@ dependencies = [
  "ndarray 0.16.1",
  "ndarray-image",
  "ndimage",
+ "rayon",
  "regex",
  "serde",
  "serde_json",

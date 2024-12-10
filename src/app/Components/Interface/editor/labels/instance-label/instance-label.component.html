@@ -1,0 +1,9 @@
+<div class="flex flex-wrap max-w-64 gap-1 m-1">
+    <div *ngFor="let shade of getShades(); let i=index" 
+    class="aspect-square w-4 hover:scale-125 rounded "  
+    (click)="changeActive(i)"
+    [style.background]="shade"
+    [ngClass]="{'border border-white border-solid': i === labelService.activeSegInstance?.instance 
+    && labelService.activeLabel==labelService.activeSegInstance?.label}">
+    </div>
+</div> 

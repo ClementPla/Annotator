@@ -21,6 +21,9 @@ pub fn run() {
             commands::images::load_image_as_base64,
             commands::images::process_image_blob,
             commands::segmentation::refine_segmentation,
+            commands::segmentation::edge_detection,
+            commands::segmentation::find_overlapping_region,
+            commands::io::save_xml_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

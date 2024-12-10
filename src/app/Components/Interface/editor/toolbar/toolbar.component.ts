@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component } from '@angular/core';
 import { ToolbarModule } from 'primeng/toolbar';
 import { ButtonModule } from 'primeng/button';
 import { SelectButtonModule } from 'primeng/selectbutton';
@@ -9,20 +9,25 @@ import { DrawingService } from '../../../../Services/UI/drawing.service';
 import { SliderModule } from 'primeng/slider';
 import { InputSwitchModule } from 'primeng/inputswitch';
 import { LabelledSwitchComponent } from "../../../Core/labelled-switch/labelled-switch.component";
-
+import { BlockUIModule } from 'primeng/blockui';
 @Component({
   selector: 'app-toolbar',
   standalone: true,
-  imports: [ToolbarModule, ButtonModule, SelectButtonModule, CommonModule, FormsModule, SliderModule, InputSwitchModule, LabelledSwitchComponent],
+  imports: [ToolbarModule, ButtonModule, SelectButtonModule, BlockUIModule, CommonModule, FormsModule, SliderModule, InputSwitchModule, LabelledSwitchComponent],
   templateUrl: './toolbar.component.html',
   styleUrl: './toolbar.component.scss'
 })
-export class ToolbarComponent {
+export class ToolbarComponent implements AfterViewInit{
 
   tools = Tools.ALL_TOOLS;
   
 
-  constructor(public drawService: DrawingService) { }
+  constructor(public drawService: DrawingService, private cdr: ChangeDetectorRef) { }
+
+  ngAfterViewInit(): void {
+    this.cdr.detectChanges()
+      
+  }
 
   
 }

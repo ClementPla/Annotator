@@ -60,17 +60,14 @@ export abstract class ImageZoomPan {
         const wheel = event.deltaY < 0 ? 1 : -1;
         const zoom = Math.exp(wheel * zoomIntensity);
 
-
         const canvasCoord = this.getCanvasCoordinates(event);
         const imageCoord = this.fromCanvasToImageCoordinates(canvasCoord);
-
 
         this.targetScale *= zoom;
         this.targetScale = Math.min(this.targetScale, this.maxScale);
         this.targetScale = Math.max(this.targetScale, this.minScale);
         this.targetOffset.x = canvasCoord.x - imageCoord.x * this.targetScale;
         this.targetOffset.y = canvasCoord.y - imageCoord.y * this.targetScale;
-
         this.smoothUpdateTransform();
     }
 

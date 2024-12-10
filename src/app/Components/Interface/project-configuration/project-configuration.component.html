@@ -48,6 +48,9 @@
                             <div #colorPicker class="aspect-auto w-12">
                             </div>
                             <p-colorPicker [(ngModel)]="label.color" [appendTo]="colorPicker" />
+                            <p-button icon="pi pi-times" [rounded]="true" [text]="true" severity="danger"
+                            
+                            (onClick)="deleteSegmentationClass(label)"></p-button>
                         </div>
                         <p-button class="flex items-center" label="Add class"
                             (click)="addSegmentationClass()"></p-button>

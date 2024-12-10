@@ -2,11 +2,10 @@ use std;
 
 use std::path::{Path, PathBuf};
 use std::io::Cursor;
-use base64::{engine::general_purpose, Engine as _};
-use image::{ImageBuffer, Rgba, Luma};
+use image::{ImageBuffer, Rgba};
 
 use image::{GenericImageView, DynamicImage};
-use ndarray::{Array2, ArrayView2};
+use ndarray::{Array2, Array3, ArrayView2, ArrayView3};
 
 use serde::Deserialize;
 
@@ -37,8 +36,7 @@ pub async fn create_thumbnails(params: ThumbnailParams) -> Vec<bool> {
         let height = params.height;
 
         let handle = task::spawn_blocking(move || {
-            let thumbnail_path = create_thumbnail_path(&output_folder, &image_name);
-
+            let thumbnail_path = join_path(&output_folder, &image_name);
             if thumbnail_path.exists() {
                 eprintln!("Thumbnail {} already exists", thumbnail_path.display());
                 return false;
@@ -53,7 +51,7 @@ pub async fn create_thumbnails(params: ThumbnailParams) -> Vec<bool> {
                 return false;
             }
 
-            let image_path = create_thumbnail_path(&input_folder, &image_name);
+            let image_path = join_path(&input_folder, &image_name);
             generate_thumbnail(&image_path, &thumbnail_path, width, height)
         });
 
@@ -96,8 +94,8 @@ pub fn load_image_as_base64(filepath: String) -> Result<Response, String> {
 }
 
 
-fn create_thumbnail_path(output_folder: &str, image_name: &str) -> PathBuf {
-    Path::new(output_folder).join(Path::new(image_name))
+fn join_path(root_folder: &str, filename: &str) -> PathBuf {
+    Path::new(root_folder).join(Path::new(filename))
 }
 
 fn generate_thumbnail(
@@ -106,11 +104,6 @@ fn generate_thumbnail(
     width: u32,
     height: u32,
 ) -> bool {
-    println!(
-        "Generating thumbnail for {} to {}",
-        image_path.display(),
-        thumbnail_path.display()
-    );
     let img = image::open(image_path).unwrap();
     let thumbnail = img.thumbnail(width, height);
     if !thumbnail_path.parent().unwrap().exists() {
@@ -170,56 +163,6 @@ pub fn load_image_to_grayscale_array(blob: &[u8]) -> Result<Array2<u8>, String> 
     Ok(array)
 }
 
-// Optional: Companion function for color images if needed
-pub fn load_color_image_to_array(blob: &[u8]) -> Result<(Array2<f64>, Array2<f64>, Array2<f64>), String> {
-    // Load image from blob
-    let img = match image::load_from_memory(blob) {
-        Ok(dynamic_image) => dynamic_image,
-        Err(_) => return Err("Failed to load image from blob".to_string())
-    };
-
-    // Convert to RGB
-    let rgb_img = img.to_rgb8();
-    let (width, height) = rgb_img.dimensions();
-
-    // Separate channels
-    let raw_rgb = rgb_img.clone().into_raw();
-    let r_channel = Array2::from_shape_vec(
-        (height as usize, width as usize), 
-        raw_rgb.iter()
-            .enumerate()
-            .filter_map(|(i, &pixel)| {
-                if i % 3 == 0 { Some((pixel as f64) / 255.0) } else { None }
-            })
-            .collect()
-    ).map_err(|_| "Failed to create R channel array".to_string())?;
-
-    let raw_rgb = rgb_img.clone().into_raw();
-    let g_channel = Array2::from_shape_vec(
-        (height as usize, width as usize), 
-        raw_rgb.iter()
-            .enumerate()
-            .filter_map(|(i, &pixel)| {
-                if i % 3 == 1 { Some((pixel as f64) / 255.0) } else { None }
-            })
-            .collect()
-    ).map_err(|_| "Failed to create G channel array".to_string())?;
-
-    let raw_rgb = rgb_img.into_raw();
-    let b_channel = Array2::from_shape_vec(
-        (height as usize, width as usize), 
-        raw_rgb.iter()
-            .enumerate()
-            .filter_map(|(i, &pixel)| {
-                if i % 3 == 2 { Some((pixel as f64) / 255.0) } else { None }
-            })
-            .collect()
-    ).map_err(|_| "Failed to create B channel array".to_string())?;
-
-    Ok((r_channel, g_channel, b_channel))
-}
-
-
 pub fn convert_mask_to_blob(mask: &Array2<bool>, color: &[u8; 4]) -> Result<Vec<u8>, String> {
     let (height, width) = mask.dim();
     
@@ -246,6 +189,30 @@ pub fn convert_mask_to_blob(mask: &Array2<bool>, color: &[u8; 4]) -> Result<Vec<
     Ok(blob)
 }
 
+pub fn convert_rgb_to_blob(rgb: &ArrayView3<u8>) -> Result<Vec<u8>, String> {
+    let (height, width, _channel ) = rgb.dim();
+    
+    // Create an image buffer from the RGB array
+    let rgb_image: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_fn(
+        width as u32, 
+        height as u32, 
+        |x, y| {
+            let r = rgb[[y as usize, x as usize, 0 as usize]];
+            let g = rgb[[y as usize, x as usize, 1 as usize]];
+            let b = rgb[[y as usize, x as usize, 2 as usize]];
+            // if 
+            Rgba([r, g, b, 255])
+        }
+    );
+    
+    // Convert to PNG blob
+    let mut blob = Vec::new();
+    let mut cursor = Cursor::new(&mut blob);
+    rgb_image.write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|_| "Failed to convert RGB to blob".to_string())?;
+    
+    Ok(blob)
+}
 pub fn load_mask_to_array(blob: &[u8]) -> Result<(Array2<bool>, [u8; 4]), String> {
     // Load image from blob
     let img = image::load_from_memory(blob)
@@ -293,4 +260,102 @@ pub fn load_mask_to_array(blob: &[u8]) -> Result<(Array2<bool>, [u8; 4]), String
     };
 
     Ok((mask, mask_color))
+}
+
+
+pub fn load_blob_to_image(blob: &[u8]) -> Result<DynamicImage, String> {
+    image::load_from_memory(blob)
+        .map_err(|_| "Failed to load image from blob".to_string())
+}
+
+pub fn convert_image_to_mask_array(image: &DynamicImage) -> Array2<bool> {
+    let (width, height) = image.dimensions();
+    let rgba_image = image.to_rgba8();
+    let pixels = rgba_image.into_raw();
+
+    let mut mask_data = Vec::with_capacity((width * height) as usize);
+
+    for pixel in pixels.chunks(4) {
+        let a = pixel[3];
+        // Binarization using the alpha channel
+        let is_masked = a > 128;
+
+        mask_data.push(is_masked);
+    }
+
+    Array2::from_shape_vec(
+        (height as usize, width as usize),
+        mask_data,
+    ).unwrap()
+}
+
+pub fn convert_image_to_luma_float_array(image: &DynamicImage) -> Array2<f32>{
+
+    let (width, height) = image.dimensions();
+    let rgba_image = image.to_rgba8();
+    let pixels = rgba_image.into_raw();
+
+    let mut float_data = Vec::with_capacity((width * height) as usize);
+
+    for pixel in pixels.chunks(4) {
+        let r = pixel[0] as f32;
+        let g = pixel[1] as f32;
+        let b = pixel[2] as f32;
+        let _a = pixel[3] as f32;
+
+        // Binarization using the alpha channel
+        let pixel_value = (r + g + b) / 3.0 / 255.0;
+
+        float_data.push(pixel_value);
+    }
+
+    Array2::from_shape_vec(
+        (height as usize, width as usize),
+        float_data,
+    ).unwrap()
+}
+
+pub fn convert_image_to_luma_u8_array(image: &DynamicImage) -> Array2<u8> {
+    let (width, height) = image.dimensions();
+    let luma_image = image.to_luma8();
+    let pixels = luma_image.into_raw();
+
+    Array2::from_shape_vec(
+        (height as usize, width as usize),
+        pixels,
+    ).unwrap()
+}
+
+pub fn convert_image_to_rgb_u8_array(image: &DynamicImage) -> Array3<u8> {
+    let (width, height) = image.dimensions();
+    let rgb_image = image.to_rgb8();
+    let pixels = rgb_image.into_raw();
+
+    Array3::from_shape_vec(
+        (height as usize, width as usize, 3 as usize),
+        pixels,
+    ).unwrap()
+}
+
+pub fn convert_image_to_rgb_float_array(image: &DynamicImage) -> Array2<f32> {
+    let (width, height) = image.dimensions();
+    let rgb_image = image.to_rgb8();
+    let pixels = rgb_image.into_raw();
+
+    let mut float_data = Vec::with_capacity((width * height * 3) as usize);
+
+    for pixel in pixels.chunks(3) {
+        let r = pixel[0] as f32;
+        let g = pixel[1] as f32;
+        let b = pixel[2] as f32;
+
+        float_data.push(r / 255.0);
+        float_data.push(g / 255.0);
+        float_data.push(b / 255.0);
+    }
+
+    Array2::from_shape_vec(
+        (height as usize, width as usize),
+        float_data,
+    ).unwrap()
 }

@@ -1,4 +1,4 @@
-import { Injectable, output } from '@angular/core';
+import { Injectable } from '@angular/core';
 
 import { invoke } from '@tauri-apps/api/core';
 import { environment } from '../../../environments/environment';
@@ -8,6 +8,9 @@ import { path } from '@tauri-apps/api';
 import { Thumbnail } from '../../Core/interface';
 
 import { loadImageFile } from '../../Core/io/images';
+
+import { exists } from '@tauri-apps/plugin-fs';
+
 
 @Injectable({
   providedIn: 'root'
@@ -33,6 +36,8 @@ export class ProjectService {
   activeIndex: number | null = null;
   activeImage: Promise<string> | null = null;
 
+  maxInstances: number = 100;
+
   constructor(private viewService: ViewService) { }
 
 
@@ -40,12 +45,34 @@ export class ProjectService {
   async startProject(regex: string, recursive: boolean): Promise<void> {
 
     this.viewService.setLoading(true, 'Starting project...');
+    this.inputFolder = await path.resolve(this.inputFolder);
+    console.log(this.inputFolder);
+    let sep = path.sep();
+    if (!this.inputFolder.endsWith(sep)) {
+      this.inputFolder = this.inputFolder + sep;
+    }
+    // const folderExists = await exists(this.inputFolder).then((value) => { return true }).catch((err) => {
+    //   this.viewService.setLoading(false, 'Input folder does not exist.');
+    //   setTimeout(() => { this.viewService.endLoading(); }, 2000);
+    //   console.log(err)
+    //   return false;
+
+    // });
+    // if(!folderExists){
+    //   return;
+    // }
+
+
+    this.outputFolder = await path.resolve(this.outputFolder);
     this.projectFolder = await path.join(this.outputFolder, this.projectName);
-    // List promises:
+
+
+
+
     let fileList$ = invoke('list_files_in_folder', { folder: this.inputFolder, regexfilter: regex, recursive: recursive });
     let isStarted$ = fileList$.then((value: any) => {
       if (value) {
-        this.viewService.setLoading(true, this.imagesName.length + ' images found. Generating thumbnails...');
+        this.viewService.setLoading(true, value.length + ' images found. Generating thumbnails...');
         this.extractImagesName(value);
         this.generateThumbnails();
       }
@@ -53,10 +80,7 @@ export class ProjectService {
       .then(() => {
         this.isProjectStarted = true;
       })
-      .then(() => {
-        this.viewService.endLoading();
-        this.viewService.navigateToGallery();
-      });
+
 
 
     return isStarted$;
@@ -68,40 +92,51 @@ export class ProjectService {
 
       (file) => {
         let filename = file.split(this.inputFolder)[1];
-
+        console.log(filename);
         return filename;
       }
     );
   }
 
   async generateThumbnails() {
+    let output_folder = await path.join(this.projectFolder, 'thumbnails');
     let thumbnails$ = invoke<boolean[] | null>('create_thumbnails', {
       params: {
         image_names: this.imagesName,
         input_folder: this.inputFolder,
-        output_folder: await path.join(this.projectFolder, 'thumbnails'),
+        output_folder: output_folder,
         width: this.viewService.thumbnailsSize,
         height: this.viewService.thumbnailsSize,
       }
     });
     this.thumbnails$ = thumbnails$.then(() => {
-          return Promise.all(this.imagesName.map(async (image, index) => {
-            return { 
-              thumbnailPath: loadImageFile(await path.join(this.projectFolder, 'thumbnails', image)),
-              name: path.basename(image) };
-          }));
-        })
+      this.viewService.endLoading();
+      this.viewService.navigateToGallery();
+
+      return Promise.all(this.imagesName.map(async (image, index) => {
+        return {
+          thumbnailPath: loadImageFile(await path.join(output_folder, image)),
+          name: path.basename(image)
+        };
+      }));
+    })
   }
 
   async openEditor(index: number) {
     this.viewService.setLoading(true, 'Loading editor');
     this.activeIndex = index;
     this.activeImage =
-     loadImageFile(await path.join(this.inputFolder, this.imagesName[index])).then((value) => {
-      this.viewService.navigateToEditor();
-    
-      return value;
-    });
+      loadImageFile(await path.join(this.inputFolder, this.imagesName[index])).then((value) => {
+        this.viewService.navigateToEditor();
+        return value;
+      });
+  }
+
+  resetProject() {
+    this.isProjectStarted = false;
+    this.imagesName = [];
+    this.activeIndex = null;
+    this.activeImage = null;
   }
 
 

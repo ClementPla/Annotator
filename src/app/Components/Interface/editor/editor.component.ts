@@ -1,6 +1,5 @@
 import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { DrawableCanvasComponent } from '../../Core/drawable-canvas/drawable-canvas.component';
-import { ListImagesComponent } from '../list-images/list-images.component';
 
 import { ToolbarComponent } from './toolbar/toolbar.component';
 import { LabelsComponent } from "./labels/labels.component";
@@ -12,11 +11,15 @@ import { Tools } from '../../../Core/canvases/tools';
 import { ToolSettingComponent } from "./tool-setting/tool-setting.component";
 import { LabelsService } from '../../../Services/Project/labels.service';
 import { ViewService } from '../../../Services/UI/view.service';
+import { PanelModule } from 'primeng/panel';
+import { ButtonModule } from 'primeng/button';
+import { IOService } from '../../../Services/io.service';
+import { LabelFormat } from '../../../Core/io/formats';
 
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [DrawableCanvasComponent, ListImagesComponent, ToolbarComponent, LabelsComponent, NgIf, ToolSettingComponent],
+  imports: [DrawableCanvasComponent, ButtonModule, ToolbarComponent, LabelsComponent, NgIf, PanelModule, ToolSettingComponent],
   templateUrl: './editor.component.html',
   styleUrl: './editor.component.scss'
 })
@@ -24,9 +27,11 @@ export class EditorComponent implements OnInit, AfterViewInit {
 
   @ViewChild(DrawableCanvasComponent) canvas: DrawableCanvasComponent;
 
-  constructor(public projectService: ProjectService, 
-    private drawService: DrawingService, 
-    private labelService: LabelsService, 
+
+  constructor(public projectService: ProjectService,
+    private drawService: DrawingService,
+    private labelService: LabelsService,
+    public IOService: IOService,
     private viewService: ViewService) { }
 
 
@@ -35,7 +40,7 @@ export class EditorComponent implements OnInit, AfterViewInit {
 
   }
   ngAfterViewInit(): void {
-    this.canvas.loadImage(this.projectService.activeImage!);    
+    this.canvas.loadImage(this.projectService.activeImage!);
 
   }
   @HostListener('window:keydown.control.z', ['$event'])
@@ -69,6 +74,36 @@ export class EditorComponent implements OnInit, AfterViewInit {
   @HostListener('window:keydown.p')
   changeToPencil() {
     this.drawService.selectedTool = Tools.PEN;
+  }
+
+  @HostListener('window:keydown.tab', ['$event'])
+  switchAllVisibility(e: KeyboardEvent) {
+    this.labelService.switchVisibilityAllSegLabels();
+    this.drawService.requestCanvasRedraw();
+
+
+  }
+
+  save() {
+    let savefile = { masksName: [], masks: [], labels: [], colors: [] } as LabelFormat
+
+    let allPromises$: Promise<void>[] = []
+    this.labelService.listSegmentationLabels.forEach((label, index) => {
+
+      savefile.masksName.push(label.label)
+      let canvas = this.canvas.classesCanvas[index]
+
+      let blob$ = canvas.convertToBlob({ type: 'image/png' })
+      allPromises$.push(blob$.then((blob) => {
+        savefile.masks.push(blob)
+      }));
+      savefile.colors.push(label.color)
+    }
+  )
+    Promise.all(allPromises$).then(() => {
+      this.IOService.save(savefile, this.canvas.width, this.canvas.height)
+    })
+    
   }
 }
 

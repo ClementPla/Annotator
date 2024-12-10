@@ -1,47 +1,35 @@
 <div #myImageContainer [ngStyle]="{ 'aspect-ratio':  width/height }" [ngClass]="{
     'relative w-full': !isFullscreen,
-    'fixed h-full max-w-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black z-50 box-shadow':
+    'fixed h-full max-w-full w-screen top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black box-shadow z-50':
       isFullscreen
   }">
-
-    <div class="relative">
-
-    </div>
-    <canvas #imageCanvas id="image" class="absolute w-full min-w-[128px] cursor-none" (wheel)="wheel($event)"
-        (mousedown)="mouseDown($event)" (mouseup)="mouseUp($event)" (mousemove)="mouseMove($event)" (mouseleave)="mouseUp($event)"
-        [width]="width" [height]="height">
+    <canvas #imageCanvas id="image" class="absolute w-full min-w-[128px] cursor-crosshair" [ngClass]="{ 'cursor-grab': drawService.canPan(), 'cursor-none': drawService.isToolWithBrushSize(),
+    'cursor-crosshair': !(drawService.isToolWithBrushSize() || drawService.canPan()) }" (wheel)="wheel($event)"
+        (mousedown)="mouseDown($event)" (mouseup)="mouseUp($event)" (mousemove)="mouseMove($event)"
+        (mouseleave)="mouseUp($event)" [width]="width" [height]="height">
     </canvas>
 
-    <canvas #drawCanvas class="absolute w-full min-w-[128px] pointer-events-none noAntialiasing" [width]="width" [height]="height">
-    </canvas>
+    <canvas #labelCanvas class="absolute w-full min-w-[128px] pointer-events-none noAntialiasing sobel" [width]="width"
+        [height]="height"></canvas>
 
-    <canvas #classesCanvas class="absolute w-full min-w-[128px] hidden pointer-events-none noAntialiasing" [width]="width"
-        [height]="height" *ngFor="let class of labelService.listSegmentationLabels">
-    </canvas>
-
-    <svg #svgCanvas class="absolute w-full min-w-[128px] pointer-events-none z-50">
+    <svg #svgUI class="absolute w-full min-w-[128px] pointer-events-none z-50">
 
         <polygon class="lassoPolygon" [attr.points]="getLassoPointsToPolygon() "
-        [attr.fill]="labelService.activeLabel?.color + '20'" [attr.stroke]="labelService.activeLabel?.color" [attr.stroke-width]="2" />
+            [attr.fill]="labelService.activeLabel?.color + '20'" [attr.stroke]="labelService.activeLabel?.color"
+            [attr.stroke-width]="2" />
         />
     </svg>
 
-    
+
     <img #image class="hidden relative">
-
-
-    <div class="cursor" *ngIf="cursor"
-        [ngStyle]="{ 'left.px': cursor?.x, 'top.px': cursor?.y, 'width.px': getCursorSize(), 'border-color': labelService.activeLabel?.color}"
-        
-        >
+    <div class="cursor" *ngIf="drawService.isToolWithBrushSize()"
+        [ngStyle]="{ 'left.px': cursor?.x, 'top.px': cursor?.y, 'width.px': getCursorSize(), 'border-color': labelService.activeLabel?.color}">
+    </div>
+    <div class=" skeleton w-full h-full absolute z-50"
+        [ngClass]="{ 'invisible': !viewService.isLoading, 'visible': viewService.isLoading }">
     </div>
 
-
-
-    <div class=" skeleton w-full h-full absolute z-50" [ngClass]="{ 'invisible': !viewService.isLoading, 'visible': viewService.isLoading }">
-    </div>
-
-    <div class="flex items-center justify-start absolute">
+    <p class="flex items-center justify-start absolute">
         <p-button pRipple [rounded]="true" [raised]="true" (click)="switchFullScreen()" *ngIf="!isFullscreen"
             icon="pi pi-window-maximize" severity="help">
         </p-button>
@@ -52,5 +40,6 @@
         <p-button [rounded]="true" [raised]="true" (click)="resetZoomAndPan(true, true)" icon="pi pi-refresh"
             severity="help">
         </p-button>
-    </div>
+    </p>
+
 </div>

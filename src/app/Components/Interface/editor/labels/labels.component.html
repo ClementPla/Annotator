@@ -1,40 +1,62 @@
-<p-panel header="Classes">
-<p-fieldset legend="Segmentation" [toggleable]="true">
-<p-tree #tree [value]="(labelsService.getTreeNode() )" (selectionChange)="changeActiveLabel($event)"
-selectionMode=single>
-    <ng-template let-node pTemplate="default" class="w-full">
+<p-panel header="Classes" class="overflow-y-scroll">
+    <div class="max-w-96 h-full overflow-y-scroll">
+        <p-fieldset legend="Segmentation" [toggleable]="true" class="m-0">
+            <div class="flex flex-row gap-4 items-center">
+                    <p-button icon="pi pi-eye" (click)="changeAllVisibility()" [rounded]="true"
+                        *ngIf="labelsService.showAllLabels; else eyeClose"></p-button>
+                    <ng-template #eyeClose>
+                        <p-button #eyeClose icon="pi pi-eye-slash" (click)="changeAllVisibility()"
+                            [rounded]="true"></p-button>
+                    </ng-template>
+                <p class="flex flex-col gap-2">
+                    <input type="text" pInputText [(ngModel)]="drawService.labelOpacity" (onChange)="updateOpacity()"
+                        class="w-full mb-3" />
+                    <p-slider [(ngModel)]="drawService.labelOpacity" [min]="0" [max]="1" [step]="0.01" (onChange)="updateOpacity()" />
+                    <small>Opacity</small>
 
-        <div class="flex flex-row items-center gap-3">
-            <ng-container *ngIf="!hasChild(node)">
-               
-                <p-button icon="pi pi-eye" (click)="changeVisibility(node)" [rounded]="true" *ngIf="node.data.isVisible; else eyeClose"></p-button>
-                <ng-template #eyeClose>
-                    <p-button #eyeClose icon="pi pi-eye-slash" (click)="changeVisibility(node)" [rounded]="true"></p-button>
+
+                </p>
+            </div>
+            <p-tree #tree [value]="(labelsService.getTreeNode() )" (selectionChange)="changeActiveLabel($event)"
+                selectionMode=single class="p-0">
+                <ng-template let-node pTemplate="default" class="w-full p-0">
+
+                    <div class="flex flex-row items-center gap-2">
+                        <ng-container *ngIf="!hasChild(node)">
+
+                            <p-button icon="pi pi-eye" (click)="changeVisibility(node)" [rounded]="true"
+                                *ngIf="node.data.isVisible; else eyeClose"></p-button>
+                            <ng-template #eyeClose>
+                                <p-button #eyeClose icon="pi pi-eye-slash" (click)="changeVisibility(node)"
+                                    [rounded]="true"></p-button>
+                            </ng-template>
+
+
+                            <p-colorPicker *ngIf="!projectService.isInstanceSegmentation" [(ngModel)]="node.data.color"
+                                [appendTo]="colorPicker" (onChange)="changeColor()" />
+                            <b>
+                                {{node.label}}
+                            </b>
+                            <p-button icon="pi pi-trash" class="smallButton" (click)="clearCanvas(node)"
+                                severity="danger"></p-button>
+
+
+                        </ng-container>
+                        <b *ngIf="hasChild(node)">
+                            {{node.label}}
+                        </b>
+
+                    </div>
+                    <ng-container *ngIf="!hasChild(node) && projectService.isInstanceSegmentation">
+                        <app-instance-label [label]="node.data"></app-instance-label>
+
+                    </ng-container>
                 </ng-template>
-
-                <p-colorPicker [(ngModel)]="node.data.color" [appendTo]="colorPicker"
-                (onChange)="drawService.requestCanvasRedraw()"
-                />
-                
-
-                <b>
-                    {{node.label}}
-                </b>
-
-                <p-button icon="pi pi-trash" class="smallButton" (click)="clearCanvas(node)" severity="danger"></p-button>
-
-            </ng-container>
-
-            <b *ngIf="hasChild(node)">
-                {{node.label}}
-            </b>
-
-            
-        </div>
-    </ng-template>
-</p-tree>
-</p-fieldset>
+            </p-tree>
+        </p-fieldset>
+    </div>
 </p-panel>
+
 <div #colorPicker class="aspect-auto w-12">
 
 </div>

@@ -10,26 +10,31 @@ import { BehaviorSubject } from 'rxjs';
 export class DrawingService {
 
 
-  selectedTool: Tool = Tools.LASSO;
-  lineWidth: number = 100;
+  selectedTool: Tool = Tools.PEN;
+  lineWidth: number = 10;
   swapMarkers: boolean = false; // if true, the markers under the cursor will be swapped with the active label
   eraseAll: boolean = false; // if true, erase all labels with erase. If false, erase only the active label
 
+  morphoSize: number = 3;
   autoPostProcess: boolean = false;
   autoPostProcessOpening: boolean = false;
   useInverse: boolean = false;
 
+  labelOpacity: number = 1;
+
+  useProcessing: boolean = false;
+  edgesOnly: boolean = false;
+
   enforceConnectivity: boolean = false;
 
-  private _requestCanvasClear: BehaviorSubject<number> = new BehaviorSubject<number>(-1);
-  private _requestCanvasRedraw: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);  
-  private _requestUndo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  private _requestRedo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  public undo = this._requestUndo.asObservable();
-  public redo = this._requestRedo.asObservable();
-  public canvasRedraw = this._requestCanvasRedraw.asObservable();
-  public canvasClear = this._requestCanvasClear.asObservable();
+  public canvasClear: BehaviorSubject<number> = new BehaviorSubject<number>(-1);
+  public canvasRedraw: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);  
+  public undo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public redo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public canvasSumRefresh: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
 
+
+  
   _lastTool: Tool;
   constructor() { }
 
@@ -46,18 +51,21 @@ export class DrawingService {
   }
 
   requestUndo() {
-    console.log('requesting undo');
-    this._requestUndo.next(true);
+    this.needsRefreshCanvasSum();
+    this.undo.next(true);
   }
   requestRedo() {
-    this._requestRedo.next(true);
+    this.needsRefreshCanvasSum();
+    this.redo.next(true);
   }
 
   requestCanvasRedraw() {
-    this._requestCanvasRedraw.next(true);
+    this.needsRefreshCanvasSum();
+    this.canvasRedraw.next(true);
   }
   requestCanvasClear(index: number = -1) {
-    this._requestCanvasClear.next(index);
+    this.needsRefreshCanvasSum();
+    this.canvasClear.next(index);
   }
 
   isDrawingTool(): boolean {
@@ -70,5 +78,10 @@ export class DrawingService {
 
   isToolWithBrushSize(): boolean {
     return this.selectedTool === Tools.PEN || this.selectedTool === Tools.ERASER;
+  }
+
+  needsRefreshCanvasSum(){
+    this.canvasSumRefresh.next(true);
+
   }
 }

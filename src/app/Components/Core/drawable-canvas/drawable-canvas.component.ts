@@ -1,6 +1,6 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, NgZone, OnInit, Output, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild } from '@angular/core';
 
-import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DrawCanvasUtility } from '../../../Core/canvases/draw';
 import { DrawingService } from '../../../Services/UI/drawing.service';
@@ -8,53 +8,70 @@ import { ViewService } from '../../../Services/UI/view.service';
 import { LabelsService } from '../../../Services/Project/labels.service';
 import { from, Observable, of } from 'rxjs';
 import { Point2D, SegLabel } from '../../../Core/interface';
-import { inject } from '@angular/core';
 import { Button } from 'primeng/button';
+import { UndoRedo } from '../../../Core/misc/undoRedo';
+import { OpenCVService } from '../../../Services/open-cv.service';
+import { ImageProcessingService } from '../../../Services/image-processing.service';
+import { ProjectService } from '../../../Services/Project/project.service';
+
+
 
 @Component({
   selector: 'app-drawable-canvas',
   standalone: true,
-  imports: [CommonModule, NgOptimizedImage, FormsModule, Button],
+  imports: [CommonModule, FormsModule, Button],
   templateUrl: './drawable-canvas.component.html',
   styleUrl: './drawable-canvas.component.scss'
 })
-export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit{
+export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit {
 
   title = 'Annotator';
-  @Input() width: number = 256;
-  @Input() height: number = 256;
-  @Input() lineWidth: number = 10;
+  width: number = 1;
+  height: number = 1;
 
   @Input() override canZoom: boolean = true;
   @Input() override canPan: boolean = true;
   @Input() labelsOpacity: number | null | undefined = null;
 
   @ViewChild('image') imageElement: ElementRef<HTMLImageElement>;
-  @ViewChild('imageCanvas') imgCanvas: ElementRef<HTMLCanvasElement>;
-  @ViewChild('drawCanvas') drawCanvas: ElementRef<HTMLCanvasElement>;
+  @ViewChild('imageCanvas') imgCanvas: ElementRef<HTMLCanvasElement>; 
+  @ViewChild('labelCanvas') labelCanvas: ElementRef<HTMLCanvasElement>; // Technically, this could be the same as imgCanvas
 
-  @ViewChild('svgCanvas') svgCanvas: ElementRef<SVGElement>;
+  @ViewChild('svgUI') svgCanvas: ElementRef<SVGElement>;
 
   @Output() panAndZommed = new EventEmitter<{ scale: number, offsetX: number, offsetY: number }>();
 
-  
-  private ngZone = inject(NgZone)
+
   isFullscreen: boolean = false;
   srcImg$: Observable<string>;
   displayLabel: boolean = true;
 
-  cursor: Point2D | null = {x: 0, y: 0};  
+  cursor: Point2D | null = { x: 0, y: 0 };
   classes$: Observable<SegLabel[]>;
 
 
-  constructor(public override drawService: DrawingService, public viewService: ViewService, public override labelService: LabelsService) {
-    super(drawService, labelService);
+
+  constructor(public override drawService: DrawingService,
+    public viewService: ViewService,
+    public override labelService: LabelsService,
+    protected override imageProcessingService: ImageProcessingService,
+    protected override openCVService: OpenCVService,
+    protected override projectService: ProjectService) {
+    super(drawService, labelService, openCVService, imageProcessingService, projectService);
   }
   ngOnInit(): void {
 
-    this.labelService.listSegmentationLabels.forEach((label) => {
-      this.classesCanvas.push(new OffscreenCanvas(this.width, this.height));
+    
+
+    this.labelService.listSegmentationLabels.forEach(() => {
+      let canvas = new OffscreenCanvas(this.width, this.height)
+      let ctx = canvas.getContext("2d", { alpha: true, willReadFrequently: true })!
+      setpixelated(ctx);
+      this.classesCanvas.push(canvas);
     });
+
+    UndoRedo.empty()
+
   }
 
   getCursorSize() {
@@ -76,9 +93,8 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
     if (this.drawService.canPan())
       this.drag(event);
     else {
-      this.ngZone.runOutsideAngular(()=>{
-        this.draw(event)
-      })
+      this.recomputeCanvasSum = true;
+      this.draw(event)
     }
 
   }
@@ -89,7 +105,7 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
     if (this.drawService.canPan())
       this.startDrag();
     else {
-
+      this.recomputeCanvasSum = true;
       this.startDraw();
       this.draw(event);
     }
@@ -111,23 +127,23 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
 
     this.image = this.imageElement.nativeElement;
     this.ctx = this.imgCanvas.nativeElement.getContext('2d', { alpha: false })!;
-    this.ctxDraw = this.drawCanvas.nativeElement.getContext('2d', { alpha: true })!;
-    this.ctxDraw.imageSmoothingEnabled = false;
-    this.ctx.imageSmoothingEnabled = false;
-    
+    this.ctxDraw = this.labelCanvas.nativeElement.getContext('2d', { alpha: true, willReadFrequently: true })!;
+    setpixelated(this.ctxDraw!);
     this.srcImg$.subscribe((src) => {
       this.image.src = src;
     });
     this.image.onload = () => {
       this.drawOnLoad();
+      this.imageProcessingService.setImage(this.image);
       this.viewService.endLoading();
     }
+
+    UndoRedo.empty()
   }
 
   redrawAllCanvas() {
     // Redraw the main image
     requestAnimationFrame(() => {
-
       if (!this.image.complete || this.image.naturalWidth === 0) {
         console.error("Image is not fully loaded or is invalid");
         return;
@@ -142,34 +158,53 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
         return;
       }
 
-
       // This is the canvas with the main image
       this.ctx.resetTransform();
       this.clearCanvas(this.ctx);
-      this.ctx.translate(this.offset.x, this.offset.y);
+      this.ctx.translate(Math.round(this.offset.x), Math.round(this.offset.y));
       this.ctx.scale(this.scale, this.scale);
-      this.ctx.drawImage(this.image, 0, 0, this.width, this.height);
 
+      let image = this.imageProcessingService.getCurrentCanvas();
+
+      this.ctx.drawImage(image, 0, 0, this.width, this.height);
 
       // This is the canvas with the marker drawings
-      this.ctxDraw.resetTransform();
-      this.ctxDraw.imageSmoothingEnabled = false
       this.clearCanvas(this.ctxDraw);
+
+      this.ctxDraw.resetTransform();
       this.ctxDraw.translate(this.offset.x, this.offset.y);
       this.ctxDraw.scale(this.scale, this.scale);
-
-      // Redraw the labels
-      this.classesCanvas.forEach((canvas, index) => {
-        if (this.labelService.listSegmentationLabels[index].isVisible) {
-          this.ctxDraw.drawImage(canvas, 0, 0);
+      this.ctxSum!.imageSmoothingEnabled = false;
+      // Investigate performance using CSS filters
+      if (this.recomputeCanvasSum) {
+        this.clearCanvas(this.ctxDraw);
+        this.clearCanvas(this.ctxSum!);
+        for (let i = 0; i < this.labelService.listSegmentationLabels.length; i++) {
+          let canvas = this.classesCanvas[i];
+          if (!this.labelService.listSegmentationLabels[i].isVisible) {
+            continue;
+          }
+          else {
+            if (this.drawService.edgesOnly) {
+              this.ctxSum!.drawImage(this.openCVService.morphoGradient(canvas, this.labelService.listSegmentationLabels[i].color), 0, 0);
+            }
+            else {
+              this.ctxSum!.drawImage(canvas, 0, 0);
+            }
+          }
         }
-      });
+        this.recomputeCanvasSum = false;
+      }
 
+      this.ctxDraw.globalAlpha = this.drawService.labelOpacity;
+      this.ctxDraw.imageSmoothingEnabled = false;
+      this.ctxDraw.drawImage(this.sumCanvas, 0, 0);
+      
+      this.ctxDraw.globalAlpha = 1;
 
       this.panAndZommed.emit({ scale: this.targetScale, offsetX: this.targetOffset.x, offsetY: this.targetOffset.y });
     });
   }
-
 
   loadImage(image: Promise<string>) {
     this.srcImg$ = from(image);
@@ -180,10 +215,18 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
   drawOnLoad() {
     this.width = this.image.naturalWidth;
     this.height = this.image.naturalHeight;
-    this.imgCanvas.nativeElement.width = this.width;
+
+    this.imgCanvas.nativeElement.width = this.width; // This is the canvas with the main image
     this.imgCanvas.nativeElement.height = this.height;
-    this.drawCanvas.nativeElement.width = this.width;
-    this.drawCanvas.nativeElement.height = this.height;
+
+    this.labelCanvas.nativeElement.width = this.width; // This is the displayed canvas
+    this.labelCanvas.nativeElement.height = this.height;
+
+    this.bufferCanvas.width = this.width; // This is the buffer canvas when drawing needs to be delayed (i.e when post-processing)
+    this.bufferCanvas.height = this.height;
+
+    this.sumCanvas.width = this.width; // This is the canvas with all the classes summed
+    this.sumCanvas.height = this.height;
 
     this.classesCanvas.forEach((canvas) => {
       canvas.width = this.width;
@@ -192,10 +235,8 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
 
     // Set viewbox for SVG
     this.svgCanvas.nativeElement.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
-    requestAnimationFrame(() => {
-      this.redrawAllCanvas();
+    this.redrawAllCanvas();
 
-    });
   }
 
   switchFullScreen() {
@@ -219,4 +260,9 @@ export class DrawableCanvasComponent extends DrawCanvasUtility implements OnInit
     return points
 
   }
+}
+
+function setpixelated(context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
+  context['imageSmoothingEnabled'] = false;       /* standard */
+
 }

@@ -1,18 +1,9 @@
+import { invoke } from "@tauri-apps/api/core";
+import { XMLBuilder } from "fast-xml-parser";
 
-
-export class LabelFormat {
-    masksName: string[] = [];
-    masks: string[] = [];
-    labels: string[] = [];
-    colors: string[] = [];
-}
-
-export class ImageFormat {
-    src: string = '';
-    src_preprocessing = '';
-}
-
-export class LoadSaveFormat {
-    image: ImageFormat;
-    label: LabelFormat;
+export interface LabelFormat {
+    masksName: string[];
+    masks: Blob[];
+    labels: string[];
+    colors: string[];
 }
