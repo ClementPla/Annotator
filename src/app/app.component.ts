@@ -13,8 +13,7 @@ import { TestingComponent } from "./Components/Core/testing/testing.component";
 import { DrawingService } from './Services/UI/drawing.service';
 import { PrimeNGConfig } from 'primeng/api';
 
-import { Window } from '@tauri-apps/api/window';
-import { listen } from '@tauri-apps/api/event';
+import { CLIService } from './Services/cli.service';
 
 
 @Component({
@@ -32,22 +31,25 @@ export class AppComponent implements AfterViewInit, OnInit{
     public drawService: DrawingService, 
     private labelService: LabelsService,
     private primengConfig: PrimeNGConfig,
-    ) {
-      listen('update_txt', (event: { payload: any }) => {
-        console.log(event.payload); 
-
-      });
-
-
-     }
+    private cli: CLIService,
+    private cdr: ChangeDetectorRef
+    ){}
 
   ngAfterViewInit(): void {
-    this.debug();
-
+    // this.debug();
+    
+    
   }
 
   ngOnInit(): void {
     this.primengConfig.ripple = true;
+    this.cli.createCLIHooks();
+
+    this.cli.commandProcessed.subscribe((value) => {
+      if(value){
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   async debug(){

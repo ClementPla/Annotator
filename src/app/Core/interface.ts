@@ -48,3 +48,15 @@ export interface UndoRedoCanvasElement{
     data: Blob | Blob[];
     index: number;
 }
+
+export interface ProjectConfig{
+    project_name: string,
+    input_dir: string,
+    output_dir: string,
+    is_segmentation: boolean,
+    is_classification: boolean,
+    is_instance_segmentation: boolean,
+    segmentation_classes: null | string[],
+    classification_classes: null | string[],
+
+}

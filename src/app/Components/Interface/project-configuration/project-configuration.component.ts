@@ -13,21 +13,37 @@ import { ButtonModule } from 'primeng/button';
 import { environment } from '../../../../environments/environment';
 import { ProjectService } from '../../../Services/Project/project.service';
 import { LabelsService } from '../../../Services/Project/labels.service';
-import { LabelledSwitchComponent } from "../../Core/labelled-switch/labelled-switch.component";
+import { LabelledSwitchComponent } from '../../Core/labelled-switch/labelled-switch.component';
 import { getDefaultColor } from '../../../Core/misc/colors';
 import { ColorPickerModule } from 'primeng/colorpicker';
 import { CheckboxModule } from 'primeng/checkbox';
 import { SegLabel } from '../../../Core/interface';
+import { CLIService } from '../../../Services/cli.service';
 
 @Component({
   selector: 'app-project-configuration',
   standalone: true,
-  imports: [CardModule, NgClass, NgIf, NgFor, DividerModule, ColorPickerModule, CheckboxModule, ButtonModule, FloatLabelModule, FormsModule, PanelModule, InputSwitchModule, InputTextModule, FieldsetModule, LabelledSwitchComponent],
+  imports: [
+    CardModule,
+    NgClass,
+    NgIf,
+    NgFor,
+    DividerModule,
+    ColorPickerModule,
+    CheckboxModule,
+    ButtonModule,
+    FloatLabelModule,
+    FormsModule,
+    PanelModule,
+    InputSwitchModule,
+    InputTextModule,
+    FieldsetModule,
+    LabelledSwitchComponent,
+  ],
   templateUrl: './project-configuration.component.html',
-  styleUrl: './project-configuration.component.scss'
+  styleUrl: './project-configuration.component.scss',
 })
 export class ProjectConfigurationComponent implements OnInit {
-
   recursiveLoad: boolean = true;
   inputRegex: string = environment.defaultRegex;
   generateThumbnails: boolean = true;
@@ -35,13 +51,24 @@ export class ProjectConfigurationComponent implements OnInit {
   isInputValid: boolean = true;
   isOutputValid: boolean = true;
   isNameValid: boolean = true;
-  constructor(public projectService: ProjectService, public labelService: LabelsService, private cdr: ChangeDetectorRef) { }
+  constructor(
+    public projectService: ProjectService,
+    public labelService: LabelsService,
+    private cli: CLIService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
+    this.cli.commandProcessed.subscribe((value) => {
+      if (value) {
+        console.log('Command processed from Project Configuration');
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   openInputFolder() {
-    const file = open({ directory: true, });
+    const file = open({ directory: true });
     file.then((value) => {
       if (value) {
         if (value != this.projectService.inputFolder) {
@@ -49,17 +76,12 @@ export class ProjectConfigurationComponent implements OnInit {
         }
         this.projectService.inputFolder = value;
       }
-
-
-
-
     });
   }
   openOutputFolder() {
-    const file = open({ directory: true, });
+    const file = open({ directory: true });
     file.then((value) => {
       if (value) this.projectService.outputFolder = value;
-
     });
   }
 
@@ -71,23 +93,29 @@ export class ProjectConfigurationComponent implements OnInit {
     if (this.isInputValid && this.isOutputValid) {
       this.projectService.startProject(this.inputRegex, this.recursiveLoad);
     }
-
   }
 
   addSegmentationClass() {
-    let color = getDefaultColor(this.labelService.listSegmentationLabels.length + 1);
-    this.labelService.addSegLabel({ label: 'Class ' + this.labelService.listSegmentationLabels.length, color: color, isVisible: true, shades: null });
+    let color = getDefaultColor(
+      this.labelService.listSegmentationLabels.length + 1
+    );
+    this.labelService.addSegLabel({
+      label: 'Class ' + this.labelService.listSegmentationLabels.length,
+      color: color,
+      isVisible: true,
+      shades: null,
+    });
     this.cdr.detectChanges();
-
   }
   deleteSegmentationClass(segLabel: SegLabel) {
     this.labelService.removeSegLabel(segLabel);
   }
 
   addClassificationClass() {
-    this.labelService.addClassLabel({ label: 'Class ' + this.labelService.listClassificationLabels.length, isExclusive: true });
+    this.labelService.addClassLabel({
+      label: 'Class ' + this.labelService.listClassificationLabels.length,
+      isExclusive: true,
+    });
     this.cdr.detectChanges();
   }
-
-
 }
