@@ -21,3 +21,5 @@ export class Tools {
     public static LASSO_ERASER = new Tool(3, "Lasso Eraser", "pi pi-cloud-slash");
     public static ALL_TOOLS = [Tools.PAN, Tools.PEN, Tools.ERASER, Tools.LASSO, Tools.LASSO_ERASER];
 }
+
+export const postProcessingOptions = [ 'otsu', 'MedSAM'];

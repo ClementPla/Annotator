@@ -1,103 +1,212 @@
 <p-panel header="Advanced settings">
-    <div class="overflow-y-auto h-full max-w-[256px]">
-        <p-fieldset legend="Instance Segmentation" [toggleable]="true" *ngIf="projectService.isInstanceSegmentation">
-            <p>
-                <input type="text" pInputText [(ngModel)]="projectService.maxInstances" class="w-full mb-3" />
+  <div class="h-full max-w-[256px] overflow-y-auto">
+    <p-fieldset
+      legend="Instance Segmentation"
+      [toggleable]="true"
+      *ngIf="projectService.isInstanceSegmentation"
+    >
+      <p>
+        <input
+          type="text"
+          pInputText
+          [(ngModel)]="projectService.maxInstances"
+          class="mb-3 w-full"
+        />
 
-                <p-slider [(ngModel)]="projectService.maxInstances" [min]="1" [max]="150" [step]="1">
+        <p-slider
+          [(ngModel)]="projectService.maxInstances"
+          [min]="1"
+          [max]="150"
+          [step]="1"
+        >
+        </p-slider>
+      </p>
+      <app-labelled-switch [(checked)]="drawService.incrementAfterStroke">
+        Increment after stroke
+      </app-labelled-switch>
+    </p-fieldset>
 
-                </p-slider>
-            </p>
-            <app-labelled-switch>
-                Increment after stroke
-            </app-labelled-switch>
-        </p-fieldset>
+    <p-fieldset
+      *ngIf="drawService.useProcessing"
+      legend="Image processsing"
+      [toggleable]="true"
+    >
+      <div class="flex flex-wrap gap-2 justify-center">
+        <app-labelled-switch
+          [(checked)]="imageProcess.to_BW"
+          (checkedChange)="imageProcess.refresh()"
+          >Convert to grayscale</app-labelled-switch
+        >
+        <app-labelled-switch
+          [(checked)]="imageProcess.stretchHist"
+          (checkedChange)="imageProcess.refresh()"
+          >Histogram stretching</app-labelled-switch
+        >
 
+        <div class="w-full">
+          <p class="flex flex-col gap-2">
+            <input
+              type="text"
+              pInputText
+              (onChange)="imageProcess.refresh()"
+              [(ngModel)]="imageProcess.brightness"
+              class="mb-3 w-full"
+            />
+            <p-slider
+              [(ngModel)]="imageProcess.brightness"
+              (onChange)="imageProcess.refresh()"
+              [min]="-255"
+              [max]="255"
+              [step]="1"
+            />
+            <small>Brightness</small>
+          </p>
 
-        <p-fieldset *ngIf="drawService.useProcessing" legend="Image processsing" [toggleable]="true">
-            <div class="flex flex-wrap gap-2 justify-center">
+          <p class="flex flex-col gap-2">
+            <input
+              type="text"
+              pInputText
+              (onChange)="imageProcess.refresh()"
+              [(ngModel)]="imageProcess.contrast"
+              class="mb-3 w-full"
+            />
+            <p-slider
+              [(ngModel)]="imageProcess.contrast"
+              (onChange)="imageProcess.refresh()"
+              [min]="0"
+              [max]="5"
+              [step]="0.1"
+            />
+            <small>Contrast</small>
+          </p>
 
-                <app-labelled-switch [(checked)]="imageProcess.to_BW" (checkedChange)="imageProcess.refresh()">Convert
-                    to
-                    grayscale</app-labelled-switch>
-                <app-labelled-switch [(checked)]="imageProcess.stretchHist"
-                    (checkedChange)="imageProcess.refresh()">Histogram stretching</app-labelled-switch>
+          <p class="flex flex-col gap-2">
+            <input
+              type="text"
+              pInputText
+              (onChange)="imageProcess.refresh()"
+              [(ngModel)]="imageProcess.gamma"
+              class="mb-3 w-full"
+            />
+            <p-slider
+              [(ngModel)]="imageProcess.gamma"
+              (onChange)="imageProcess.refresh()"
+              [min]="0.25"
+              [max]="2"
+              [step]="0.05"
+            />
+            <small>Gamma</small>
+          </p>
+        </div>
 
+        <app-labelled-switch
+          [(checked)]="imageProcess.use_medianBlur"
+          (checkedChange)="imageProcess.refresh()"
+          >Smooth</app-labelled-switch
+        >
 
-                <div class="w-full">
-                    <p class="flex flex-col gap-2">
-                        <input type="text" pInputText (onChange)="imageProcess.refresh()"
-                            [(ngModel)]="imageProcess.brightness" class="w-full mb-3" />
-                        <p-slider [(ngModel)]="imageProcess.brightness" (onChange)="imageProcess.refresh()" [min]="-255"
-                            [max]="255" [step]="1" />
-                        <small>Brightness</small>
-                    </p>
+        <app-labelled-switch
+          [(checked)]="imageProcess.reinforceEdges"
+          (checkedChange)="imageProcess.refresh()"
+          >Edge reinforcement</app-labelled-switch
+        >
 
-                    <p class="flex flex-col gap-2">
-                        <input type="text" pInputText (onChange)="imageProcess.refresh()"
-                            [(ngModel)]="imageProcess.contrast" class="w-full mb-3" />
-                        <p-slider [(ngModel)]="imageProcess.contrast" (onChange)="imageProcess.refresh()" [min]="0"
-                            [max]="5" [step]="0.1" />
-                        <small>Contrast</small>
-                    </p>
+        <p *ngIf="imageProcess.use_medianBlur" class="flex flex-col gap-2">
+          <input
+            type="text"
+            pInputText
+            [(ngModel)]="imageProcess.kernel_size"
+            (onChange)="imageProcess.refresh()"
+            class="mb-3 w-full"
+          />
+          <p-slider
+            [(ngModel)]="imageProcess.kernel_size"
+            [min]="1"
+            [max]="15"
+            [step]="2"
+            (onChange)="imageProcess.refresh()"
+          />
+          <small>Kernel size</small>
+        </p>
 
-                    <p class="flex flex-col gap-2">
-                        <input type="text" pInputText (onChange)="imageProcess.refresh()"
-                            [(ngModel)]="imageProcess.gamma" class="w-full mb-3" />
-                        <p-slider [(ngModel)]="imageProcess.gamma" (onChange)="imageProcess.refresh()" [min]="0.25"
-                            [max]="2" [step]="0.05" />
-                        <small>Gamma</small>
-                    </p>
+        <p *ngIf="imageProcess.reinforceEdges" class="flex flex-col gap-2">
+          <input
+            type="text"
+            pInputText
+            [(ngModel)]="imageProcess.edgeStrength"
+            (onChange)="imageProcess.refresh()"
+            class="mb-3 w-full"
+          />
+          <p-slider
+            [(ngModel)]="imageProcess.edgeStrength"
+            [min]="0"
+            [max]="5"
+            [step]="0.1"
+            (onChange)="imageProcess.refresh()"
+          />
+          <small>Edge strength</small>
+        </p>
+      </div>
+    </p-fieldset>
 
-                    
-                </div>
+    <p-fieldset
+      legend="Auto-postprocessing"
+      [toggleable]="true"
+      *ngIf="drawService.autoPostProcess"
+    >
+      <div class="flex flex-wrap gap-2 justify-center">
+        <ng-container *ngIf="drawService.isDrawingTool()">
+          <p-selectButton
+            [options]="postProcessingOptions"
+            [(ngModel)]="drawService.postProcessOption"
+          ></p-selectButton>
+          <ng-container [ngSwitch]="drawService.postProcessOption">
+            <ng-container *ngSwitchCase="'otsu'">
+              <small
+                >Automatically snap to the extrema by thresholding the area
+                covered by the brush stroke
+              </small>
+              <app-labelled-switch [(checked)]="drawService.useInverse"
+                >Use inverse image</app-labelled-switch
+              >
+              <app-labelled-switch
+                [(checked)]="drawService.autoPostProcessOpening"
+                >Smooth</app-labelled-switch
+              >
+              <p *ngIf="drawService.autoPostProcessOpening">
+                <input
+                  type="text"
+                  pInputText
+                  [(ngModel)]="drawService.morphoSize"
+                  class="mb-3 w-full"
+                />
 
-                <app-labelled-switch [(checked)]="imageProcess.use_medianBlur"
-                    (checkedChange)="imageProcess.refresh()">Smooth</app-labelled-switch>
+                <p-slider
+                  [(ngModel)]="drawService.morphoSize"
+                  [min]="1"
+                  [max]="15"
+                  [step]="2"
+                />
+              </p>
+              <app-labelled-switch [(checked)]="drawService.enforceConnectivity"
+                >Force connectivity</app-labelled-switch
+              >
+            </ng-container>
+            <ng-container>
 
-                <app-labelled-switch [(checked)]="imageProcess.reinforceEdges"
-                    (checkedChange)="imageProcess.refresh()">Edge
-                    reinforcement</app-labelled-switch>
-
-                <p *ngIf="imageProcess.use_medianBlur" class="flex flex-col gap-2">
-                    <input type="text" pInputText [(ngModel)]="imageProcess.kernel_size"
-                        (onChange)="imageProcess.refresh()" class="w-full mb-3" />
-                    <p-slider [(ngModel)]="imageProcess.kernel_size" [min]="1" [max]="15" [step]="2"
-                        (onChange)="imageProcess.refresh()" />
-                    <small>Kernel size</small>
-                </p>
-
-
-                <p *ngIf="imageProcess.reinforceEdges" class="flex flex-col gap-2">
-                    <input type="text" pInputText [(ngModel)]="imageProcess.edgeStrength"
-                        (onChange)="imageProcess.refresh()" class="w-full mb-3" />
-                    <p-slider [(ngModel)]="imageProcess.edgeStrength" [min]="0" [max]="5" [step]="0.1"
-                        (onChange)="imageProcess.refresh()" />
-                    <small>Edge strength</small>
-
-            </div>
-        </p-fieldset>
-
-
-
-        <p-fieldset legend="Auto-postprocessing" [toggleable]="true" *ngIf="drawService.autoPostProcess">
-            <div class="flex flex-wrap gap-2" *ngIf="drawService.isDrawingTool()">
-                <small>Automatically snap to the extrema by thresholding the area covered by the brush  stroke </small>
-                <app-labelled-switch [(checked)]="drawService.useInverse">Use inverse image</app-labelled-switch>
-                <app-labelled-switch [(checked)]="drawService.autoPostProcessOpening">Smooth</app-labelled-switch>
-                <p *ngIf="drawService.autoPostProcessOpening">
-                    <input type="text" pInputText [(ngModel)]="drawService.morphoSize" class="w-full mb-3" />
-
-                    <p-slider [(ngModel)]="drawService.morphoSize" [min]="1" [max]="15" [step]="2" />
-                </p>
-                <app-labelled-switch [(checked)]="drawService.enforceConnectivity">Force
-                    connectivity</app-labelled-switch>
-            </div>
-            <div class="flex" *ngIf="drawService.isEraser()">
-                <small> Automatically remove all connected pixels that were covered by the brush stroke</small>
-
-            </div>
-        </p-fieldset>
-
-    </div>
+                <small>
+                    Use MED-Sam has a post-processing step to auto-segment based on the current stroke indication.
+                </small>
+            </ng-container>
+          </ng-container>
+        </ng-container>
+        <div class="flex" *ngIf="drawService.isEraser()">
+          <small>
+            Automatically remove all connected pixels that were covered by the
+            brush stroke</small
+          >
+        </div>
+      </div>
+    </p-fieldset>
+  </div>
 </p-panel>

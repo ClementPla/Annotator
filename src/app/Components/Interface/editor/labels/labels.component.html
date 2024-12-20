@@ -1,5 +1,5 @@
 <p-panel header="Classes" class="overflow-y-scroll">
-    <div class="max-w-96 h-full overflow-y-scroll">
+    <div class="h-full max-w-96 overflow-y-scroll">
         <p-fieldset legend="Segmentation" [toggleable]="true" class="m-0">
             <div class="flex flex-row gap-4 items-center">
                     <p-button icon="pi pi-eye" (click)="changeAllVisibility()" [rounded]="true"
@@ -10,7 +10,7 @@
                     </ng-template>
                 <p class="flex flex-col gap-2">
                     <input type="text" pInputText [(ngModel)]="drawService.labelOpacity" (onChange)="updateOpacity()"
-                        class="w-full mb-3" />
+                        class="mb-3 w-full" />
                     <p-slider [(ngModel)]="drawService.labelOpacity" [min]="0" [max]="1" [step]="0.01" (onChange)="updateOpacity()" />
                     <small>Opacity</small>
 
@@ -19,9 +19,9 @@
             </div>
             <p-tree #tree [value]="(labelsService.getTreeNode() )" (selectionChange)="changeActiveLabel($event)"
                 selectionMode=single class="p-0">
-                <ng-template let-node pTemplate="default" class="w-full p-0">
+                <ng-template let-node pTemplate="default" class="p-0 w-full">
 
-                    <div class="flex flex-row items-center gap-2">
+                    <div class="flex flex-row gap-2 items-center">
                         <ng-container *ngIf="!hasChild(node)">
 
                             <p-button icon="pi pi-eye" (click)="changeVisibility(node)" [rounded]="true"

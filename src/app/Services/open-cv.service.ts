@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { NgxOpenCVService, OpenCVState } from 'ngx-opencv';
 import { from_hex_to_rgb } from '../Core/misc/colors';
+import { Rect } from '../Core/interface';
 
 declare var cv: any;
 
@@ -25,45 +26,40 @@ export class OpenCVService {
     });
   }
 
-  morphoGradient(canvas: HTMLCanvasElement | OffscreenCanvas, color: string): OffscreenCanvas | HTMLCanvasElement {
+  edgeDetection(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D): OffscreenCanvas | HTMLCanvasElement {
 
-    let tmp_canvas = document.createElement('canvas');
-    tmp_canvas.width = canvas.width;
-    tmp_canvas.height = canvas.height;
-    tmp_canvas.getContext('2d', { alpha: true, willReadFrequently: false })!.drawImage(canvas, 0, 0);
+    // Given a canvas with multiple colors, detect the edges of the different colors
+    // Use morpho gradient for that
 
-    let src = cv.imread(tmp_canvas);
+    let outputCanvas = new OffscreenCanvas(ctx.canvas.width, ctx.canvas.height);
 
+    // Get the canvas context and image data
 
-    // We convert the image to grayscale
+    const imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    let gray = new cv.Mat();
+    const src = cv.matFromImageData(imgData);
 
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-
+    // Convert the image data to OpenCV format
 
 
-    // We apply the morphological gradient to the image
+    // Convert the image to grayscale
 
-    let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
-    let grad = new cv.Mat();
-    cv.morphologyEx(gray, grad, cv.MORPH_GRADIENT, kernel);
+    const gradient = new cv.Mat();
 
+    // Apply morphological gradient
 
-    // We convert the image to color
+    const M = cv.Mat.ones(3, 3, cv.CV_8U);
 
-    cv.cvtColor(grad, src, cv.COLOR_GRAY2RGBA, 0);
-
+    cv.morphologyEx(src, gradient, cv.MORPH_GRADIENT, M);
 
 
-    cv.imshow(tmp_canvas, src);
+    // Convert the output to an image data format
+    const processedImageData = new ImageData(new Uint8ClampedArray(gradient.data), ctx.canvas.width, ctx.canvas.height);
+    outputCanvas.getContext('2d', { alpha: true })!.putImageData(processedImageData, 0, 0);
+    src.delete();
+    gradient.delete();
 
-    kernel.delete(); // We delete the kernel to free memory
-    gray.delete(); // We delete the gray image to free memory
-    grad.delete(); // We delete the gradient image to free memory
-    src.delete(); // We delete the source image to free memory
-
-    return tmp_canvas;
+    return outputCanvas;
   }
 
   to_grayscale(input: HTMLCanvasElement, output: HTMLCanvasElement): HTMLCanvasElement {
@@ -247,10 +243,13 @@ export class OpenCVService {
     return output;
   }
 
-  binarizeCanvas(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, color: string) {
+  binarizeCanvas(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, color: string, bbox: Rect | null) {
     // Get the canvas context and image data
     const rgb = from_hex_to_rgb(color); // Convert hex color to RGB
-    const imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (!bbox) {
+      bbox = { x: 0, y: 0, width: ctx.canvas.width, height: ctx.canvas.height }
+    }
+    const imgData = ctx.getImageData(bbox.x, bbox.y, bbox.width, bbox.height);
 
     // Convert the image data to OpenCV format
     const src = cv.matFromImageData(imgData);
@@ -274,8 +273,8 @@ export class OpenCVService {
     foreground.copyTo(output, binary);
 
     // Convert the output to an image data format
-    const processedImageData = new ImageData(new Uint8ClampedArray(output.data), ctx.canvas.width, ctx.canvas.height);
-    ctx.putImageData(processedImageData, 0, 0);
+    const processedImageData = new ImageData(new Uint8ClampedArray(output.data), bbox.width, bbox.height);
+    ctx.putImageData(processedImageData, bbox.x, bbox.y, 0, 0, bbox.width, bbox.height);
 
     // Clean up
     src.delete();
@@ -284,9 +283,13 @@ export class OpenCVService {
     foreground.delete();
     output.delete();
   }
-  binarizeMultiColorCanvas(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, labelColors: string[]) {
+  binarizeMultiColorCanvas(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, labelColors: string[], bbox: Rect | null) {
+    if (!bbox) {
+      bbox = { x: 0, y: 0, width: ctx.canvas.width, height: ctx.canvas.height }
+    }
+
     // Get the canvas context and image data
-    const imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const imgData = ctx.getImageData(bbox.x, bbox.y, bbox.width, bbox.height);
 
     // Convert the image data to OpenCV format
     const src = cv.matFromImageData(imgData);
@@ -303,8 +306,8 @@ export class OpenCVService {
       const lowerBound = new cv.Mat(src.size(), src.type()); // Slight tolerance
       const upperBound = new cv.Mat(src.size(), src.type());
 
-      lowerBound.setTo(new cv.Scalar(r - 1, g - 1, b - 1, 255))
-      upperBound.setTo(new cv.Scalar(r + 1, g + 1, b + 1, 255))
+      lowerBound.setTo(new cv.Scalar(r - 5, g - 5, b - 5, 255))
+      upperBound.setTo(new cv.Scalar(r + 5, g + 5, b + 5, 255))
 
       cv.inRange(src, lowerBound, upperBound, mask);
 
@@ -324,8 +327,8 @@ export class OpenCVService {
     }
 
     // Convert the output to an ImageData object
-    const processedImageData = new ImageData(new Uint8ClampedArray(output.data), ctx.canvas.width, ctx.canvas.height);
-    ctx.putImageData(processedImageData, 0, 0);
+    const processedImageData = new ImageData(new Uint8ClampedArray(output.data), bbox.width, bbox.height);
+    ctx.putImageData(processedImageData, bbox.x, bbox.y, 0, 0, bbox.width, bbox.height);
 
     // Clean up
     src.delete();

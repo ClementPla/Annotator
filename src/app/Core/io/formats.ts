@@ -3,7 +3,8 @@ import { XMLBuilder } from "fast-xml-parser";
 
 export interface LabelFormat {
     masksName: string[];
-    masks: Blob[];
+    masks: (Blob | string)[]; // Saved as Blob, loaded as string
     labels: string[];
     colors: string[];
+    shades: string[][] | null;
 }

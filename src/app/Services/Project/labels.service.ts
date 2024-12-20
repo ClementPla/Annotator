@@ -22,6 +22,13 @@ export class LabelsService {
   }
 
   addSegLabel(label: SegLabel) {
+
+    // Only add label if it does not already exist in the list
+
+    if (this.listSegmentationLabels.find((l) => l.label === label.label)) {
+      return;
+    }
+  
     this.listSegmentationLabels.push(label)
     if (!this.activeLabel) {
       this.activeLabel = label;
@@ -70,6 +77,25 @@ export class LabelsService {
     this.listSegmentationLabels.forEach((label) => {
       label.isVisible = this.showAllLabels;
     })
+  }
+
+  incrementActiveInstance(){
+    if (!this.activeLabel) {
+      return;
+    }
+    if (!this.activeSegInstance) {
+      this.activeSegInstance = { label: this.activeLabel, instance: 1, shade: "" };
+    } else {
+      let current_instance =  this.activeSegInstance.instance;
+      if(current_instance >= this.activeLabel.shades!.length - 1){
+        current_instance = -1;
+      }
+      current_instance++;
+      let new_shade = this.activeLabel.shades![current_instance]
+
+      this.activeSegInstance = { label: this.activeLabel, instance: current_instance, shade: new_shade };
+    }
+
   }
 
 

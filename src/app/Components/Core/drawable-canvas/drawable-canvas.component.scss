@@ -15,10 +15,12 @@
     transform-origin: center center;
     translate: -50% -50%;
 }
+.max-screen-available{
+    height: calc(100vh -  2 * var(--toolbar-height) - 8rem);
+}
 
 .noAntialiasing {
     image-rendering: pixelated;
-    image-rendering: crisp-edges;
 }
 
 .cursor::before {
@@ -68,26 +70,39 @@
     }
 }
 
-.path {
-    stroke-dasharray: 100;
-    animation: dash 5s linear;
+
+
+.viewBoxMarker{
+    height: inherit;
+    display: flex;
+    align-items: start;
+    translate: 0% -80%;
+    gap: 5px;
+    z-index: 1200;
+    color: var(--green-400);
+}
+.viewBoxMarker::before{
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: inherit;
+    background-color: white;
+
 }
 
-@keyframes dash {
-    to {
-        stroke-dashoffset: 1000;
-    }
+.viewBoxMarkerHorizontal{
+    width: inherit;
+    z-index: 1200;
+    color: var(--green-400);
 }
 
-.lassoPolygon {
-    stroke-width: 1;
-    stroke-dasharray: 10;
-    animation: dash 20s linear;
-    animation-iteration-count: infinite;
-}
+.viewBoxMarkerHorizontal::before{
+    content: '';
+    position: absolute;
+    width: inherit;
+    height: 1px;
+    left: 0px;
+    background-color: white;
 
-@keyframes dash {
-    to {
-        stroke-dashoffset: 1000;
-    }
 }

@@ -36,3 +36,6 @@ ndarray-image = "0.3.0"
 imageproc = "0.25.0"
 itertools = "0.13.0"
 rayon = "1.10.0"
+ort = {version = "=2.0.0-rc.9", features = ["cuda"] }
+lazy_static = "1.5.0"
+zmq = "0.10.0"

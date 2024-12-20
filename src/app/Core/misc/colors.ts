@@ -34,12 +34,8 @@ function componentToHex(c: number): string {
     return hex.length == 1 ? "0" + hex : hex;
 }
 
-
-
 export function from_rgb_to_hex(r: number, g: number, b: number): string {
     return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
-
-
 }
 
 export function generate_shades(hex: string, n: number) {
@@ -47,8 +43,8 @@ export function generate_shades(hex: string, n: number) {
     let shades = []
     for (let i = 0; i < n; i++) {
         let rnew = Math.floor(r * (1 - i / n))
-        let gnew = Math.floor( g * (1 - 1 / n))
-        let bnew = Math.floor( b * (1 - 1 / n))
+        let gnew = Math.floor( g * (1 - i / n))
+        let bnew = Math.floor( b * (1 - i / n))
         let shade = from_rgb_to_hex(rnew, gnew, bnew)
         shades.push(shade)
     }

@@ -1,87 +1,93 @@
-import { Injectable } from '@angular/core';
-import { Tools, Tool } from '../../Core/canvases/tools';
 import { BehaviorSubject } from 'rxjs';
-
-
+import { Injectable } from '@angular/core';
+import { Tool, Tools } from '../../Core/canvases/tools';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DrawingService {
 
-
-  selectedTool: Tool = Tools.PEN;
-  lineWidth: number = 10;
-  swapMarkers: boolean = false; // if true, the markers under the cursor will be swapped with the active label
-  eraseAll: boolean = false; // if true, erase all labels with erase. If false, erase only the active label
-
-  morphoSize: number = 3;
-  autoPostProcess: boolean = false;
-  autoPostProcessOpening: boolean = false;
-  useInverse: boolean = false;
-
-  labelOpacity: number = 1;
-
-  useProcessing: boolean = false;
-  edgesOnly: boolean = false;
-
-  enforceConnectivity: boolean = false;
-
+  public _lastTool: Tool;
+  public autoPostProcess: boolean = false;
+  public autoPostProcessOpening: boolean = false;
   public canvasClear: BehaviorSubject<number> = new BehaviorSubject<number>(-1);
-  public canvasRedraw: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);  
-  public undo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  public redo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public canvasRedraw: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   public canvasSumRefresh: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public edgesOnly: boolean = false;
+  public enforceConnectivity: boolean = false;
+  public eraseAll: boolean = false;
+  public labelOpacity: number = 1;
+  public lineWidth: number = 10;
+  public morphoSize: number = 3;
+  public redo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public selectedTool: Tool = Tools.PEN;
+  public swapMarkers: boolean = false;
+  public undo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public useInverse: boolean = false;
+  public useProcessing: boolean = false;
+
+  public postProcessOption: string = "otsu"
+
+  public incrementAfterStroke: boolean = false;
 
 
-  
-  _lastTool: Tool;
+
   constructor() { }
 
-  canPan(): boolean {
-    return this.selectedTool === Tools.PAN;
-  }
 
-  activatePanMode() {
+
+  public activatePanMode() {
     this._lastTool = this.selectedTool;
     this.selectedTool = Tools.PAN;
   }
-  restoreLastTool() {
-    this.selectedTool = this._lastTool;
+
+  public affectsMultipleLabels(): boolean {
+    return this.eraseAll || this.swapMarkers;
   }
 
-  requestUndo() {
-    this.needsRefreshCanvasSum();
-    this.undo.next(true);
-  }
-  requestRedo() {
-    this.needsRefreshCanvasSum();
-    this.redo.next(true);
+  public canPan(): boolean {
+    return this.selectedTool === Tools.PAN;
   }
 
-  requestCanvasRedraw() {
-    this.needsRefreshCanvasSum();
-    this.canvasRedraw.next(true);
+  public isDrawingTool(): boolean {
+    return this.selectedTool === Tools.PEN || this.selectedTool === Tools.LASSO;
   }
-  requestCanvasClear(index: number = -1) {
+
+  public isEraser(): boolean {
+    return this.selectedTool === Tools.ERASER || this.selectedTool === Tools.LASSO_ERASER;
+  }
+
+  public isToolWithBrushSize(): boolean {
+    return this.selectedTool === Tools.PEN || this.selectedTool === Tools.ERASER;
+  }
+
+  public needsRefreshCanvasSum(){
+    this.canvasSumRefresh.next(true);
+  }
+
+  public requestCanvasClear(index: number = -1) {
     this.needsRefreshCanvasSum();
     this.canvasClear.next(index);
   }
 
-  isDrawingTool(): boolean {
-    return this.selectedTool === Tools.PEN || this.selectedTool === Tools.LASSO;
+  public requestCanvasRedraw() {
+    this.needsRefreshCanvasSum();
+    this.canvasRedraw.next(true);
   }
 
-  isEraser(): boolean {
-    return this.selectedTool === Tools.ERASER || this.selectedTool === Tools.LASSO_ERASER;
+  public requestRedo() {
+    this.needsRefreshCanvasSum();
+    this.redo.next(true);
   }
 
-  isToolWithBrushSize(): boolean {
-    return this.selectedTool === Tools.PEN || this.selectedTool === Tools.ERASER;
+  public requestUndo() {
+    this.needsRefreshCanvasSum();
+    this.undo.next(true);
   }
 
-  needsRefreshCanvasSum(){
-    this.canvasSumRefresh.next(true);
-
+  public restoreLastTool() {
+    this.selectedTool = this._lastTool;
   }
+
+  // #endregion Public Methods (12)
 }

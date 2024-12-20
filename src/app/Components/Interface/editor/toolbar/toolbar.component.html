@@ -25,7 +25,7 @@
                 labels</app-labelled-switch>
 
             
-            <app-labelled-switch [(checked)]="drawService.edgesOnly"> Show only edges</app-labelled-switch>
+            <app-labelled-switch [(checked)]="drawService.edgesOnly" (checkedChange)="drawService.requestCanvasRedraw()"> Show only edges</app-labelled-switch>
 
             <button pButton pRipple icon='pi pi-undo' (onClick)="drawService.requestUndo()">
             </button>

@@ -11,8 +11,12 @@ import { environment } from '../environments/environment';
 import { LabelsService } from './Services/Project/labels.service';
 import { TestingComponent } from "./Components/Core/testing/testing.component";
 import { DrawingService } from './Services/UI/drawing.service';
-import { Tool, Tools } from './Core/canvases/tools';
 import { PrimeNGConfig } from 'primeng/api';
+
+import { Window } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
+
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -28,8 +32,12 @@ export class AppComponent implements AfterViewInit, OnInit{
     public drawService: DrawingService, 
     private labelService: LabelsService,
     private primengConfig: PrimeNGConfig,
-    private cdr: ChangeDetectorRef) {
-      this.projectService.isSegmentation = true;
+    ) {
+      listen('update_txt', (event: { payload: any }) => {
+        console.log(event.payload); 
+
+      });
+
 
      }
 
@@ -49,11 +57,13 @@ export class AppComponent implements AfterViewInit, OnInit{
     this.labelService.addSegLabel( { label: "Example1/Class 1", color: "#df8e1d" , isVisible: true, shades: null });
     this.labelService.addSegLabel( { label: "Example1/Class 2", color: "#8839ef" , isVisible: true, shades: null });
     this.labelService.addSegLabel( { label: "Example2/Class 3", color: "#d20f39" , isVisible: true, shades: null });
-    this.projectService.isInstanceSegmentation = true
     let isStarted$ = this.projectService.startProject(environment.defaultRegex, true);
+    this.projectService.isSegmentation = true;
     isStarted$.then(() => {
-      this.projectService.openEditor(1);
-      this.drawService.useProcessing = true;
+      this.projectService.openEditor(0);
+      this.drawService.useProcessing = false;
+      // this.drawService.autoPostProcess = true;
+      // this.drawService.postProcessOption = "MedSAM"
 
 
 

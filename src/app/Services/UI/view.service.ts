@@ -29,6 +29,9 @@ export class ViewService {
   }
 
   navigateToEditor() {
+    if (this.router.url === '/editor') {
+      return;
+    }
     this.router.navigate(['/editor']);
   }
 

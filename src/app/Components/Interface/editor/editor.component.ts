@@ -1,14 +1,20 @@
-import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  Host,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { DrawableCanvasComponent } from '../../Core/drawable-canvas/drawable-canvas.component';
 
 import { ToolbarComponent } from './toolbar/toolbar.component';
-import { LabelsComponent } from "./labels/labels.component";
+import { LabelsComponent } from './labels/labels.component';
 import { ProjectService } from '../../../Services/Project/project.service';
-import { NgIf } from '@angular/common';
+import { NgIf, NgStyle } from '@angular/common';
 import { HostListener } from '@angular/core';
 import { DrawingService } from '../../../Services/UI/drawing.service';
 import { Tools } from '../../../Core/canvases/tools';
-import { ToolSettingComponent } from "./tool-setting/tool-setting.component";
+import { ToolSettingComponent } from './tool-setting/tool-setting.component';
 import { LabelsService } from '../../../Services/Project/labels.service';
 import { ViewService } from '../../../Services/UI/view.service';
 import { PanelModule } from 'primeng/panel';
@@ -19,30 +25,47 @@ import { LabelFormat } from '../../../Core/io/formats';
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [DrawableCanvasComponent, ButtonModule, ToolbarComponent, LabelsComponent, NgIf, PanelModule, ToolSettingComponent],
+  imports: [
+    DrawableCanvasComponent,
+    ButtonModule,
+    ToolbarComponent,
+    LabelsComponent,
+    NgIf,
+    PanelModule,
+    ToolSettingComponent,
+    NgStyle,
+  ],
   templateUrl: './editor.component.html',
-  styleUrl: './editor.component.scss'
+  styleUrl: './editor.component.scss',
 })
 export class EditorComponent implements OnInit, AfterViewInit {
-
   @ViewChild(DrawableCanvasComponent) canvas: DrawableCanvasComponent;
-
-
-  constructor(public projectService: ProjectService,
+  public viewPortSize: number = 800;
+  constructor(
+    public projectService: ProjectService,
     private drawService: DrawingService,
     private labelService: LabelsService,
     public IOService: IOService,
-    private viewService: ViewService) { }
+    private viewService: ViewService
+  ) {}
 
+  ngOnInit(): void {}
+  ngAfterViewInit() {
+    this.loadCanvas();
+  }
 
-  ngOnInit(): void {
-    this.labelService.rebuildTreeNodes()
+  loadCanvas() {
+    this.viewService.setLoading(true, 'Loading image');
+    this.IOService.load(this.canvas)
 
   }
-  ngAfterViewInit(): void {
-    this.canvas.loadImage(this.projectService.activeImage!);
 
+  initSize() {
+    let width = this.canvas.width;
+    let height = this.canvas.height;
+    this.viewPortSize = Math.min(width, height);
   }
+
   @HostListener('window:keydown.control.z', ['$event'])
   undo(event: KeyboardEvent) {
     this.drawService.requestUndo();
@@ -80,31 +103,38 @@ export class EditorComponent implements OnInit, AfterViewInit {
   switchAllVisibility(e: KeyboardEvent) {
     this.labelService.switchVisibilityAllSegLabels();
     this.drawService.requestCanvasRedraw();
-
-
   }
 
-  save() {
-    let savefile = { masksName: [], masks: [], labels: [], colors: [] } as LabelFormat
+  @HostListener('window:keydown.control.s', ['$event'])
+  async save() {
+    return this.IOService.save(this.canvas);
+  }
 
-    let allPromises$: Promise<void>[] = []
-    this.labelService.listSegmentationLabels.forEach((label, index) => {
+  @HostListener('window:keydown.ArrowRight', ['$event'])
+  async loadNext() {
+    this.save()
+      .then((hasSaved) => {
+        if (!hasSaved) {
+          return Promise.reject('Could not save');
+        }
+        return this.projectService.goNext();
+      })
+      .then(() => {
+        this.loadCanvas();
+      });
+  }
 
-      savefile.masksName.push(label.label)
-      let canvas = this.canvas.classesCanvas[index]
-
-      let blob$ = canvas.convertToBlob({ type: 'image/png' })
-      allPromises$.push(blob$.then((blob) => {
-        savefile.masks.push(blob)
-      }));
-      savefile.colors.push(label.color)
-    }
-  )
-    Promise.all(allPromises$).then(() => {
-      this.IOService.save(savefile, this.canvas.width, this.canvas.height)
-    })
-    
+  @HostListener('window:keydown.ArrowLeft', ['$event'])
+  async loadPrevious() {
+    this.save()
+      .then((hasSaved) => {
+        if (!hasSaved) {
+          return Promise.reject('Could not save');
+        }
+        return this.projectService.goPrevious();
+      })
+      .then(() => {
+        this.loadCanvas();
+      });
   }
 }
-
-

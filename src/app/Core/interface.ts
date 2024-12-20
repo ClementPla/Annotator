@@ -29,8 +29,22 @@ export interface Point2D {
     y: number;
 }
 
+export interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+
+export interface Viewbox{
+    xmin: number;
+    ymin: number;
+    xmax: number;
+    ymax: number;
+}
 
 export interface UndoRedoCanvasElement{
-    data: Promise<Blob>;
+    data: Blob | Blob[];
     index: number;
 }

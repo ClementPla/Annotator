@@ -1,19 +1,21 @@
 <app-toolbar></app-toolbar>
 
-<div class="flex justify-around gap-8 max-screen-available editor">
+<div
+  class="editor flex gap-8 justify-around max-screen-available min-h-0 w-full"
+>
+  <app-labels *ngIf="projectService.isSegmentation"></app-labels>
+  <app-drawable-canvas
+    (imageLoaded)="initSize()"
+  ></app-drawable-canvas>
 
-    <app-labels *ngIf="projectService.isSegmentation"></app-labels>
-    <app-drawable-canvas class="flex-grow max-screen-available editor"></app-drawable-canvas>
-
-    <div class="flex flex-col gap-4 overflow-y-auto ">
-        <app-tool-setting></app-tool-setting>
-        <p-panel header="Save">
-            <p class="flex justify-center">
-            <p-button (onClick)="IOService.loadPrevious()">Previous</p-button>
-            <p-button (onClick)="save()">Save</p-button>
-            <p-button (onClick)="IOService.loadNext()">Next</p-button>
-        </p>
-        </p-panel>
-
-    </div>
+  <div class="flex flex-col gap-4 min-w-96 overflow-y-auto">
+    <app-tool-setting></app-tool-setting>
+    <p-panel header="Save">
+      <p class="flex justify-center">
+        <p-button (onClick)="loadPrevious()">Previous</p-button>
+        <p-button (onClick)="save()">Save</p-button>
+        <p-button (onClick)="loadNext()">Next</p-button>
+      </p>
+    </p-panel>
+  </div>
 </div>

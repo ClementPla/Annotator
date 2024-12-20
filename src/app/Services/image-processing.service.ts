@@ -54,7 +54,10 @@ export class ImageProcessingService {
     this.ref_canvas = document.createElement('canvas');
     this.ref_canvas.width = img.width;
     this.ref_canvas.height = img.height;
-    this.ref_canvas.getContext('2d', { alpha: false, willReadFrequently: false })!.drawImage(img, 0, 0);
+    let ctx = this.ref_canvas.getContext('2d', { alpha: false, willReadFrequently: false })!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0);
+    
 
   }
   preprocess() {
