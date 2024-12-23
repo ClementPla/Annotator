@@ -6,11 +6,15 @@ import { invoke } from '@tauri-apps/api/core';
 import { DrawableCanvasComponent } from '../Components/Core/drawable-canvas/drawable-canvas.component';
 import { LabelsService } from './Project/labels.service';
 import { ViewService } from './UI/view.service';
+import { ImageFromCLI } from '../Core/interface';
+import { BehaviorSubject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class IOService {
+  public requestedReload: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+
   constructor(
     private projectService: ProjectService,
     private labelService: LabelsService,
@@ -21,6 +25,10 @@ export class IOService {
 
   loadNext() {}
 
+  requestReload() {
+    this.requestedReload.next(true);
+  }
+  
   checkIfDataExists(): Promise<boolean> {
     return this.getActiveSavePath().then((filepath) => {
       return invoke<boolean>('check_file_exists', { filepath })
@@ -32,6 +40,7 @@ export class IOService {
         });
     });
   }
+
 
   loadExistingAnnotations(): Promise<LabelFormat> {
     return this.getActiveSavePath()
@@ -167,6 +176,35 @@ export class IOService {
     return finished;
   }
 
+  saveFromCLI(data: ImageFromCLI){
+
+    let savefile = {
+      masksName: [],
+      masks: [],
+      labels: [],
+      colors: [],
+      shades: null,
+    } as LabelFormat;
+
+    this.labelService.listSegmentationLabels.forEach((label, index) => {
+      if (label.shades) {
+        if (!savefile.shades) {
+          savefile.shades = [];
+        }
+        savefile.shades.push(label.shades);
+      }
+
+      savefile.labels.push(label.label);
+      savefile.masksName.push(label.label);
+      if(data.mask_data){
+        savefile.masks.push(data.mask_data[index]);
+      }
+      savefile.colors.push(label.color);
+    });
+
+    return this.writeSave(savefile, 512, 512);
+  }
+
   async writeSave(labelFormat: LabelFormat, width: number, height: number) {
     let svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
@@ -200,14 +238,17 @@ export class IOService {
   }
 
   async getActiveSavePath() {
+    
     const imageName =
       this.projectService.imagesName[this.projectService.activeIndex!];
+
     const imageNameWithoutExtension = imageName
       .split('.')
       .slice(0, -1)
       .join('.');
     const svgName = imageNameWithoutExtension + '.svg';
-
+    console.log('SVG name:', svgName);
+    console.log('Project folder:', this.projectService.projectFolder);
     return path.join(this.projectService.projectFolder, 'annotations', svgName);
   }
 }

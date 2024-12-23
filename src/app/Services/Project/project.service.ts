@@ -9,7 +9,6 @@ import { Thumbnail } from '../../Core/interface';
 
 import { loadImageFile } from '../../Core/io/images';
 
-
 @Injectable({
   providedIn: 'root',
 })
@@ -19,6 +18,8 @@ export class ProjectService {
   isInstanceSegmentation: boolean = false;
   isBoundingBoxDetection: boolean = false;
 
+  inputRegex: string = environment.defaultRegex;
+  recursive: boolean = true;
   isProjectStarted: boolean = false;
   projectName: string = environment.defaultProjectName;
   outputFolder: string = environment.defaultOutputFolder;
@@ -36,10 +37,9 @@ export class ProjectService {
 
   constructor(private viewService: ViewService) {}
 
-  async startProject(regex: string, recursive: boolean): Promise<void> {
+  async startProject(): Promise<void> {
     this.viewService.setLoading(true, 'Starting project...');
     this.inputFolder = await path.resolve(this.inputFolder);
-    console.log(this.inputFolder);
     let sep = path.sep();
     if (!this.inputFolder.endsWith(sep)) {
       this.inputFolder = this.inputFolder + sep;
@@ -57,13 +57,12 @@ export class ProjectService {
 
     this.outputFolder = await path.resolve(this.outputFolder);
     this.projectFolder = await path.join(this.outputFolder, this.projectName);
-
     let fileList$ = invoke('list_files_in_folder', {
       folder: this.inputFolder,
-      regexfilter: regex,
-      recursive: recursive,
+      regexfilter: this.inputRegex,
+      recursive: this.recursive,
     });
-    let isStarted$ = fileList$
+    await fileList$
       .then((value: any) => {
         if (value) {
           this.viewService.setLoading(
@@ -76,14 +75,15 @@ export class ProjectService {
       })
       .then(() => {
         this.isProjectStarted = true;
+        this.viewService.navigateToGallery();
+        this.viewService.endLoading();
       });
 
-    return isStarted$;
   }
+
   extractImagesName(files: string[]) {
     this.imagesName = files.map((file) => {
       let filename = file.split(this.inputFolder)[1];
-      console.log(filename);
       return filename;
     });
   }
@@ -100,9 +100,6 @@ export class ProjectService {
       },
     });
     this.thumbnails$ = thumbnails$.then(() => {
-      this.viewService.endLoading();
-      this.viewService.navigateToGallery();
-
       return Promise.all(
         this.imagesName.map(async (image, index) => {
           return {
@@ -117,13 +114,18 @@ export class ProjectService {
   async openEditor(index: number) {
     this.viewService.setLoading(true, 'Loading editor');
     this.activeIndex = index;
-    this.activeImage = loadImageFile(
-      await path.join(this.inputFolder, this.imagesName[index])
-    ).then((value) => {
-      this.viewService.navigateToEditor();
-      return value;
-    });
-    return this.activeImage;
+    const openPromise$ = path
+      .join(this.inputFolder, this.imagesName[index])
+      .then((filepath) => {
+        this.activeImage = loadImageFile(filepath);
+        return this.activeImage.then((image) => {
+          return this.viewService.navigateToEditor()?.then(() => {
+            this.viewService.endLoading();
+          });
+        });
+      })
+      
+    return openPromise$;
   }
 
   async goNext() {
@@ -134,7 +136,6 @@ export class ProjectService {
       return this.openEditor(this.activeIndex + 1);
     }
     return Promise.resolve('No more images');
-    
   }
 
   async goPrevious() {
@@ -142,7 +143,6 @@ export class ProjectService {
       return this.openEditor(this.activeIndex - 1);
     }
     return Promise.resolve('No more images');
-    
   }
   resetProject() {
     this.isProjectStarted = false;

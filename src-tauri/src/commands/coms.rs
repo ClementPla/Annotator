@@ -1,4 +1,4 @@
-use zmq;
+use zmq::{self, Socket};
 use std::thread;
 use tauri::{AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
@@ -23,9 +23,46 @@ struct ProjectConfig {
     segmentation_classes: Option<Vec<String>>,
     classification_classes: Option<Vec<String>>,
 }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ImageConfig{
+    image_path: String,
+    mask_data: Option<Vec<String>>,
+    segmentation_classes: Option<Vec<String>>,
+    classification_classes: Option<Vec<String>>,
 
-fn handle_command(app: Arc<AppHandle>, command: Command) {
+
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct ImageListResponse {
+    images: Vec<String>
+}
+
+fn handle_command(app: Arc<AppHandle>, command: Command, socket: &Socket) {
     match command.command.as_str() {
+        "get_images" => {
+            // Get images from project service
+            // let response = ImageListResponse {
+            //     images: app.state::<ProjectService>().get_images()
+            // };
+            
+            // if let Ok(json) = serde_json::to_string(&response) {
+            //     if let Err(e) = socket.send(json.as_bytes(), 0) {
+            //         eprintln!("Error sending response: {}", e);
+            //     }
+            // }
+        }
+        "load_image" => {
+            if let Ok(config) = serde_json::from_value::<ImageConfig>(command.data) {
+                // Handle project creation logic here
+                println!("Loading image: {:?}", config.image_path);
+                // Emit event or perform other actions
+                if let Err(e) = app.emit("load_image", config) {
+                    eprintln!("Error emitting image loaded event: {}", e);
+                }
+            } else {
+                eprintln!("Invalid image configuration data");
+            }
+        }
         "create_project" => {
             if let Ok(config) = serde_json::from_value::<ProjectConfig>(command.data) {
                 // Handle project creation logic here
@@ -73,7 +110,7 @@ pub fn setup_zmq_receiver(app: AppHandle) -> std::result::Result<(), Box<dyn std
                     // Try to parse as JSON command
                     match serde_json::from_slice::<Command>(&msg_bytes) {
                         Ok(command) => {
-                            handle_command(app.clone(), command);
+                            handle_command(app.clone(), command, &socket);
                         }
                         Err(_) => {
                             eprintln!("Error parsing command");
@@ -90,3 +127,5 @@ pub fn setup_zmq_receiver(app: AppHandle) -> std::result::Result<(), Box<dyn std
 
     Ok(())
 }
+
+

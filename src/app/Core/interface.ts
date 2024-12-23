@@ -60,3 +60,10 @@ export interface ProjectConfig{
     classification_classes: null | string[],
 
 }
+
+export interface ImageFromCLI{
+    image_path: string;
+    mask_data: string[] | null;
+    segmentation_classes: string[] | null;
+    classification_classes: string[] | null;
+}

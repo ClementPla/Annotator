@@ -39,36 +39,7 @@ export abstract class DrawCanvasUtility extends ImageZoomPan {
   ) {
     super();
 
-    this.drawService.canvasSumRefresh.subscribe((value) => {
-      this.recomputeCanvasSum = value;
-    });
-
-    this.drawService.undo.subscribe((value) => {
-      if (value) {
-        this.recomputeCanvasSum = value;
-        this.undo();
-      }
-    });
-    this.drawService.redo.subscribe((value) => {
-      if (value) {
-        this.recomputeCanvasSum = value;
-        this.redo();
-      }
-    });
-
-    this.drawService.canvasRedraw.subscribe((value) => {
-      if (value) {
-        this.recomputeCanvasSum = value;
-        this.refreshColor();
-      }
-    });
-
-    this.drawService.canvasClear.subscribe((value) => {
-      if (value >= 0) {
-        this.recomputeCanvasSum = true;
-        this.clearCanvasByIndex(value);
-      }
-    });
+    
     this.sumCanvas = new OffscreenCanvas(1, 1);
     this.bufferCanvas = new OffscreenCanvas(1, 1);
     this.ctxSum = this.sumCanvas.getContext('2d', {
@@ -554,27 +525,38 @@ export abstract class DrawCanvasUtility extends ImageZoomPan {
     }
   }
 
-  public refreshColor() {
+  public refreshColor(inputCtx: OffscreenCanvasRenderingContext2D | null = null, inputColor: string | null = null) {
     if (this.projectService.isInstanceSegmentation) {
       this.redrawAllCanvas();
       return;
     }
-    if (this._activeCtx) {
-      this._activeCtx = this.classesCanvas[
-        this.labelService.getActiveIndex()
-      ]!.getContext('2d', { alpha: true, willReadFrequently: true });
-      if (!this._activeCtx) {
-        return;
-      }
-      const color = this.labelService.activeLabel?.color;
 
-      this._activeCtx.fillStyle = color ? color : '#ffffff';
-      this._activeCtx.strokeStyle = color ? color : '#ffffff';
-      this._activeCtx.globalCompositeOperation = 'source-atop';
-
-      this._activeCtx.fillRect(0, 0, this.width, this.height);
-      this._activeCtx.globalCompositeOperation = 'source-over';
+    let ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+    if(!inputCtx && !this._activeCtx){
+      ctx = this.classesCanvas[this.labelService.getActiveIndex()]!.getContext('2d', { alpha: true, willReadFrequently: true });
     }
+    else if(!inputCtx && this._activeCtx){
+      ctx = this._activeCtx;
+    }
+    else{
+      ctx = inputCtx;
+    }
+
+      
+    if (!ctx) {
+      return;
+    }
+    let color = inputColor ? inputColor : this.labelService.activeLabel?.color;
+
+    console.log('refresh color', color);
+
+    ctx.fillStyle = color ? color : '#ffffff';
+    ctx.strokeStyle = color ? color : '#ffffff';
+    ctx.globalCompositeOperation = 'source-atop';
+
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.globalCompositeOperation = 'source-over';
+  
 
     this.redrawAllCanvas();
   }

@@ -44,8 +44,6 @@ import { CLIService } from '../../../Services/cli.service';
   styleUrl: './project-configuration.component.scss',
 })
 export class ProjectConfigurationComponent implements OnInit {
-  recursiveLoad: boolean = true;
-  inputRegex: string = environment.defaultRegex;
   generateThumbnails: boolean = true;
 
   isInputValid: boolean = true;
@@ -91,7 +89,7 @@ export class ProjectConfigurationComponent implements OnInit {
     this.isOutputValid = this.projectService.outputFolder !== '';
     this.isNameValid = this.projectService.projectName !== '';
     if (this.isInputValid && this.isOutputValid) {
-      this.projectService.startProject(this.inputRegex, this.recursiveLoad);
+      this.projectService.startProject();
     }
   }
 

@@ -1,8 +1,11 @@
 import {
+  AfterViewInit,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
   Input,
+  NgZone,
   OnInit,
   Output,
   ViewChild,
@@ -14,14 +17,14 @@ import { DrawCanvasUtility } from '../../../Core/canvases/draw';
 import { DrawingService } from '../../../Services/UI/drawing.service';
 import { ViewService } from '../../../Services/UI/view.service';
 import { LabelsService } from '../../../Services/Project/labels.service';
-import { from, Observable, of } from 'rxjs';
-import { Point2D, SegLabel, Viewbox } from '../../../Core/interface';
+import { Point2D, Viewbox } from '../../../Core/interface';
 import { Button } from 'primeng/button';
 import { UndoRedo } from '../../../Core/misc/undoRedo';
 import { OpenCVService } from '../../../Services/open-cv.service';
 import { ImageProcessingService } from '../../../Services/image-processing.service';
 import { ProjectService } from '../../../Services/Project/project.service';
 import { SVGElementsComponent } from './svgelements/svgelements.component';
+import { CLIService } from '../../../Services/cli.service';
 
 @Component({
   selector: 'app-drawable-canvas',
@@ -32,14 +35,14 @@ import { SVGElementsComponent } from './svgelements/svgelements.component';
 })
 export class DrawableCanvasComponent
   extends DrawCanvasUtility
-  implements OnInit
+  implements AfterViewInit
 {
   @Input() override canPan: boolean = true;
   @Input() override canZoom: boolean = true;
 
   @Output() public imageLoaded = new EventEmitter<boolean>();
 
-  public cursor: Point2D = { x: 0, y: 0 };
+  public cursor: Point2D = { x: 25, y: 25 };
   public currentPixel: Point2D = { x: 0, y: 0 };
   public viewBox: Viewbox = { xmin: 0, ymin: 0, xmax: 0, ymax: 0 };
   public isFullscreen: boolean = false;
@@ -60,7 +63,10 @@ export class DrawableCanvasComponent
     public override labelService: LabelsService,
     protected override imageProcessingService: ImageProcessingService,
     protected override openCVService: OpenCVService,
-    protected override projectService: ProjectService
+    protected override projectService: ProjectService,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone,
+    private cliService: CLIService
   ) {
     super(
       drawService,
@@ -69,6 +75,44 @@ export class DrawableCanvasComponent
       imageProcessingService,
       projectService
     );
+  }
+
+  public ngOnInit(): void {}
+
+  public ngAfterViewInit(): void {
+    this.drawService.canvasSumRefresh.subscribe((value) => {
+      this.recomputeCanvasSum = value;
+    });
+
+    this.drawService.undo.subscribe((value) => {
+      if (value) {
+        this.recomputeCanvasSum = value;
+        this.undo();
+      }
+    });
+    this.drawService.redo.subscribe((value) => {
+      if (value) {
+        this.recomputeCanvasSum = value;
+        this.redo();
+      }
+    });
+
+    this.drawService.canvasRedraw.subscribe((value) => {
+      if (value) {
+        this.recomputeCanvasSum = value;
+        this.refreshColor();
+      }
+    });
+
+    this.drawService.canvasClear.subscribe((value) => {
+      if (value >= 0) {
+        this.recomputeCanvasSum = true;
+        this.clearCanvasByIndex(value);
+      }
+    });
+
+    this.builCanvasMask();
+    UndoRedo.empty();
   }
 
   public drawOnLoad() {
@@ -126,9 +170,11 @@ export class DrawableCanvasComponent
     return points;
   }
 
-  public async loadImage(image: Promise<string>) {
-    this.srcImg = await image;
-    this.reload();
+  public loadImage(image: Promise<string>) {
+    return image.then((img) => {
+      this.srcImg = img;
+      this.reload();
+    });
   }
 
   public override wheel(event: WheelEvent): void {
@@ -138,9 +184,11 @@ export class DrawableCanvasComponent
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     this.currentPixel = this.getImageCoordinates(event);
+    this.recomputeCanvasSum = false;
 
     super.wheel(event);
   }
+
   public mouseDown(event: MouseEvent) {
     if (event.button == 1) {
       this.drawService.activatePanMode();
@@ -184,13 +232,6 @@ export class DrawableCanvasComponent
       this.endDraw();
     }
     this.isDrawing = false;
-  }
-
-  public ngOnInit(): void {
-    this.builCanvasMask();
-
-    UndoRedo.empty();
-    this.update_undo_redo();
   }
 
   public builCanvasMask() {
@@ -296,6 +337,7 @@ export class DrawableCanvasComponent
       UndoRedo.empty();
     };
   }
+
   public loadCanvas(data: string, index: number) {
     let canvas = this.classesCanvas[index];
     canvas.width = this.width;
@@ -307,9 +349,12 @@ export class DrawableCanvasComponent
     img.src = data;
     img.onload = () => {
       this.clearCanvas(ctx);
-      console.log('Canvas has been drawn');
       ctx.drawImage(img, 0, 0);
       this.recomputeCanvasSum = true;
+      this.refreshColor(
+        ctx,
+        this.labelService.listSegmentationLabels[index].color
+      );
       this.redrawAllCanvas();
     };
   }
@@ -327,6 +372,4 @@ export class DrawableCanvasComponent
       this.resetZoomAndPan(true, true);
     }
   }
-
-  // #endregion Public Methods (11)
 }

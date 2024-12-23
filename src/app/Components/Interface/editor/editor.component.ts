@@ -1,5 +1,6 @@
 import {
   AfterViewInit,
+  ChangeDetectorRef,
   Component,
   Host,
   OnInit,
@@ -21,6 +22,7 @@ import { PanelModule } from 'primeng/panel';
 import { ButtonModule } from 'primeng/button';
 import { IOService } from '../../../Services/io.service';
 import { LabelFormat } from '../../../Core/io/formats';
+import { CLIService } from '../../../Services/cli.service';
 
 @Component({
   selector: 'app-editor',
@@ -46,21 +48,33 @@ export class EditorComponent implements OnInit, AfterViewInit {
     private drawService: DrawingService,
     private labelService: LabelsService,
     public IOService: IOService,
-    private viewService: ViewService
-  ) {}
+    private cdr: ChangeDetectorRef
+  ) {
+    this.IOService.requestedReload.subscribe((value) => {
+      if (value) {
+        this.loadCanvas();
+      }
+    });
+  }
 
-  ngOnInit(): void {}
+  ngOnInit() {}
   ngAfterViewInit() {
+   
+
     this.loadCanvas();
   }
 
-  loadCanvas() {
-    this.viewService.setLoading(true, 'Loading image');
-    this.IOService.load(this.canvas)
-
+  async loadCanvas() {
+    if(!this.canvas){
+      return;
+    }
+    this.IOService.load(this.canvas);
   }
 
   initSize() {
+    if (!this.canvas) {
+      return;
+    }
     let width = this.canvas.width;
     let height = this.canvas.height;
     this.viewPortSize = Math.min(width, height);
