@@ -1,0 +1,137 @@
+<div class="max-screen-available">
+  <div
+    class="bg-gray-950 overflow-hidden relative rounded-t-lg"
+    [style.height.px]="rulerSize"
+    [style.width]="'calc(100% - ' + rulerSize + 'px)'"
+    [ngStyle]="{ translate: rulerSize + 'px' }"
+  >
+    <p
+      class="absolute text-gray viewBoxMarker w-fit"
+      [style.left.px]="viewBox.xmin"
+    >
+      0
+    </p>
+
+    <p
+      class="absolute text-gray viewBoxMarker w-fit"
+      [style.left.px]="cursor.x"
+    >
+      {{ currentPixel.x }}
+    </p>
+
+    <p class="absolute viewBoxMarker w-fit" [style.left.px]="viewBox.xmax">
+      {{ width }}
+    </p>
+  </div>
+
+  <div class="flex flex-row overflow-hidden relative">
+    <div
+      class="bg-gray-950 overflow-hidden rounded-l-lg"
+      [style.width.px]="rulerSize"
+    >
+      <p class="absolute viewBoxMarkerHorizontal" [style.top.px]="viewBox.ymin">
+        0
+      </p>
+      <p class="absolute viewBoxMarkerHorizontal" [style.top.px]="cursor.y">
+        {{ currentPixel.y }}
+      </p>
+      <p class="absolute viewBoxMarkerHorizontal" [style.top.px]="viewBox.ymax">
+        {{ height }}
+      </p>
+    </div>
+    <div
+
+      #myImageContainer
+      [ngStyle]="{
+        'aspect-ratio': width / height,
+      }"
+      [ngClass]="{
+        'relative max-screen-available': !isFullscreen,
+        'fixed h-full max-w-full top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black box-shadow z-50':
+          isFullscreen
+      }"
+    >
+      <canvas
+        #imageCanvas
+        id="image"
+        class="absolute cursor-crosshair min-w-[128px] w-full"
+        [ngClass]="{
+          'cursor-grab': drawService.canPan(),
+          'cursor-none': drawService.isToolWithBrushSize(),
+          'cursor-crosshair': !(
+            drawService.isToolWithBrushSize() || drawService.canPan()
+          )
+        }"
+        (wheel)="wheel($event)"
+        (mousedown)="mouseDown($event)"
+        (mouseup)="mouseUp($event)"
+        (mousemove)="mouseMove($event)"
+        (mouseleave)="mouseUp($event)"
+        [width]="width"
+        [height]="height"
+      >
+      </canvas>
+
+      <canvas
+        #labelCanvas
+        class="absolute min-w-[128px] noAntialiasing pointer-events-none w-full"
+        [width]="width"
+        [height]="height"
+      ></canvas>
+
+      <app-svgelements #svg [UIPoints]="getLassoPointsToPolygon()">
+      </app-svgelements>
+
+      <div
+        class="cursor"
+        *ngIf="drawService.isToolWithBrushSize()"
+        [ngStyle]="{
+          'left.px': cursor.x,
+          'top.px': cursor.y,
+          'width.px': getCursorSize(),
+          'border-color': labelService.activeLabel?.color
+        }"
+      ></div>
+      <div
+        class="absolute h-full skeleton w-full z-50"
+        [ngClass]="{
+          invisible: !viewService.isLoading,
+          visible: viewService.isLoading
+        }"
+      ></div>
+
+      <p class="absolute flex items-center justify-start">
+        <p-button
+          pRipple
+          [rounded]="true"
+          [raised]="true"
+          (click)="switchFullScreen()"
+          *ngIf="!isFullscreen"
+          icon="pi pi-window-maximize"
+          severity="help"
+        >
+        </p-button>
+        <p-button
+          pButton
+          pRipple
+          [rounded]="true"
+          [raised]="true"
+          (click)="switchFullScreen()"
+          *ngIf="isFullscreen"
+          icon="pi pi-window-minimize"
+          severity="help"
+        >
+        </p-button>
+
+        <p-button
+          [rounded]="true"
+          [raised]="true"
+          (click)="resetZoomAndPan(true, true)"
+          icon="pi pi-refresh"
+          severity="help"
+        >
+        </p-button>
+      </p>
+    </div>
+  </div>
+</div>
