@@ -10,7 +10,6 @@ import { Tools } from './tools';
 import { UndoRedo } from '../misc/undoRedo';
 
 export abstract class DrawCanvasUtility extends ImageZoomPan {
-  // #region Properties (14)
 
   protected _activeCtx:
     | OffscreenCanvasRenderingContext2D

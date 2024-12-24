@@ -1,6 +1,6 @@
 import { ElementRef } from '@angular/core';
 import { Point2D, Viewbox } from '../interface';
-import { SVGElementsComponent } from '../../Components/Core/drawable-canvas/svgelements/svgelements.component';
+import { SVGElementsComponent } from '../../Components/Core/drawable-canvas/component/svgelements/svgelements.component';
 
 export abstract class ImageZoomPan {
   // #region Properties (13)

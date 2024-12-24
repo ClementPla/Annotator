@@ -3,7 +3,7 @@ import { LabelFormat } from '../Core/io/formats';
 import { ProjectService } from './Project/project.service';
 import { path } from '@tauri-apps/api';
 import { invoke } from '@tauri-apps/api/core';
-import { DrawableCanvasComponent } from '../Components/Core/drawable-canvas/drawable-canvas.component';
+import { DrawableCanvasComponent } from '../Components/Core/drawable-canvas/component/drawable-canvas.component';
 import { LabelsService } from './Project/labels.service';
 import { ViewService } from './UI/view.service';
 import { ImageFromCLI } from '../Core/interface';

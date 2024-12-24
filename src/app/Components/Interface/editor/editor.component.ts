@@ -6,7 +6,7 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import { DrawableCanvasComponent } from '../../Core/drawable-canvas/drawable-canvas.component';
+import { DrawableCanvasComponent } from '../../Core/drawable-canvas/component/drawable-canvas.component';
 
 import { ToolbarComponent } from './toolbar/toolbar.component';
 import { LabelsComponent } from './labels/labels.component';
