@@ -13,16 +13,13 @@ import { LabelsComponent } from './labels/labels.component';
 import { ProjectService } from '../../../Services/Project/project.service';
 import { NgIf, NgStyle } from '@angular/common';
 import { HostListener } from '@angular/core';
-import { DrawingService } from '../../../Services/UI/drawing.service';
+import { EditorService } from '../../../Services/UI/editor.service';
 import { Tools } from '../../../Core/canvases/tools';
 import { ToolSettingComponent } from './tool-setting/tool-setting.component';
 import { LabelsService } from '../../../Services/Project/labels.service';
-import { ViewService } from '../../../Services/UI/view.service';
 import { PanelModule } from 'primeng/panel';
 import { ButtonModule } from 'primeng/button';
 import { IOService } from '../../../Services/io.service';
-import { LabelFormat } from '../../../Core/io/formats';
-import { CLIService } from '../../../Services/cli.service';
 
 @Component({
   selector: 'app-editor',
@@ -45,7 +42,7 @@ export class EditorComponent implements OnInit, AfterViewInit {
   public viewPortSize: number = 800;
   constructor(
     public projectService: ProjectService,
-    private drawService: DrawingService,
+    private drawService: EditorService,
     private labelService: LabelsService,
     public IOService: IOService,
     private cdr: ChangeDetectorRef
@@ -60,7 +57,7 @@ export class EditorComponent implements OnInit, AfterViewInit {
   ngOnInit() {}
   ngAfterViewInit() {
    
-
+    console.log('EditorComponent: ngAfterViewInit');
     this.loadCanvas();
   }
 
@@ -68,15 +65,15 @@ export class EditorComponent implements OnInit, AfterViewInit {
     if(!this.canvas){
       return;
     }
-    this.IOService.load(this.canvas);
+    await this.IOService.load(this.canvas);
   }
 
   initSize() {
     if (!this.canvas) {
       return;
     }
-    let width = this.canvas.width;
-    let height = this.canvas.height;
+    let width = this.canvas.stateService.width;
+    let height = this.canvas.stateService.height;
     this.viewPortSize = Math.min(width, height);
   }
 
@@ -120,8 +117,8 @@ export class EditorComponent implements OnInit, AfterViewInit {
   }
 
   @HostListener('window:keydown.control.s', ['$event'])
-  async save() {
-    return this.IOService.save(this.canvas);
+  save() {
+    return this.IOService.save();
   }
 
   @HostListener('window:keydown.ArrowRight', ['$event'])

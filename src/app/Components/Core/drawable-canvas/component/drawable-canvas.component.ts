@@ -1,29 +1,28 @@
 import {
   AfterViewInit,
-  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
-  Input,
-  NgZone,
-  OnInit,
   Output,
   ViewChild,
 } from '@angular/core';
 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DrawCanvasUtility } from '../../../../Core/canvases/draw';
-import { DrawingService } from '../../../../Services/UI/drawing.service';
+import { EditorService } from '../../../../Services/UI/editor.service';
 import { ViewService } from '../../../../Services/UI/view.service';
 import { LabelsService } from '../../../../Services/Project/labels.service';
 import { Point2D, Viewbox } from '../../../../Core/interface';
 import { Button } from 'primeng/button';
-import { UndoRedo } from '../../../../Core/misc/undoRedo';
 import { OpenCVService } from '../../../../Services/open-cv.service';
 import { ImageProcessingService } from '../../../../Services/image-processing.service';
 import { ProjectService } from '../../../../Services/Project/project.service';
 import { SVGElementsComponent } from './svgelements/svgelements.component';
+import { ZoomPanService } from '../service/zoom-pan.service';
+import { CanvasManagerService } from '../service/canvas-manager.service';
+import { StateManagerService } from '../service/state-manager.service';
+import { DrawService } from '../service/draw.service';
+import { UndoRedoService } from '../service/undo-redo.service';
 
 @Component({
   selector: 'app-drawable-canvas',
@@ -32,11 +31,7 @@ import { SVGElementsComponent } from './svgelements/svgelements.component';
   templateUrl: './drawable-canvas.component.html',
   styleUrl: './drawable-canvas.component.scss',
 })
-export class DrawableCanvasComponent
-  extends DrawCanvasUtility
-  implements AfterViewInit
-{
-
+export class DrawableCanvasComponent implements AfterViewInit {
   @Output() public imageLoaded = new EventEmitter<boolean>();
 
   public cursor: Point2D = { x: 25, y: 25 };
@@ -45,121 +40,127 @@ export class DrawableCanvasComponent
   public isFullscreen: boolean = false;
   public rulerSize: number = 16;
 
+  private ctxImage: CanvasRenderingContext2D | null = null;
+  private ctxLabel: CanvasRenderingContext2D;
   srcImg: string;
 
   @ViewChild('imageCanvas') public imgCanvas: ElementRef<HTMLCanvasElement>;
   @ViewChild('labelCanvas') public labelCanvas: ElementRef<HTMLCanvasElement>;
 
-  @ViewChild('svg') public override svg: SVGElementsComponent;
+  @ViewChild('svg') public svg: SVGElementsComponent;
 
-  override image: HTMLImageElement = new Image();
+  image: HTMLImageElement = new Image();
 
   constructor(
-    public override drawService: DrawingService,
+    public editorService: EditorService,
     public viewService: ViewService,
-    public override labelService: LabelsService,
-    protected override imageProcessingService: ImageProcessingService,
-    protected override openCVService: OpenCVService,
-    protected override projectService: ProjectService,
+    public labelService: LabelsService,
+    protected imageProcessingService: ImageProcessingService,
+    protected openCVService: OpenCVService,
+    protected projectService: ProjectService,
+    public zoomPanService: ZoomPanService,
+    private canvasManagerService: CanvasManagerService,
+    public stateService: StateManagerService,
+    private drawService: DrawService,
+    private undoRedoService: UndoRedoService
   ) {
-    super(
-      drawService,
-      labelService,
-      openCVService,
-      imageProcessingService,
-      projectService
+    this.initSubscriptions();
+  } 
+
+  private initSubscriptions() {
+
+    this.zoomPanService.redrawRequest.subscribe((value) => {
+      if (value) {
+        this.redrawAllCanvas();
+      }
+    });
+
+    this.canvasManagerService.requestRedraw.subscribe((value) => {
+      if (value) {
+        this.redrawAllCanvas();
+      }
+    });
+
+    this.zoomPanService.svgRequest.subscribe((value) => {
+      if (value) {
+        const viewbox = this.zoomPanService.getViewBox();
+        const rect = {
+          x: viewbox.xmin,
+          y: viewbox.ymin,
+          width: viewbox.xmax - viewbox.xmin,
+          height: viewbox.ymax - viewbox.ymin,
+        };
+        this.svg.setViewBox(rect);
+      }
+    });
+
+  this.drawService.singleDrawRequest.subscribe((ctx) => {
+      if (ctx) {
+        this.ctxLabel.drawImage(ctx.canvas, 0, 0);
+      }
+    });
+
+    this.undoRedoService.redrawRequest.subscribe((value) => {
+      if (value) {
+        this.redrawAllCanvas();
+      }
+    });
+  }
+
+  public ngAfterViewInit(): void {    
+    this.ctxImage = this.imgCanvas.nativeElement.getContext('2d', {
+      alpha: false,
+    })!;
+    this.ctxLabel = this.labelCanvas.nativeElement.getContext('2d', {
+      alpha: true,
+    })!;
+    this.zoomPanService.setContext(this.imgCanvas.nativeElement);
+    this.canvasManagerService.initCanvas();
+    this.undoRedoService.empty();
+  }
+
+  public initalizeDims() {
+    this.stateService.setWidthAndHeight(
+      this.image.width,
+      this.image.height
     );
-  }
 
-  public ngOnInit(): void {}
+    this.imgCanvas.nativeElement.width = this.stateService.width; // This is the canvas with the main image
+    this.imgCanvas.nativeElement.height = this.stateService.height;
 
-  public ngAfterViewInit(): void {
-    this.drawService.canvasSumRefresh.subscribe((value) => {
-      this.recomputeCanvasSum = value;
-    });
-
-    this.drawService.undo.subscribe((value) => {
-      if (value) {
-        this.recomputeCanvasSum = value;
-        this.undo();
-      }
-    });
-    this.drawService.redo.subscribe((value) => {
-      if (value) {
-        this.recomputeCanvasSum = value;
-        this.redo();
-      }
-    });
-
-    this.drawService.canvasRedraw.subscribe((value) => {
-      if (value) {
-        this.recomputeCanvasSum = value;
-        this.refreshColor();
-      }
-    });
-
-    this.drawService.canvasClear.subscribe((value) => {
-      if (value >= 0) {
-        this.recomputeCanvasSum = true;
-        this.clearCanvasByIndex(value);
-      }
-    });
-
-    this.builCanvasMask();
-    UndoRedo.empty();
-  }
-
-  public drawOnLoad() {
-    this.imageLoaded.emit(true);
-    this.width = this.image.naturalWidth;
-    this.height = this.image.naturalHeight;
-
-    this.imgCanvas.nativeElement.width = this.width; // This is the canvas with the main image
-    this.imgCanvas.nativeElement.height = this.height;
-
-    this.labelCanvas.nativeElement.width = this.width; // This is the displayed canvas
-    this.labelCanvas.nativeElement.height = this.height;
-
-    this.bufferCanvas.width = this.width; // This is the buffer canvas when drawing needs to be delayed (i.e when post-processing)
-    this.bufferCanvas.height = this.height;
-
-    this.sumCanvas.width = this.width; // This is the canvas with all the classes summed
-    this.sumCanvas.height = this.height;
-
-    this.classesCanvas.forEach((canvas) => {
-      canvas.width = this.width;
-      canvas.height = this.height;
-    });
+    this.labelCanvas.nativeElement.width = this.stateService.width; // This is the displayed canvas
+    this.labelCanvas.nativeElement.height = this.stateService.height;
 
     this.svg.setViewBox({
       x: 0,
       y: 0,
-      width: this.width,
-      height: this.height,
-    });
-    this.adjustScaleToFitImage();
-    requestAnimationFrame(() => {
-      this.redrawAllCanvas();
+      width: this.stateService.width,
+      height: this.stateService.height,
     });
   }
 
   public getCursorSize() {
-    if (!this.ctxDraw) {
+    if (!this.ctxLabel) {
       return 0;
     }
-    const rect = this.ctxDraw.canvas.getBoundingClientRect();
+    const rect = this.ctxLabel.canvas.getBoundingClientRect();
     return (
-      ((this.drawService.lineWidth * rect.width) / this.width) * this.scale
+      ((this.editorService.lineWidth * rect.width) / this.stateService.width) *
+      this.zoomPanService.getScale()
     );
   }
 
   public getLassoPointsToPolygon() {
-    if (this.lassoPoints.length < 3) {
+    if (this.drawService.lassoPoints.length < 3) {
       return '';
     }
     let points = '';
-    for (let i = 0; i < this.lassoPoints.length; i++) {
-      points += this.lassoPoints[i].x + ',' + this.lassoPoints[i].y + ' ';
+    for (let i = 0; i < this.drawService.lassoPoints.length; i++) {
+      points +=
+        this.drawService.lassoPoints[i].x +
+        ',' +
+        this.drawService.lassoPoints[i].y +
+        ' ';
     }
     return points;
   }
@@ -171,79 +172,69 @@ export class DrawableCanvasComponent
     });
   }
 
-  public override wheel(event: WheelEvent): void {
-    this.viewBox = this.getCurrentViewbox();
-    const rect = this.ctxDraw.canvas.getBoundingClientRect();
-    // Transform mouse coordinates to canvas coordinates
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    this.currentPixel = this.getImageCoordinates(event);
-    this.recomputeCanvasSum = false;
+  public wheel(event: WheelEvent): void {
+    this.stateService.recomputeCanvasSum = false;
 
-    super.wheel(event);
+    this.zoomPanService.wheel(event);
+    // Transform mouse coordinates to canvas coordinates
+    this.currentPixel = this.zoomPanService.getImageCoordinates(event);
+    this.viewBox = this.zoomPanService.getViewBox();
+
   }
 
   public mouseDown(event: MouseEvent) {
     if (event.button == 1) {
-      this.drawService.activatePanMode();
+      this.editorService.activatePanMode();
     }
-    if (this.drawService.canPan()) {
-      this.recomputeCanvasSum = false;
-      this.startDrag();
+    if (this.editorService.canPan()) {
+      this.stateService.recomputeCanvasSum = false;
+      this.zoomPanService.startDrag();
     } else {
-      this.recomputeCanvasSum = true;
-      this.startDraw().then(() => {
-        this.draw(event);
+      this.stateService.recomputeCanvasSum = true;
+      this.drawService.startDraw().then(() => {
+        this.drawService.draw(event);
       });
     }
   }
 
   public mouseMove(event: MouseEvent) {
-    const rect = this.ctxDraw.canvas.getBoundingClientRect();
+    const rect = this.ctxLabel.canvas.getBoundingClientRect();
     // Transform mouse coordinates to canvas coordinates
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    this.viewBox = this.getCurrentViewbox();
-    this.currentPixel = this.getImageCoordinates(event);
+    this.currentPixel = this.zoomPanService.getImageCoordinates(event);
 
     this.cursor = { x: mouseX, y: mouseY };
-    if (this.drawService.canPan()) {
-      this.recomputeCanvasSum = false;
-      this.drag(event);
+    if (this.editorService.canPan()) {
+      this.stateService.recomputeCanvasSum = false;
+      this.zoomPanService.drag(event);
+      this.viewBox = this.zoomPanService.getViewBox();
+  
     } else {
-      this.recomputeCanvasSum = true;
-      this.draw(event);
+      this.stateService.recomputeCanvasSum = true;
+      this.drawService.draw(event);
     }
   }
 
   public mouseUp($event: MouseEvent) {
     if ($event.button == 1) {
-      this.drawService.restoreLastTool();
+      this.editorService.restoreLastTool();
     }
-    if (this.drawService.canPan()) this.endDrag();
+
+    if (this.editorService.canPan()){
+      this.zoomPanService.endDrag();
+    } 
     else {
-      this.endDraw();
+      this.drawService.endDraw();
     }
-    this.isDrawing = false;
   }
 
-  public builCanvasMask() {
-    this.labelService.listSegmentationLabels.forEach(() => {
-      let canvas = new OffscreenCanvas(this.width, this.height);
-      let ctx = canvas.getContext('2d', {
-        alpha: true,
-        willReadFrequently: true,
-      })!;
-      ctx.imageSmoothingEnabled = false;
-      this.classesCanvas.push(canvas);
-    });
-  }
 
   public redrawAllCanvas() {
     // Redraw the main image
 
-    this.viewBox = this.getCurrentViewbox();
+    this.viewBox = this.zoomPanService.getViewBox();
 
     if (!this.image.complete || this.image.naturalWidth === 0) {
       console.error('Image is not fully loaded or is invalid');
@@ -251,119 +242,82 @@ export class DrawableCanvasComponent
     }
 
     // Redraw the main image
-    if (this.ctx == null) {
-      this.ctx = this.imgCanvas.nativeElement.getContext('2d', {
+    if (this.ctxImage == null) {
+      this.ctxImage = this.imgCanvas.nativeElement.getContext('2d', {
         alpha: false,
       })!;
     }
-    if (!this.ctx) {
+    if (!this.ctxImage) {
       console.error('Failed to get 2D context');
       return;
     }
-
+    const scale = this.zoomPanService.getScale();
+    const offset = this.zoomPanService.getOffset();
     // This is the canvas with the main image
-    this.ctx.resetTransform();
-    this.clearCanvas(this.ctx);
-    this.ctx.translate(Math.round(this.offset.x), Math.round(this.offset.y));
-    this.ctx.scale(this.scale, this.scale);
-
+    this.ctxImage.resetTransform();
+    this.drawService.clearCanvas(this.ctxImage);
+    this.ctxImage.translate(Math.round(offset.x), Math.round(offset.y));
+    this.ctxImage.scale(scale, scale);
     let image = this.imageProcessingService.getCurrentCanvas();
-
-    this.ctx.drawImage(image, 0, 0, this.width, this.height);
-
+    this.ctxImage.drawImage(
+      image,
+      0,
+      0,
+      this.stateService.width,
+      this.stateService.height
+    );
     // This is the canvas with the marker drawings
-    this.clearCanvas(this.ctxDraw);
+    this.drawService.clearCanvas(this.ctxLabel);
 
-    this.ctxDraw.resetTransform();
-    this.ctxDraw.translate(this.offset.x, this.offset.y);
-    this.ctxDraw.scale(this.scale, this.scale);
-    this.ctxSum!.imageSmoothingEnabled = false;
-    // Investigate performance using CSS filters
-    if (this.recomputeCanvasSum) {
-      this.clearCanvas(this.ctxDraw);
-      this.clearCanvas(this.ctxSum!);
-      for (
-        let i = 0;
-        i < this.labelService.listSegmentationLabels.length;
-        i++
-      ) {
-        let canvas = this.classesCanvas[i];
-        if (!this.labelService.listSegmentationLabels[i].isVisible) {
-          continue;
-        } else {
-          if (this.drawService.edgesOnly) {
-            const edgeCanvas = this.openCVService.edgeDetection(
-              canvas.getContext('2d')!
-            );
-            this.ctxSum!.drawImage(edgeCanvas, 0, 0);
-          } else {
-            this.ctxSum!.drawImage(canvas, 0, 0);
-          }
-        }
-      }
-      this.recomputeCanvasSum = false;
+    this.ctxLabel.resetTransform();
+    this.ctxLabel.translate(offset.x, offset.y);
+    this.ctxLabel.scale(scale, scale);
+
+    if (this.stateService.recomputeCanvasSum) {
+      this.canvasManagerService.computeCombinedCanvas();
     }
 
-    this.ctxDraw.globalAlpha = this.drawService.labelOpacity;
-    this.ctxDraw.imageSmoothingEnabled = false;
-    this.ctxDraw.drawImage(this.sumCanvas, 0, 0);
-
-    this.ctxDraw.globalAlpha = 1;
+    this.ctxLabel.globalAlpha = this.editorService.labelOpacity;
+    this.ctxLabel.imageSmoothingEnabled = false;
+    this.ctxLabel.drawImage(
+      this.canvasManagerService.getCombinedCanvas(),
+      0,
+      0
+    );
+    this.ctxLabel.globalAlpha = 1;
   }
 
   public reload(): void {
-    this.ctx = this.imgCanvas.nativeElement.getContext('2d', { alpha: false })!;
-    this.ctxDraw = this.labelCanvas.nativeElement.getContext('2d', {
-      alpha: true,
-      willReadFrequently: true,
-    })!;
-    this.ctxDraw.imageSmoothingEnabled = false;
-    this.clearCanvas(this.ctxDraw);
-    this.clearCanvas(this.ctx);
-    this.clearCanvas(this.ctxSum!);
-
     this.image.src = this.srcImg;
 
     this.image.onload = () => {
+      this.imageLoaded.emit(true);
+
       this.imageProcessingService.setImage(this.image);
-      this.drawOnLoad();
+      this.drawService.clearCanvas(this.ctxLabel);
+      this.drawService.clearCanvas(this.ctxImage!);
+      this.canvasManagerService.resetCombinedCanvas();
+
+      this.initalizeDims();
+      this.redrawAllCanvas();
+      this.undoRedoService.empty();
       this.viewService.endLoading();
-      UndoRedo.empty();
     };
   }
 
   public loadCanvas(data: string, index: number) {
-    let canvas = this.classesCanvas[index];
-    canvas.width = this.width;
-    canvas.height = this.height;
-
-    let ctx = canvas.getContext('2d', { alpha: true })!;
-
-    let img = new Image();
-    img.src = data;
-    img.onload = () => {
-      this.clearCanvas(ctx);
-      ctx.drawImage(img, 0, 0);
-      this.recomputeCanvasSum = true;
-      this.refreshColor(
-        ctx,
-        this.labelService.listSegmentationLabels[index].color
-      );
-      this.redrawAllCanvas();
-    };
+    this.canvasManagerService.loadCanvas(data, index);
   }
 
   public loadAllCanvas(masks: string[]) {
-    this.labelService.listSegmentationLabels.forEach((label, index) => {
-      this.loadCanvas(masks[index], index);
-    });
+    this.canvasManagerService.loadAllCanvas(masks);
   }
 
   public switchFullScreen() {
     this.isFullscreen = !this.isFullscreen;
     if (this.isFullscreen) {
     } else {
-      this.resetZoomAndPan(true, true);
+      this.zoomPanService.resetZoomAndPan(true, true);
     }
   }
 }

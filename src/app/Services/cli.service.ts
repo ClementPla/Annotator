@@ -1,5 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Subject } from 'rxjs';
 import { ImageFromCLI, ProjectConfig } from '../Core/interface';
 import { listen } from '@tauri-apps/api/event';
 
@@ -7,10 +7,9 @@ import { listen } from '@tauri-apps/api/event';
   providedIn: 'root',
 })
 export class CLIService {
-  public commandProcessed: BehaviorSubject<boolean> =
-    new BehaviorSubject<boolean>(false);
-  public projectCreated = new BehaviorSubject<ProjectConfig | null>(null);
-  public imageLoaded = new BehaviorSubject<ImageFromCLI | null>(null);
+  public commandProcessed: Subject<boolean> = new Subject<boolean>();
+  public projectCreated = new Subject<ProjectConfig | null>();
+  public imageLoaded = new Subject<ImageFromCLI | null>();
 
   constructor(private ngZone: NgZone) {
     this.initializeListeners();

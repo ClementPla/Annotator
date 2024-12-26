@@ -16,7 +16,7 @@ import { Button } from 'primeng/button';
 import { RouterModule } from '@angular/router';
 import { environment } from '../environments/environment';
 import { LabelsService } from './Services/Project/labels.service';
-import { DrawingService } from './Services/UI/drawing.service';
+import { EditorService } from './Services/UI/editor.service';
 import { PrimeNGConfig } from 'primeng/api';
 import { getDefaultColor } from './Core/misc/colors';
 import { path } from '@tauri-apps/api';
@@ -37,19 +37,18 @@ import { ProjectConfig, ImageFromCLI, SegLabel } from './Core/interface';
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, AfterViewInit {
   title = 'Client';
 
   constructor(
     public viewService: ViewService,
     public projectService: ProjectService,
-    public drawService: DrawingService,
+    public drawService: EditorService,
     private labelService: LabelsService,
     private primengConfig: PrimeNGConfig,
     private cli: CLIService,
     private cdr: ChangeDetectorRef,
     private IOService: IOService,
-    private ngZone: NgZone
   ) {}
 
 
@@ -70,6 +69,10 @@ export class AppComponent implements OnInit {
         this.load_image(imageConfig);
       }
     });
+  }
+
+  ngAfterViewInit() {
+    this.debug();
   }
 
 
@@ -102,9 +105,6 @@ export class AppComponent implements OnInit {
     this.projectService.isSegmentation = true;
     isStarted$.then(() => {
       this.projectService.openEditor(0);
-      this.drawService.useProcessing = false;
-      // this.drawService.autoPostProcess = true;
-      // this.drawService.postProcessOption = "MedSAM"
     });
   }
   create_project(config: ProjectConfig) {

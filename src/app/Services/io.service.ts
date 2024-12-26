@@ -8,6 +8,10 @@ import { LabelsService } from './Project/labels.service';
 import { ViewService } from './UI/view.service';
 import { ImageFromCLI } from '../Core/interface';
 import { BehaviorSubject } from 'rxjs';
+import { DrawService } from '../Components/Core/drawable-canvas/service/draw.service';
+import { ZoomPanService } from '../Components/Core/drawable-canvas/service/zoom-pan.service';
+import { CanvasManagerService } from '../Components/Core/drawable-canvas/service/canvas-manager.service';
+import { StateManagerService } from '../Components/Core/drawable-canvas/service/state-manager.service';
 
 @Injectable({
   providedIn: 'root',
@@ -18,7 +22,11 @@ export class IOService {
   constructor(
     private projectService: ProjectService,
     private labelService: LabelsService,
-    private viewService: ViewService
+    private viewService: ViewService,
+    private drawService: DrawService,
+    private zoomPanService: ZoomPanService,
+    private canvasManagerService: CanvasManagerService,
+    private stateService: StateManagerService
   ) {}
 
   loadPrevious() {}
@@ -89,6 +97,7 @@ export class IOService {
     currentCanvas
       .loadImage(this.projectService.activeImage!)
       .then(() => {
+        console.log('Image loaded');
         return this.checkIfDataExists();
       })
       .then((exists) => {
@@ -112,11 +121,13 @@ export class IOService {
           this.labelService.addSegLabel(segLabel);
         });
         this.labelService.rebuildTreeNodes();
-        currentCanvas.builCanvasMask();
-        this.labelService.activeLabel =
-          this.labelService.listSegmentationLabels[0];
+        
+        this.labelService.activeLabel = this.labelService.listSegmentationLabels[0];
 
-        currentCanvas.loadAllCanvas(data.masks as string[]);
+        this.canvasManagerService.initCanvas()
+        this.canvasManagerService.loadAllCanvas(data.masks as string[]);
+        
+
         return true;
       })
       .then((hasLoaded) => {
@@ -125,13 +136,13 @@ export class IOService {
           return;
         }
         currentCanvas.reload();
-        currentCanvas.resetZoomAndPan();
-        currentCanvas.refreshColor();
+        this.zoomPanService.resetZoomAndPan();
+        this.drawService.refreshColor();
         this.viewService.endLoading();
       });
   }
 
-  save(currentCanvas: DrawableCanvasComponent) {
+  save() {
     this.viewService.setLoading(true, 'Saving annotations');
     let savefile = {
       masksName: [],
@@ -152,7 +163,7 @@ export class IOService {
 
       savefile.labels.push(label.label);
       savefile.masksName.push(label.label);
-      let canvas = currentCanvas.classesCanvas[index];
+      let canvas = this.canvasManagerService.labelCanvas[index];
       let blob$ = canvas
         .convertToBlob({ type: 'image/png' })
         .then((blob) => {
@@ -167,7 +178,7 @@ export class IOService {
 
     let finished = Promise.all(allPromises$)
       .then(() => {
-        this.writeSave(savefile, currentCanvas.width, currentCanvas.height);
+        this.writeSave(savefile, this.stateService.width, this.stateService.height);
       })
       .then(() => {
         this.viewService.endLoading();

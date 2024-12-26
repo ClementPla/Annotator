@@ -1,41 +1,35 @@
-import { BehaviorSubject } from 'rxjs';
+import { Subject } from 'rxjs';
 import { Injectable } from '@angular/core';
 import { Tool, Tools } from '../../Core/canvases/tools';
 
 @Injectable({
   providedIn: 'root'
 })
-export class DrawingService {
+export class EditorService {
 
   public _lastTool: Tool;
   public autoPostProcess: boolean = false;
   public autoPostProcessOpening: boolean = false;
-  public canvasClear: BehaviorSubject<number> = new BehaviorSubject<number>(-1);
-  public canvasRedraw: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
-  public canvasSumRefresh: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public canvasClear: Subject<number> = new Subject<number>();
+  public canvasRedraw: Subject<boolean> = new Subject<boolean>();
+  public canvasSumRefresh: Subject<boolean> = new Subject<boolean>();
   public edgesOnly: boolean = false;
   public enforceConnectivity: boolean = false;
   public eraseAll: boolean = false;
   public labelOpacity: number = 1;
   public lineWidth: number = 10;
   public morphoSize: number = 3;
-  public redo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public redo: Subject<boolean> = new Subject<boolean>();
   public selectedTool: Tool = Tools.PEN;
   public swapMarkers: boolean = false;
-  public undo: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public undo: Subject<boolean> = new Subject<boolean>();
   public useInverse: boolean = false;
   public useProcessing: boolean = false;
 
   public postProcessOption: string = "otsu"
 
   public incrementAfterStroke: boolean = false;
-
-
-
   constructor() { }
-
-
-
   public activatePanMode() {
     this._lastTool = this.selectedTool;
     this.selectedTool = Tools.PAN;
@@ -61,27 +55,20 @@ export class DrawingService {
     return this.selectedTool === Tools.PEN || this.selectedTool === Tools.ERASER;
   }
 
-  public needsRefreshCanvasSum(){
-    this.canvasSumRefresh.next(true);
-  }
 
   public requestCanvasClear(index: number = -1) {
-    this.needsRefreshCanvasSum();
     this.canvasClear.next(index);
   }
 
   public requestCanvasRedraw() {
-    this.needsRefreshCanvasSum();
     this.canvasRedraw.next(true);
   }
 
   public requestRedo() {
-    this.needsRefreshCanvasSum();
     this.redo.next(true);
   }
 
   public requestUndo() {
-    this.needsRefreshCanvasSum();
     this.undo.next(true);
   }
 
@@ -89,5 +76,4 @@ export class DrawingService {
     this.selectedTool = this._lastTool;
   }
 
-  // #endregion Public Methods (12)
 }

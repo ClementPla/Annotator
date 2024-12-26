@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { DrawingService } from './UI/drawing.service';
+import { EditorService } from './UI/editor.service';
 import { OpenCVService } from './open-cv.service';
 
 @Injectable({
@@ -25,23 +25,23 @@ export class ImageProcessingService {
   edgeStrength: number = 1;
   reinforceEdges: boolean = false;
 
-  constructor(private drawService: DrawingService, private openCVService: OpenCVService) { }
+  constructor(private editorService: EditorService, private openCVService: OpenCVService) { }
 
 
   refresh() {
     this.preprocess()
-    this.drawService.requestCanvasRedraw();
+    this.editorService.requestCanvasRedraw();
   }
 
   getCurrentCanvas(): HTMLCanvasElement {
 
-    if (!this.drawService.useProcessing) {
+    if (!this.editorService.useProcessing) {
       return this.ref_canvas!;
     }
 
     if (!this.isUpdated || this.preprocessImage === null) {
       this.preprocess();
-      this.drawService.requestCanvasRedraw();
+      this.editorService.requestCanvasRedraw();
     }
 
     return this.preprocessImage!;

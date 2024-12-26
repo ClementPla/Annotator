@@ -7,7 +7,7 @@
   >
     <p
       class="absolute text-gray viewBoxMarker w-fit"
-      [style.left.px]="viewBox.xmin"
+      [style.left.px]="-viewBox.xmin"
     >
       0
     </p>
@@ -20,7 +20,7 @@
     </p>
 
     <p class="absolute viewBoxMarker w-fit" [style.left.px]="viewBox.xmax">
-      {{ width }}
+      {{ stateService.width }}
     </p>
   </div>
 
@@ -36,14 +36,13 @@
         {{ currentPixel.y }}
       </p>
       <p class="absolute viewBoxMarkerHorizontal" [style.top.px]="viewBox.ymax">
-        {{ height }}
+        {{ stateService.height }}
       </p>
     </div>
     <div
-
       #myImageContainer
       [ngStyle]="{
-        'aspect-ratio': width / height,
+        'aspect-ratio': stateService.width / stateService.height,
       }"
       [ngClass]="{
         'relative max-screen-available': !isFullscreen,
@@ -56,10 +55,10 @@
         id="image"
         class="absolute cursor-crosshair min-w-[128px] w-full"
         [ngClass]="{
-          'cursor-grab': drawService.canPan(),
-          'cursor-none': drawService.isToolWithBrushSize(),
+          'cursor-grab': editorService.canPan(),
+          'cursor-none': editorService.isToolWithBrushSize(),
           'cursor-crosshair': !(
-            drawService.isToolWithBrushSize() || drawService.canPan()
+            editorService.isToolWithBrushSize() || editorService.canPan()
           )
         }"
         (wheel)="wheel($event)"
@@ -67,16 +66,16 @@
         (mouseup)="mouseUp($event)"
         (mousemove)="mouseMove($event)"
         (mouseleave)="mouseUp($event)"
-        [width]="width"
-        [height]="height"
+        [width]="stateService.width"
+        [height]="stateService.height"
       >
       </canvas>
 
       <canvas
         #labelCanvas
         class="absolute min-w-[128px] noAntialiasing pointer-events-none w-full"
-        [width]="width"
-        [height]="height"
+        [width]="stateService.width"
+        [height]="stateService.height"
       ></canvas>
 
       <app-svgelements #svg [UIPoints]="getLassoPointsToPolygon()">
@@ -84,7 +83,7 @@
 
       <div
         class="cursor"
-        *ngIf="drawService.isToolWithBrushSize()"
+        *ngIf="editorService.isToolWithBrushSize()"
         [ngStyle]="{
           'left.px': cursor.x,
           'top.px': cursor.y,
@@ -126,7 +125,7 @@
         <p-button
           [rounded]="true"
           [raised]="true"
-          (click)="resetZoomAndPan(true, true)"
+          (click)="zoomPanService.resetZoomAndPan(true, true)"
           icon="pi pi-refresh"
           severity="help"
         >

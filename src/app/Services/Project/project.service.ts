@@ -44,16 +44,6 @@ export class ProjectService {
     if (!this.inputFolder.endsWith(sep)) {
       this.inputFolder = this.inputFolder + sep;
     }
-    // const folderExists = await exists(this.inputFolder).then((value) => { return true }).catch((err) => {
-    //   this.viewService.setLoading(false, 'Input folder does not exist.');
-    //   setTimeout(() => { this.viewService.endLoading(); }, 2000);
-    //   console.log(err)
-    //   return false;
-
-    // });
-    // if(!folderExists){
-    //   return;
-    // }
 
     this.outputFolder = await path.resolve(this.outputFolder);
     this.projectFolder = await path.join(this.outputFolder, this.projectName);

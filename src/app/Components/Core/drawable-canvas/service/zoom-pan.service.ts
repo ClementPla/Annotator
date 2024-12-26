@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Point2D, Viewbox } from '../models';
-import { BehaviorSubject } from 'rxjs';
+import { Subject } from 'rxjs';
+import { StateManagerService } from './state-manager.service';
 
 @Injectable({
   providedIn: 'root',
@@ -15,22 +16,15 @@ export class ZoomPanService {
   private targetOffset: Point2D = { x: 0, y: 0 };
   private canZoom = true;
   private canPan = true;
-  private ctx: CanvasRenderingContext2D;
-  private width: number;
-  private height: number;
+  private canvasRef: HTMLCanvasElement;
 
-  public redrawRequest = new BehaviorSubject<boolean>(false);
-  public svgRequest = new BehaviorSubject<boolean>(false);
+  public redrawRequest = new Subject<boolean>();
+  public svgRequest = new Subject<boolean>();
 
-  constructor() {}
+  constructor(private stateService: StateManagerService) {}
 
-  public setContext(ctx: CanvasRenderingContext2D) {
-    this.ctx = ctx;
-  }
-
-  public setCanvasSize(width: number, height: number) {
-    this.width = width;
-    this.height = height;
+  public setContext(ctx: HTMLCanvasElement) {
+    this.canvasRef = ctx;
   }
 
   enableDrag() {
@@ -42,12 +36,20 @@ export class ZoomPanService {
   }
 
   getViewBox(): Viewbox {
+    if (!this.canvasRef) {
+      return {
+        xmin: 0,
+        ymin: 0,
+        xmax: 0,
+        ymax: 0,
+      };
+    }
     // Return computed viewBox
     return {
       xmin: -this.offset.x / this.scale,
       ymin: -this.offset.y / this.scale,
-      xmax: this.ctx!.canvas.width / this.scale,
-      ymax: this.ctx!.canvas.height / this.scale,
+      xmax: this.stateService.width / this.scale,
+      ymax: this.stateService.height / this.scale,
     };
   }
 
@@ -56,7 +58,7 @@ export class ZoomPanService {
       return;
     }
     if (this.isDragging) {
-      const canvas = this.ctx.canvas;
+      const canvas = this.canvasRef;
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
@@ -80,7 +82,7 @@ export class ZoomPanService {
   public fromCanvasToImageCoordinates(point: Point2D): Point2D {
     const imageX = (point.x - this.offset.x) / this.scale;
     const imageY = (point.y - this.offset.y) / this.scale;
-    return { x: Math.trunc(imageX), y: Math.trunc(imageY) };
+    return { x: Math.round(imageX), y: Math.round(imageY) };
   }
 
   public getCanvasCoordinates(
@@ -93,9 +95,9 @@ export class ZoomPanService {
       ? (event as MouseEvent).clientY
       : (event as Point2D).y;
 
-    const rect = this.ctx.canvas.getBoundingClientRect();
-    const scaleX = this.ctx.canvas.width / rect.width;
-    const scaleY = this.ctx.canvas.height / rect.height;
+    const rect = this.canvasRef.getBoundingClientRect();
+    const scaleX = this.canvasRef.width / rect.width;
+    const scaleY = this.canvasRef.height / rect.height;
 
     const x = Math.round((clientX - rect.left) * scaleX);
     const y = Math.round((clientY - rect.top) * scaleY);
@@ -113,17 +115,17 @@ export class ZoomPanService {
       ? (event as MouseEvent).clientY
       : (event as Point2D).y;
 
-    const rect = this.ctx.canvas.getBoundingClientRect();
-    const scaleX = this.ctx.canvas.width / rect.width;
-    const scaleY = this.ctx.canvas.height / rect.height;
+    const rect = this.canvasRef.getBoundingClientRect();
+    const scaleX = this.canvasRef.width / rect.width;
+    const scaleY = this.canvasRef.height / rect.height;
 
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
     let imageX = (x - this.offset.x) / this.scale;
     let imageY = (y - this.offset.y) / this.scale;
-    imageX = Math.min(this.width - 1, Math.max(0, imageX));
-    imageY = Math.min(this.height - 1, Math.max(0, imageY));
+    imageX = Math.min(this.stateService.width - 1, Math.max(0, imageX));
+    imageY = Math.min(this.stateService.height - 1, Math.max(0, imageY));
 
     return { x: Math.round(imageX), y: Math.round(imageY) };
   }
@@ -215,6 +217,14 @@ export class ZoomPanService {
     this.targetOffset.x = canvasCoord.x - imageCoord.x * this.targetScale;
     this.targetOffset.y = canvasCoord.y - imageCoord.y * this.targetScale;
     this.smoothUpdateTransform();
+  }
+
+  getScale() {
+    return this.scale;
+  }
+
+  getOffset() {
+    return this.offset;
   }
 
 }

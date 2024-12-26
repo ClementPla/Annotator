@@ -8,7 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { TreeNode } from 'primeng/api';
 import { Button } from 'primeng/button';
 import { SegLabel } from '../../../../Core/interface';
-import { DrawingService } from '../../../../Services/UI/drawing.service';
+import { EditorService } from '../../../../Services/UI/editor.service';
 import { PanelModule } from 'primeng/panel';
 import { FieldsetModule } from 'primeng/fieldset';
 import { InstanceLabelComponent } from './instance-label/instance-label.component';
@@ -26,7 +26,7 @@ export class LabelsComponent implements OnInit {
 
 
 
-  constructor(public labelsService: LabelsService, public drawService: DrawingService, public projectService: ProjectService) {
+  constructor(public labelsService: LabelsService, public drawService: EditorService, public projectService: ProjectService) {
 
   }
 
