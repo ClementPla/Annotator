@@ -22,17 +22,7 @@
             </div>
             <ng-container *ngIf="projectService.isClassification">
                 <p-fieldset legend="Classification configuration" [toggleable]="true">
-                    <div class="flex flex-col gap-4 items-center">
-                        <div *ngFor="let label of labelService.listClassificationLabels, let i=index"
-                            class="flex flex-row gap-4 items-center">
-                            <label [for]="label">Class {{i}}:</label>
-                            <input pInputText [id]="label.label" aria-describedby="inputPath-help"
-                                [(ngModel)]="label.label" />
-                            <p-checkbox [(ngModel)]="label.isExclusive" [binary]="true"></p-checkbox>
-                        </div>
-                        <p-button class="flex items-center" label="Add class"
-                            (click)="addClassificationClass()"></p-button>
-                    </div>
+                    <app-classification-configuration></app-classification-configuration>
                 </p-fieldset>
             </ng-container>
 

@@ -7,7 +7,7 @@ import { DrawableCanvasComponent } from '../Components/Core/drawable-canvas/comp
 import { LabelsService } from './Project/labels.service';
 import { ViewService } from './UI/view.service';
 import { ImageFromCLI } from '../Core/interface';
-import { BehaviorSubject } from 'rxjs';
+import { Subject } from 'rxjs';
 import { DrawService } from '../Components/Core/drawable-canvas/service/draw.service';
 import { ZoomPanService } from '../Components/Core/drawable-canvas/service/zoom-pan.service';
 import { CanvasManagerService } from '../Components/Core/drawable-canvas/service/canvas-manager.service';
@@ -17,7 +17,7 @@ import { StateManagerService } from '../Components/Core/drawable-canvas/service/
   providedIn: 'root',
 })
 export class IOService {
-  public requestedReload: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+  public requestedReload: Subject<boolean> = new Subject<boolean>();
 
   constructor(
     private projectService: ProjectService,
@@ -36,7 +36,7 @@ export class IOService {
   requestReload() {
     this.requestedReload.next(true);
   }
-  
+
   checkIfDataExists(): Promise<boolean> {
     return this.getActiveSavePath().then((filepath) => {
       return invoke<boolean>('check_file_exists', { filepath })
@@ -48,7 +48,6 @@ export class IOService {
         });
     });
   }
-
 
   loadExistingAnnotations(): Promise<LabelFormat> {
     return this.getActiveSavePath()
@@ -93,13 +92,8 @@ export class IOService {
       });
   }
 
-  load(currentCanvas: DrawableCanvasComponent) {
-    currentCanvas
-      .loadImage(this.projectService.activeImage!)
-      .then(() => {
-        console.log('Image loaded');
-        return this.checkIfDataExists();
-      })
+  async load() {
+    return this.checkIfDataExists()
       .then((exists) => {
         if (exists) {
           return this.loadExistingAnnotations();
@@ -121,24 +115,14 @@ export class IOService {
           this.labelService.addSegLabel(segLabel);
         });
         this.labelService.rebuildTreeNodes();
-        
-        this.labelService.activeLabel = this.labelService.listSegmentationLabels[0];
 
-        this.canvasManagerService.initCanvas()
+        this.labelService.activeLabel =
+          this.labelService.listSegmentationLabels[0];
+
+        this.canvasManagerService.initCanvas();
         this.canvasManagerService.loadAllCanvas(data.masks as string[]);
-        
-
-        return true;
-      })
-      .then((hasLoaded) => {
-        if (!hasLoaded){
-          this.viewService.endLoading();
-          return;
-        }
-        currentCanvas.reload();
-        this.zoomPanService.resetZoomAndPan();
-        this.drawService.refreshColor();
         this.viewService.endLoading();
+        return true;
       });
   }
 
@@ -178,7 +162,11 @@ export class IOService {
 
     let finished = Promise.all(allPromises$)
       .then(() => {
-        this.writeSave(savefile, this.stateService.width, this.stateService.height);
+        this.writeSave(
+          savefile,
+          this.stateService.width,
+          this.stateService.height
+        );
       })
       .then(() => {
         this.viewService.endLoading();
@@ -187,8 +175,7 @@ export class IOService {
     return finished;
   }
 
-  saveFromCLI(data: ImageFromCLI){
-
+  saveFromCLI(data: ImageFromCLI) {
     let savefile = {
       masksName: [],
       masks: [],
@@ -207,7 +194,7 @@ export class IOService {
 
       savefile.labels.push(label.label);
       savefile.masksName.push(label.label);
-      if(data.mask_data){
+      if (data.mask_data) {
         savefile.masks.push(data.mask_data[index]);
       }
       savefile.colors.push(label.color);
@@ -249,7 +236,6 @@ export class IOService {
   }
 
   async getActiveSavePath() {
-    
     const imageName =
       this.projectService.imagesName[this.projectService.activeIndex!];
 

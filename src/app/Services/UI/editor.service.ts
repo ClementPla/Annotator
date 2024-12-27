@@ -30,6 +30,7 @@ export class EditorService {
 
   public incrementAfterStroke: boolean = false;
   constructor() { }
+  
   public activatePanMode() {
     this._lastTool = this.selectedTool;
     this.selectedTool = Tools.PAN;

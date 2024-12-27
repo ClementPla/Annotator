@@ -1,10 +1,8 @@
 import { Injectable } from '@angular/core';
-import { SegLabel } from '../../../../Core/interface';
 import { StateManagerService } from './state-manager.service';
 import { LabelsService } from '../../../../Services/Project/labels.service';
 import { OpenCVService } from '../../../../Services/open-cv.service';
 import { EditorService } from '../../../../Services/UI/editor.service';
-import { DrawService } from './draw.service';
 import { Subject } from 'rxjs';
 
 @Injectable({
@@ -34,7 +32,6 @@ export class CanvasManagerService {
     this.labelCanvas = [];
     this.canvasCtx = [];
     this.labelService.listSegmentationLabels.forEach((label) => {
-      console.log(this.stateService.width, this.stateService.height);
       const canvas = new OffscreenCanvas(this.stateService.width, this.stateService.height);
       this.labelCanvas.push(canvas);
       this.canvasCtx.push(canvas.getContext('2d', {'alpha': true})!);
@@ -57,7 +54,6 @@ export class CanvasManagerService {
       }
       this.combinedCtx.drawImage(canvas, 0, 0);
     });
-    this.stateService.recomputeCanvasSum = false;
   }
 
   clearCanvasAtIndex(index: number){

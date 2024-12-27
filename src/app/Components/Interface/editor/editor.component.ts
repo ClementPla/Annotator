@@ -3,6 +3,7 @@ import {
   ChangeDetectorRef,
   Component,
   Host,
+  OnDestroy,
   OnInit,
   ViewChild,
 } from '@angular/core';
@@ -11,7 +12,7 @@ import { DrawableCanvasComponent } from '../../Core/drawable-canvas/component/dr
 import { ToolbarComponent } from './toolbar/toolbar.component';
 import { LabelsComponent } from './labels/labels.component';
 import { ProjectService } from '../../../Services/Project/project.service';
-import { NgIf, NgStyle } from '@angular/common';
+import { NgIf } from '@angular/common';
 import { HostListener } from '@angular/core';
 import { EditorService } from '../../../Services/UI/editor.service';
 import { Tools } from '../../../Core/canvases/tools';
@@ -20,6 +21,7 @@ import { LabelsService } from '../../../Services/Project/labels.service';
 import { PanelModule } from 'primeng/panel';
 import { ButtonModule } from 'primeng/button';
 import { IOService } from '../../../Services/io.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-editor',
@@ -32,20 +34,21 @@ import { IOService } from '../../../Services/io.service';
     NgIf,
     PanelModule,
     ToolSettingComponent,
-    NgStyle,
   ],
   templateUrl: './editor.component.html',
   styleUrl: './editor.component.scss',
 })
-export class EditorComponent implements OnInit, AfterViewInit {
+export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(DrawableCanvasComponent) canvas: DrawableCanvasComponent;
   public viewPortSize: number = 800;
+  private subscriptions = new Subscription();
+
+  
   constructor(
     public projectService: ProjectService,
     private drawService: EditorService,
     private labelService: LabelsService,
-    public IOService: IOService,
-    private cdr: ChangeDetectorRef
+    public IOService: IOService
   ) {
     this.IOService.requestedReload.subscribe((value) => {
       if (value) {
@@ -54,18 +57,51 @@ export class EditorComponent implements OnInit, AfterViewInit {
     });
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.initializeSubscriptions()
+  }
   ngAfterViewInit() {
-   
-    console.log('EditorComponent: ngAfterViewInit');
-    this.loadCanvas();
+    void this.loadCanvas();
   }
 
-  async loadCanvas() {
-    if(!this.canvas){
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+  }
+
+  private initializeSubscriptions(): void {
+    this.subscriptions.add(
+      this.IOService.requestedReload.subscribe({
+        next: (shouldReload: boolean) => {
+          if (shouldReload) {
+            void this.loadCanvas();
+          }
+        },
+        error: (error: Error) => {
+          console.error('Reload subscription error:', error);
+        }
+      })
+    );
+  }
+
+  public async loadCanvas(): Promise<void> {
+    if (!this.canvas || !this.projectService.activeImage) {
+      console.warn('Canvas or active image not available');
       return;
     }
-    await this.IOService.load(this.canvas);
+
+    try {
+      await this.canvas.loadImage(this.projectService.activeImage);
+      const hasLoaded = await this.IOService.load();
+      
+      if (hasLoaded) {
+        this.canvas.reload();
+      } else {
+        throw new Error('Failed to load canvas data');
+      }
+    } catch (error) {
+      console.error('Error loading canvas:', error);
+      // Handle error appropriately (e.g., show user feedback)
+    }
   }
 
   initSize() {
@@ -112,6 +148,7 @@ export class EditorComponent implements OnInit, AfterViewInit {
 
   @HostListener('window:keydown.tab', ['$event'])
   switchAllVisibility(e: KeyboardEvent) {
+    e.preventDefault();
     this.labelService.switchVisibilityAllSegLabels();
     this.drawService.requestCanvasRedraw();
   }

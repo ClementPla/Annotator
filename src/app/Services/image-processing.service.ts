@@ -8,7 +8,8 @@ import { OpenCVService } from './open-cv.service';
 export class ImageProcessingService {
 
   ref_image: HTMLImageElement;
-  private ref_canvas: HTMLCanvasElement | null = null;
+  private ref_canvas: HTMLCanvasElement | null = null; 
+  // We don't use OffscreenCanvas because it's not supported by OpenCV.js
   preprocessImage: HTMLCanvasElement | null = null;
 
   to_BW: boolean = false;
@@ -70,7 +71,6 @@ export class ImageProcessingService {
       this.preprocessImage.height = this.ref_image.height;
 
     }
-    // TODO: Implement image processing
     this.preprocessImage.getContext('2d', { alpha: false, willReadFrequently: false })!.drawImage(this.ref_canvas, 0, 0);
 
     if(this.stretchHist) {

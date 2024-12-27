@@ -7,7 +7,7 @@
   >
     <p
       class="absolute text-gray viewBoxMarker w-fit"
-      [style.left.px]="-viewBox.xmin"
+      [style.left.px]="viewBox.xmin"
     >
       0
     </p>
@@ -68,6 +68,7 @@
         (mouseleave)="mouseUp($event)"
         [width]="stateService.width"
         [height]="stateService.height"
+        [attr.passive]="true"
       >
       </canvas>
 

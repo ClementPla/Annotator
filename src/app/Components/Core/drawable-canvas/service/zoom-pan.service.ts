@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Point2D, Viewbox } from '../models';
+import { Point2D, Rect, Viewbox } from '../models';
 import { Subject } from 'rxjs';
 import { StateManagerService } from './state-manager.service';
 
@@ -19,12 +19,11 @@ export class ZoomPanService {
   private canvasRef: HTMLCanvasElement;
 
   public redrawRequest = new Subject<boolean>();
-  public svgRequest = new Subject<boolean>();
 
   constructor(private stateService: StateManagerService) {}
 
-  public setContext(ctx: HTMLCanvasElement) {
-    this.canvasRef = ctx;
+  public setContext(canvasRef: HTMLCanvasElement) {
+    this.canvasRef = canvasRef;
   }
 
   enableDrag() {
@@ -45,12 +44,25 @@ export class ZoomPanService {
       };
     }
     // Return computed viewBox
-    return {
-      xmin: -this.offset.x / this.scale,
-      ymin: -this.offset.y / this.scale,
-      xmax: this.stateService.width / this.scale,
-      ymax: this.stateService.height / this.scale,
-    };
+
+    let rect = this.canvasRef.getBoundingClientRect();
+
+    let canvasScale = rect.width / this.stateService.width;
+    let xmin = Math.round(this.offset.x * canvasScale);
+    let xmax = xmin + this.stateService.width * this.scale * canvasScale;
+    let ymin = Math.round(this.offset.y * canvasScale);
+    let ymax = ymin + this.stateService.height * this.scale * canvasScale;
+
+    return { xmin: xmin, ymin: ymin, xmax: xmax, ymax: ymax };
+
+  }
+
+  getSVGViewBox(): Rect {
+    const viewBoxX = -this.offset.x / this.scale;
+    const viewBoxY = -this.offset.y / this.scale;
+    const viewBoxWidth = this.stateService.width / this.scale;
+    const viewBoxHeight = this.stateService.width / this.scale;
+    return {x: viewBoxX, y: viewBoxY, width: viewBoxWidth, height: viewBoxHeight};
   }
 
   public drag(event: MouseEvent) {
@@ -70,7 +82,6 @@ export class ZoomPanService {
       this.targetOffset.y += dy;
       this.offset.x += dx;
       this.offset.y += dy;
-      this.svgRequest.next(true);
       this.redrawRequest.next(true);
     }
   }
@@ -155,12 +166,12 @@ export class ZoomPanService {
   }
 
   public resetZoomAndPan(smooth: boolean = true, redraw: boolean = true) {
+    this.stateService.recomputeCanvasSum = false;
     this.targetScale = 1;
     this.targetOffset = { x: 0, y: 0 };
     if (!redraw) {
       return;
     }
-    this.svgRequest.next(true);
 
     if (smooth) {
       this.smoothUpdateTransform();
@@ -178,12 +189,11 @@ export class ZoomPanService {
       this.offset.x + (this.targetOffset.x - this.offset.x) * easeFactor;
     const newOffsetY =
       this.offset.y + (this.targetOffset.y - this.offset.y) * easeFactor;
-    this.svgRequest.next(true);
 
     if (
-      Math.abs(this.targetScale - newScale) > 0.2 ||
-      Math.abs(this.targetOffset.x - newOffsetX) > 0.2 ||
-      Math.abs(this.targetOffset.y - newOffsetY) > 0.2
+      Math.abs(this.targetScale - newScale) > 0.05 ||
+      Math.abs(this.targetOffset.x - newOffsetX) > 1 ||
+      Math.abs(this.targetOffset.y - newOffsetY) > 1
     ) {
       this.scale = newScale;
       this.offset.x = newOffsetX;

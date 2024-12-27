@@ -108,6 +108,7 @@ export class ProjectService {
       .join(this.inputFolder, this.imagesName[index])
       .then((filepath) => {
         this.activeImage = loadImageFile(filepath);
+        
         return this.activeImage.then((image) => {
           return this.viewService.navigateToEditor()?.then(() => {
             this.viewService.endLoading();

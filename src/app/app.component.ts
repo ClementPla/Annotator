@@ -17,12 +17,15 @@ import { RouterModule } from '@angular/router';
 import { environment } from '../environments/environment';
 import { LabelsService } from './Services/Project/labels.service';
 import { EditorService } from './Services/UI/editor.service';
-import { PrimeNGConfig } from 'primeng/api';
 import { getDefaultColor } from './Core/misc/colors';
 import { path } from '@tauri-apps/api';
 import { CLIService } from './Services/cli.service';
 import { IOService } from './Services/io.service';
 import { ProjectConfig, ImageFromCLI, SegLabel } from './Core/interface';
+
+import { PrimeNG } from 'primeng/config';
+import Aura from '@primeng/themes/aura';
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -45,15 +48,23 @@ export class AppComponent implements OnInit, AfterViewInit {
     public projectService: ProjectService,
     public drawService: EditorService,
     private labelService: LabelsService,
-    private primengConfig: PrimeNGConfig,
     private cli: CLIService,
     private cdr: ChangeDetectorRef,
     private IOService: IOService,
-  ) {}
-
+    private primeNG: PrimeNG
+  ) {
+    this.primeNG.theme.set({
+      preset: Aura,
+      options: {
+        cssLayer: {
+          name: 'primeng',
+          order: 'tailwind-base, primeng, tailwind-utilities',
+        },
+      },
+    });
+  }
 
   ngOnInit(): void {
-    this.primengConfig.ripple = true;
     this.cli.commandProcessed.subscribe((value) => {
       if (value) {
         this.cdr.detectChanges();
@@ -72,9 +83,9 @@ export class AppComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    this.debug();
+    this.projectService.isClassification = true;
+    // this.debug();
   }
-
 
   async debug() {
     this.labelService.addSegLabel({
@@ -101,8 +112,9 @@ export class AppComponent implements OnInit, AfterViewInit {
       isVisible: true,
       shades: null,
     });
-    let isStarted$ = this.projectService.startProject();
     this.projectService.isSegmentation = true;
+
+    let isStarted$ = this.projectService.startProject();
     isStarted$.then(() => {
       this.projectService.openEditor(0);
     });

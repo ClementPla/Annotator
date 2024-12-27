@@ -221,7 +221,7 @@ export class DrawService {
         if (this.editorService.autoPostProcess) {
           this.applyLasso(bufferCtx);
         } else {
-          this.applyLasso(bufferCtx);
+          this.applyLasso(activeCtx);
         }
         break;
       case Tools.LASSO_ERASER:
@@ -248,6 +248,7 @@ export class DrawService {
     }
 
     await postProcessCallback?.then(() => {
+      console.log('Requesting redraw')
       this.redrawRequest.next(true);
     });
 
@@ -484,11 +485,13 @@ export class DrawService {
       ctx = inputCtx;
     }
     if (!ctx) {
+      ctx = this.canvasManagerService.canvasCtx[this.canvasManagerService.canvasCtx.length - 1];
+      this.labelService.activeLabel = this.labelService.listSegmentationLabels[this.labelService.listSegmentationLabels.length - 1];
+    }
+    if (!ctx) {
       return;
     }
     let color = inputColor ? inputColor : this.labelService.activeLabel?.color;
-
-    console.log('refresh color', color);
 
     ctx.fillStyle = color ? color : '#ffffff';
     ctx.strokeStyle = color ? color : '#ffffff';
@@ -498,6 +501,12 @@ export class DrawService {
     ctx.globalCompositeOperation = 'source-over';
 
     this.redrawRequest.next(true);
+  }
+
+  refreshAllColors() {
+    this.canvasManagerService.getAllCanvasCtx().forEach((ctx, index) => {
+      this.refreshColor(ctx, this.labelService.listSegmentationLabels[index].color);
+    });
   }
 
   public startDraw() {

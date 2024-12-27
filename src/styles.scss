@@ -1,24 +1,15 @@
 @use "assets/css/variables" as *;
 
-
-@import "primeicons/primeicons.css";
-@import "primeng/resources/themes/bootstrap4-dark-purple/theme.css";
-
-@import "primeng/resources/primeng";
-
 @layer tailwind-base, primeng, tailwind-utilities;
-        
+
 @layer tailwind-base {
-    @tailwind base;
+@tailwind base;
 }
 
 @layer tailwind-utilities {
-    @tailwind components;
-    @tailwind utilities;
+@tailwind components;
+@tailwind utilities;
 }
-
-
-@layer reset, primeng;
 
 
 html,

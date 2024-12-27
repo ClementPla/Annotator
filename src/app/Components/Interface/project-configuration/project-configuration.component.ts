@@ -19,12 +19,13 @@ import { ColorPickerModule } from 'primeng/colorpicker';
 import { CheckboxModule } from 'primeng/checkbox';
 import { SegLabel } from '../../../Core/interface';
 import { CLIService } from '../../../Services/cli.service';
-
+import { ClassificationConfigurationComponent } from "./classification-configuration/classification-configuration.component";
 @Component({
   selector: 'app-project-configuration',
   standalone: true,
   imports: [
     CardModule,
+    ClassificationConfigurationComponent,
     NgClass,
     NgIf,
     NgFor,
@@ -39,7 +40,8 @@ import { CLIService } from '../../../Services/cli.service';
     InputTextModule,
     FieldsetModule,
     LabelledSwitchComponent,
-  ],
+    ClassificationConfigurationComponent
+],
   templateUrl: './project-configuration.component.html',
   styleUrl: './project-configuration.component.scss',
 })
@@ -103,7 +105,6 @@ export class ProjectConfigurationComponent implements OnInit {
       isVisible: true,
       shades: null,
     });
-    this.cdr.detectChanges();
   }
   deleteSegmentationClass(segLabel: SegLabel) {
     this.labelService.removeSegLabel(segLabel);
@@ -114,6 +115,5 @@ export class ProjectConfigurationComponent implements OnInit {
       label: 'Class ' + this.labelService.listClassificationLabels.length,
       isExclusive: true,
     });
-    this.cdr.detectChanges();
   }
 }

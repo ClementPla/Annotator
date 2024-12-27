@@ -1,8 +1,10 @@
 import {
   AfterViewInit,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Output,
   ViewChild,
 } from '@angular/core';
@@ -62,13 +64,13 @@ export class DrawableCanvasComponent implements AfterViewInit {
     private canvasManagerService: CanvasManagerService,
     public stateService: StateManagerService,
     private drawService: DrawService,
-    private undoRedoService: UndoRedoService
+    private undoRedoService: UndoRedoService,
+    private cdr: ChangeDetectorRef
   ) {
     this.initSubscriptions();
-  } 
+  }
 
   private initSubscriptions() {
-
     this.zoomPanService.redrawRequest.subscribe((value) => {
       if (value) {
         this.redrawAllCanvas();
@@ -77,24 +79,18 @@ export class DrawableCanvasComponent implements AfterViewInit {
 
     this.canvasManagerService.requestRedraw.subscribe((value) => {
       if (value) {
+        this.drawService.refreshAllColors();
         this.redrawAllCanvas();
       }
     });
 
-    this.zoomPanService.svgRequest.subscribe((value) => {
+    this.drawService.redrawRequest.subscribe((value) => {
       if (value) {
-        const viewbox = this.zoomPanService.getViewBox();
-        const rect = {
-          x: viewbox.xmin,
-          y: viewbox.ymin,
-          width: viewbox.xmax - viewbox.xmin,
-          height: viewbox.ymax - viewbox.ymin,
-        };
-        this.svg.setViewBox(rect);
+        this.redrawAllCanvas();
       }
     });
 
-  this.drawService.singleDrawRequest.subscribe((ctx) => {
+    this.drawService.singleDrawRequest.subscribe((ctx) => {
       if (ctx) {
         this.ctxLabel.drawImage(ctx.canvas, 0, 0);
       }
@@ -107,23 +103,23 @@ export class DrawableCanvasComponent implements AfterViewInit {
     });
   }
 
-  public ngAfterViewInit(): void {    
+  public async ngAfterViewInit() {
     this.ctxImage = this.imgCanvas.nativeElement.getContext('2d', {
       alpha: false,
     })!;
     this.ctxLabel = this.labelCanvas.nativeElement.getContext('2d', {
       alpha: true,
     })!;
+
     this.zoomPanService.setContext(this.imgCanvas.nativeElement);
-    this.canvasManagerService.initCanvas();
     this.undoRedoService.empty();
+    if (this.projectService.activeImage) {
+      await this.loadImage(this.projectService.activeImage);
+    }
   }
 
   public initalizeDims() {
-    this.stateService.setWidthAndHeight(
-      this.image.width,
-      this.image.height
-    );
+    this.stateService.setWidthAndHeight(this.image.width, this.image.height);
 
     this.imgCanvas.nativeElement.width = this.stateService.width; // This is the canvas with the main image
     this.imgCanvas.nativeElement.height = this.stateService.height;
@@ -168,18 +164,24 @@ export class DrawableCanvasComponent implements AfterViewInit {
   public loadImage(image: Promise<string>) {
     return image.then((img) => {
       this.srcImg = img;
+      this.cdr.detectChanges();
       this.reload();
     });
   }
-
   public wheel(event: WheelEvent): void {
+    event.preventDefault();
+    if(event.ctrlKey){
+      this.editorService.lineWidth += event.deltaY > 0 ? -2 : 2;
+      this.editorService.lineWidth = Math.max(1, this.editorService.lineWidth);
+      return;
+
+    }
     this.stateService.recomputeCanvasSum = false;
 
     this.zoomPanService.wheel(event);
     // Transform mouse coordinates to canvas coordinates
     this.currentPixel = this.zoomPanService.getImageCoordinates(event);
     this.viewBox = this.zoomPanService.getViewBox();
-
   }
 
   public mouseDown(event: MouseEvent) {
@@ -210,7 +212,6 @@ export class DrawableCanvasComponent implements AfterViewInit {
       this.stateService.recomputeCanvasSum = false;
       this.zoomPanService.drag(event);
       this.viewBox = this.zoomPanService.getViewBox();
-  
     } else {
       this.stateService.recomputeCanvasSum = true;
       this.drawService.draw(event);
@@ -222,19 +223,17 @@ export class DrawableCanvasComponent implements AfterViewInit {
       this.editorService.restoreLastTool();
     }
 
-    if (this.editorService.canPan()){
+    if (this.editorService.canPan()) {
       this.zoomPanService.endDrag();
-    } 
-    else {
+    } else {
       this.drawService.endDraw();
     }
   }
 
-
   public redrawAllCanvas() {
     // Redraw the main image
-
     this.viewBox = this.zoomPanService.getViewBox();
+    this.svg.setViewBox(this.zoomPanService.getSVGViewBox());
 
     if (!this.image.complete || this.image.naturalWidth === 0) {
       console.error('Image is not fully loaded or is invalid');
@@ -256,7 +255,7 @@ export class DrawableCanvasComponent implements AfterViewInit {
     // This is the canvas with the main image
     this.ctxImage.resetTransform();
     this.drawService.clearCanvas(this.ctxImage);
-    this.ctxImage.translate(Math.round(offset.x), Math.round(offset.y));
+    this.ctxImage.translate(Math.floor(offset.x), Math.floor(offset.y));
     this.ctxImage.scale(scale, scale);
     let image = this.imageProcessingService.getCurrentCanvas();
     this.ctxImage.drawImage(
@@ -270,11 +269,12 @@ export class DrawableCanvasComponent implements AfterViewInit {
     this.drawService.clearCanvas(this.ctxLabel);
 
     this.ctxLabel.resetTransform();
-    this.ctxLabel.translate(offset.x, offset.y);
+    this.ctxLabel.translate(Math.floor(offset.x), Math.floor(offset.y));
     this.ctxLabel.scale(scale, scale);
 
     if (this.stateService.recomputeCanvasSum) {
       this.canvasManagerService.computeCombinedCanvas();
+      this.stateService.recomputeCanvasSum = false;
     }
 
     this.ctxLabel.globalAlpha = this.editorService.labelOpacity;
@@ -291,17 +291,23 @@ export class DrawableCanvasComponent implements AfterViewInit {
     this.image.src = this.srcImg;
 
     this.image.onload = () => {
+      this.stateService.recomputeCanvasSum = true;
       this.imageLoaded.emit(true);
 
       this.imageProcessingService.setImage(this.image);
       this.drawService.clearCanvas(this.ctxLabel);
       this.drawService.clearCanvas(this.ctxImage!);
-      this.canvasManagerService.resetCombinedCanvas();
 
       this.initalizeDims();
-      this.redrawAllCanvas();
+
+      this.canvasManagerService.initCanvas();
+      this.canvasManagerService.resetCombinedCanvas();
+
       this.undoRedoService.empty();
       this.viewService.endLoading();
+      requestAnimationFrame(() => {
+        this.redrawAllCanvas();
+      });
     };
   }
 
@@ -311,6 +317,7 @@ export class DrawableCanvasComponent implements AfterViewInit {
 
   public loadAllCanvas(masks: string[]) {
     this.canvasManagerService.loadAllCanvas(masks);
+    
   }
 
   public switchFullScreen() {
