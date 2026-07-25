@@ -125,22 +125,41 @@
       </label>
     </div>
 
-    <p-button
-      label="Run learning curve"
-      icon="pi pi-play"
-      [disabled]="!canRun()"
-      [loading]="running()"
-      (onClick)="run()"
-    />
+    <div class="actions">
+      <p-button
+        label="Train model"
+        icon="pi pi-bolt"
+        [disabled]="!canRun()"
+        [loading]="running() && job() === 'train'"
+        (onClick)="trainModel()"
+      />
+      <p-button
+        label="Run learning curve"
+        icon="pi pi-chart-line"
+        severity="secondary"
+        [disabled]="!canRun()"
+        [loading]="running() && job() === 'curve'"
+        (onClick)="run()"
+      />
+    </div>
+    <p class="muted hint">
+      <strong>Train model</strong> fits one head on every frame and keeps it for
+      per-frame prediction. <strong>Learning curve</strong> retrains at
+      increasing budgets to show how quality scales — slower, and it does not
+      leave a usable model behind.
+    </p>
 
     @if (running()) {
       <div class="prog">
         <p-progressBar [value]="progressPercent()" />
-        @if (progress(); as p) {
-          <span class="muted">
-            {{ p.stage }} — {{ p.done }} / {{ p.total }}
-          </span>
-        }
+        <div class="prog-row">
+          <span class="muted">{{ progressLabel() }}</span>
+          @if (lossPath(); as d) {
+            <svg viewBox="0 0 240 34" class="spark" aria-label="training loss">
+              <path [attr.d]="d" />
+            </svg>
+          }
+        </div>
       </div>
     }
 
@@ -148,6 +167,36 @@
       <p class="err">{{ e }}</p>
     }
   </p-card>
+
+  <!-- Trained model -->
+  @if (model(); as m) {
+    <p-card styleClass="lab-card">
+      <ng-template pTemplate="title">Current model</ng-template>
+      <div class="stats">
+        <div class="stat">
+          <span class="v">{{ fmt(m.metrics.meanDice) }}</span>
+          <span class="k">held-out mean Dice</span>
+        </div>
+        <div class="stat">
+          <span class="v">{{ fmt(m.metrics.accuracy) }}</span>
+          <span class="k">accuracy</span>
+        </div>
+        <div class="stat">
+          <span class="v">{{ m.trainFrames }}</span>
+          <span class="k">frames trained on</span>
+        </div>
+        <div class="stat">
+          <span class="v">{{ m.featureDim }}</span>
+          <span class="k">features</span>
+        </div>
+      </div>
+      <p class="muted">
+        Feature source: {{ m.encoder ?? 'local basis only' }}. The head is held
+        in memory for this session — apply it per frame from the editor, or
+        retrain after annotating more.
+      </p>
+    </p-card>
+  }
 
   <!-- Results -->
   @if (report(); as r) {

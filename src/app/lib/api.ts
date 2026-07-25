@@ -331,11 +331,55 @@ export interface CurveOptions {
   seed?: number;
 }
 
-/** Payload of the `ml-progress` event emitted during a sweep. */
+/** Payload of the `ml-progress` event (feature extraction phase). */
 export interface MlProgress {
   stage: string;
   done: number;
   total: number;
+}
+
+/**
+ * Payload of `ml-train-progress`, emitted once per epoch. Training dominates
+ * wall-clock, so this is what keeps the UI honest during the slow phase.
+ */
+export interface TrainTick {
+  budget: number;
+  repeat: number;
+  epoch: number;
+  epochs: number;
+  loss: number;
+  /** Fit index within a sweep; both 0 for a single training run. */
+  point: number;
+  points: number;
+}
+
+export interface TrainSummary {
+  trainFrames: number;
+  valFrames: number;
+  featureDim: number;
+  classes: number;
+  encoder: string | null;
+  metrics: EvalMetrics;
+}
+
+export interface PredictedMask {
+  labelId: number;
+  /** Base64 uint8 mask at native resolution, 1 where predicted. */
+  maskBase64: string;
+  coverage: number;
+}
+
+export interface PredictedFrame {
+  frameId: number;
+  width: number;
+  height: number;
+  masks: PredictedMask[];
+}
+
+/** Scribble conditioning: flat pixel indices at native resolution. */
+export interface ScribbleInput {
+  positive: number[];
+  negative: number[];
 }
 
 export const api = {
@@ -492,6 +536,11 @@ export const api = {
   mlDatasetSummary: () => invoke<DatasetSummary>('ml_dataset_summary'),
   mlRunLearningCurve: (options: CurveOptions) =>
     invoke<CurveReport>('ml_run_learning_curve', { options }),
+  mlTrainModel: (options: CurveOptions) =>
+    invoke<TrainSummary>('ml_train_model', { options }),
+  mlModelStatus: () => invoke<TrainSummary | null>('ml_model_status'),
+  mlPredictFrame: (frameId: number, scribbles?: ScribbleInput) =>
+    invoke<PredictedFrame>('ml_predict_frame', { frameId, scribbles }),
 
   scanAndImportFolder: (options: {
     folder_path: string;

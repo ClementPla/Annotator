@@ -18,6 +18,8 @@ import {
   DatasetSummary,
   EncoderStatus,
   MlProgress,
+  TrainSummary,
+  TrainTick,
 } from '../../../lib/api';
 
 /** One budget's aggregated result: mean Dice plus the spread across draws. */
@@ -57,7 +59,14 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   readonly running = signal(false);
   readonly downloading = signal<string | null>(null);
   readonly progress = signal<MlProgress | null>(null);
+  readonly tick = signal<TrainTick | null>(null);
   readonly error = signal<string | null>(null);
+
+  /** What the running job is, so the UI can label it accurately. */
+  readonly job = signal<'curve' | 'train' | null>(null);
+  readonly model = signal<TrainSummary | null>(null);
+  /** Rolling loss history for the current fit, for a sparkline. */
+  readonly lossHistory = signal<number[]>([]);
 
   // Training knobs, deliberately few: these are the ones that change the
   // answer rather than the aesthetics.
@@ -66,19 +75,30 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   epochs = 40;
   curveRepeats = 3;
 
-  private unlisten: UnlistenFn | null = null;
+  private unlisten: UnlistenFn[] = [];
 
   constructor(private messages: MessageService) {}
 
   async ngOnInit(): Promise<void> {
-    this.unlisten = await listen<MlProgress>('ml-progress', (e) =>
-      this.progress.set(e.payload),
+    this.unlisten.push(
+      await listen<MlProgress>('ml-progress', (e) =>
+        this.progress.set(e.payload),
+      ),
+      await listen<TrainTick>('ml-train-progress', (e) => {
+        const t = e.payload;
+        this.tick.set(t);
+        // Reset the trace when a new fit starts, so the sparkline shows this
+        // fit's convergence rather than every fit concatenated.
+        this.lossHistory.update((h) =>
+          t.epoch <= 1 ? [t.loss] : [...h.slice(-199), t.loss],
+        );
+      }),
     );
     await this.refresh();
   }
 
   ngOnDestroy(): void {
-    this.unlisten?.();
+    this.unlisten.forEach((u) => u());
   }
 
   async refresh(): Promise<void> {
@@ -89,6 +109,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       ]);
       this.encoders.set(encoders);
       this.summary.set(summary);
+      this.model.set(await api.mlModelStatus());
     } catch (e) {
       this.error.set(String(e));
     }
@@ -134,32 +155,109 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     this.selectedEncoder.set(id);
   }
 
-  async run(): Promise<void> {
+  private options() {
+    return {
+      encoderId: this.selectedEncoder(),
+      workingSize: this.workingSize,
+      pixelsPerFrame: this.pixelsPerFrame,
+      epochs: this.epochs,
+      curveRepeats: this.curveRepeats,
+    };
+  }
+
+  private begin(job: 'curve' | 'train'): void {
     this.running.set(true);
+    this.job.set(job);
     this.error.set(null);
-    this.report.set(null);
     this.progress.set(null);
+    this.tick.set(null);
+    this.lossHistory.set([]);
+  }
+
+  private end(): void {
+    this.running.set(false);
+    this.job.set(null);
+    this.progress.set(null);
+    this.tick.set(null);
+  }
+
+  async run(): Promise<void> {
+    this.begin('curve');
+    this.report.set(null);
     try {
-      const report = await api.mlRunLearningCurve({
-        encoderId: this.selectedEncoder(),
-        workingSize: this.workingSize,
-        pixelsPerFrame: this.pixelsPerFrame,
-        epochs: this.epochs,
-        curveRepeats: this.curveRepeats,
-      });
-      this.report.set(report);
+      this.report.set(await api.mlRunLearningCurve(this.options()));
     } catch (e) {
       this.error.set(String(e));
     } finally {
-      this.running.set(false);
-      this.progress.set(null);
+      this.end();
     }
   }
 
+  async trainModel(): Promise<void> {
+    this.begin('train');
+    try {
+      const summary = await api.mlTrainModel(this.options());
+      this.model.set(summary);
+      this.messages.add({
+        severity: 'success',
+        summary: 'Model ready',
+        detail: `Dice ${summary.metrics.meanDice.toFixed(3)} on ${summary.valFrames} held-out frames`,
+      });
+    } catch (e) {
+      this.error.set(String(e));
+    } finally {
+      this.end();
+    }
+  }
+
+  /**
+   * Overall completion. Feature extraction and training are reported by
+   * different events, so this picks whichever phase is currently live rather
+   * than showing a bar that resets between them.
+   */
   readonly progressPercent = computed(() => {
+    const t = this.tick();
+    if (t) {
+      const perFit = t.epochs > 0 ? t.epoch / t.epochs : 0;
+      if (t.points > 0) {
+        return Math.round(((t.point + perFit) / t.points) * 100);
+      }
+      return Math.round(perFit * 100);
+    }
     const p = this.progress();
     if (!p || p.total === 0) return 0;
     return Math.round((p.done / p.total) * 100);
+  });
+
+  /** Human-readable description of what is happening right now. */
+  readonly progressLabel = computed(() => {
+    const t = this.tick();
+    if (t) {
+      const fit =
+        t.points > 1 ? `fit ${t.point + 1}/${t.points} · ${t.budget} frames · ` : '';
+      return `Training — ${fit}epoch ${t.epoch}/${t.epochs} · loss ${t.loss.toFixed(4)}`;
+    }
+    const p = this.progress();
+    if (p) return `Extracting features — frame ${p.done}/${p.total}`;
+    return this.job() === 'train' ? 'Preparing…' : 'Starting…';
+  });
+
+  /** Sparkline path for the current fit's loss trace. */
+  readonly lossPath = computed(() => {
+    const h = this.lossHistory();
+    if (h.length < 2) return null;
+    const w = 240;
+    const ht = 34;
+    const max = Math.max(...h);
+    const min = Math.min(...h);
+    const span = max - min || 1;
+    return h
+      .map((v, i) => {
+        const x = (i / (h.length - 1)) * w;
+        const y = ht - ((v - min) / span) * ht;
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
   });
 
   /** Aggregate repeats per budget into mean and spread. */

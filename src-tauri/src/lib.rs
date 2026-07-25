@@ -101,6 +101,7 @@ pub fn run() {
         .manage(commands::superpixel::SuperpixelState::default())
         .manage(commands::frame::FrameImageCache::default())
         .manage(commands::frame::ThumbnailCache::default())
+        .manage(commands::ml::predict::MlState::default())
         .setup(|app| {
             connection::coms::setup_zmq_receiver(app.handle().clone())?;
             Ok(())
@@ -183,6 +184,12 @@ pub fn run() {
             commands::ml::commands::ml_dataset_summary,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_run_learning_curve,
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_train_model,
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_model_status,
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_predict_frame,
 
 
         ])

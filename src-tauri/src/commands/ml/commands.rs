@@ -17,6 +17,7 @@ use crate::storage::DbState;
 
 use super::dataset::{self, DatasetConfig};
 use super::encoder::EncoderSession;
+use super::predict::{self, MlState, PredictedFrame, ScribbleInput, TrainedModel};
 use super::registry;
 use super::scribble::Rng;
 use super::train::{self, CurvePoint, Samples, TrainConfig};
@@ -123,17 +124,46 @@ fn default_budgets(pool: usize) -> Vec<usize> {
     b
 }
 
-/// Run the annotation-budget sweep and report held-out quality at each point.
-///
-/// The validation split is by **frame**, drawn once and shared by every budget,
-/// so points differ only in how much training data they saw.
-#[tauri::command]
-pub fn ml_run_learning_curve(
-    app: AppHandle,
-    db: State<DbState>,
-    options: CurveOptions,
-) -> Result<CurveReport, String> {
-    let frames = dataset::annotated_frame_ids(&db)?;
+/// Everything a fit needs, built once so the sweep and a single training run
+/// cannot disagree about how features or splits were made.
+struct Split {
+    per_frame: Vec<Samples>,
+    val: Samples,
+    order: Vec<i64>,
+    classes: usize,
+    feature_dim: usize,
+    val_frames: usize,
+}
+
+/// Open (or reuse) the encoder a run asks for, caching it in state.
+fn ensure_encoder(
+    app: &AppHandle,
+    state: &MlState,
+    encoder_id: &Option<String>,
+) -> Result<(), String> {
+    let Some(id) = encoder_id else { return Ok(()) };
+    let mut slot = state.encoder.lock();
+    if slot.as_ref().map(|(cached, _)| cached == id).unwrap_or(false) {
+        return Ok(());
+    }
+    let spec = registry::find(id).ok_or_else(|| format!("unknown encoder '{id}'"))?;
+    let path = registry::cache_path(app, &spec)?;
+    if !path.exists() {
+        return Err(format!(
+            "encoder '{id}' is not downloaded yet — fetch it first"
+        ));
+    }
+    *slot = Some((id.clone(), EncoderSession::load(&path, spec)?));
+    Ok(())
+}
+
+fn build_split(
+    app: &AppHandle,
+    db: &DbState,
+    state: &MlState,
+    options: &CurveOptions,
+) -> Result<Split, String> {
+    let frames = dataset::annotated_frame_ids(db)?;
     let order = dataset::label_order(&db)?;
     if order.is_empty() {
         return Err("this project defines no segmentation labels".into());
@@ -166,19 +196,12 @@ pub fn ml_run_learning_curve(
         ..Default::default()
     };
 
-    // Load the encoder once, if requested.
-    let mut encoder = match &options.encoder_id {
-        Some(id) => {
-            let spec = registry::find(id).ok_or_else(|| format!("unknown encoder '{id}'"))?;
-            let path = registry::cache_path(&app, &spec)?;
-            if !path.exists() {
-                return Err(format!(
-                    "encoder '{id}' is not downloaded yet — fetch it first"
-                ));
-            }
-            Some(EncoderSession::load(&path, spec)?)
-        }
-        None => None,
+    ensure_encoder(app, state, &options.encoder_id)?;
+    let mut guard = state.encoder.lock();
+    let mut encoder = if options.encoder_id.is_some() {
+        guard.as_mut().map(|(_, e)| e)
+    } else {
+        None
     };
 
     let total = shuffled.len();
@@ -194,7 +217,7 @@ pub fn ml_run_learning_curve(
     let mut feature_dim = 0usize;
     for &fid in val_ids {
         let mut rng = Rng::new(seed ^ (fid as u64).wrapping_mul(0x9E37));
-        let s = dataset::build_frame_samples(&db, fid, &order, &val_cfg, encoder.as_mut(), &mut rng)?;
+        let s = dataset::build_frame_samples(db, fid, &order, &val_cfg, encoder.as_deref_mut(), &mut rng)?;
         if s.n > 0 {
             if val.n == 0 {
                 val = Samples::new(s.d);
@@ -209,7 +232,7 @@ pub fn ml_run_learning_curve(
     let mut per_frame: Vec<Samples> = Vec::new();
     for &fid in train_ids {
         let mut rng = Rng::new(seed ^ (fid as u64).wrapping_mul(0x1F123));
-        let s = dataset::build_frame_samples(&db, fid, &order, &ds, encoder.as_mut(), &mut rng)?;
+        let s = dataset::build_frame_samples(db, fid, &order, &ds, encoder.as_deref_mut(), &mut rng)?;
         if s.n > 0 {
             feature_dim = s.d;
             per_frame.push(s);
@@ -225,37 +248,186 @@ pub fn ml_run_learning_curve(
         return Err("no usable validation frames".into());
     }
 
-    let budgets = options
-        .budgets
-        .filter(|b| !b.is_empty())
-        .unwrap_or_else(|| default_budgets(per_frame.len()));
-    let tcfg = TrainConfig {
+    Ok(Split {
+        per_frame,
+        val,
+        order,
+        classes,
+        feature_dim,
+        val_frames: val_ids.len(),
+    })
+}
+
+fn train_config(options: &CurveOptions) -> TrainConfig {
+    TrainConfig {
         hidden: options.hidden.unwrap_or(64),
         epochs: options.epochs.unwrap_or(40),
-        seed,
+        seed: options.seed.unwrap_or(0),
         ..Default::default()
-    };
+    }
+}
 
-    emit(&app, "training", 0, budgets.len());
-    let points = train::learning_curve(
-        &per_frame,
-        &val,
-        classes,
+/// Forward optimisation ticks to the UI.
+fn emit_train(app: &AppHandle, p: train::TrainProgress) {
+    let _ = app.emit(
+        "ml-train-progress",
+        TrainTick {
+            budget: p.budget,
+            repeat: p.repeat,
+            epoch: p.epoch,
+            epochs: p.epochs,
+            loss: p.loss,
+            point: p.point,
+            points: p.points,
+        },
+    );
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TrainTick {
+    budget: usize,
+    repeat: usize,
+    epoch: usize,
+    epochs: usize,
+    loss: f32,
+    point: usize,
+    points: usize,
+}
+
+/// Run the annotation-budget sweep and report held-out quality at each point.
+///
+/// The validation split is by **frame**, drawn once and shared by every budget,
+/// so points differ only in how much training data they saw.
+#[tauri::command]
+pub fn ml_run_learning_curve(
+    app: AppHandle,
+    db: State<DbState>,
+    state: State<MlState>,
+    options: CurveOptions,
+) -> Result<CurveReport, String> {
+    let split = build_split(&app, &db, &state, &options)?;
+    let budgets = options
+        .budgets
+        .clone()
+        .filter(|b| !b.is_empty())
+        .unwrap_or_else(|| default_budgets(split.per_frame.len()));
+
+    let points = train::learning_curve_with(
+        &split.per_frame,
+        &split.val,
+        split.classes,
         &budgets,
         options.curve_repeats.unwrap_or(3),
-        &tcfg,
+        &train_config(&options),
+        &mut |p| emit_train(&app, p),
     )?;
-    emit(&app, "training", budgets.len(), budgets.len());
 
     Ok(CurveReport {
         points,
-        train_frames: per_frame.len(),
-        val_frames: val_ids.len(),
-        feature_dim,
-        classes,
-        encoder: options.encoder_id,
+        train_frames: split.per_frame.len(),
+        val_frames: split.val_frames,
+        feature_dim: split.feature_dim,
+        classes: split.classes,
+        encoder: options.encoder_id.clone(),
         budgets,
     })
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainSummary {
+    pub train_frames: usize,
+    pub val_frames: usize,
+    pub feature_dim: usize,
+    pub classes: usize,
+    pub encoder: Option<String>,
+    pub metrics: train::EvalMetrics,
+}
+
+/// Fit one head on every available training frame and keep it for per-frame
+/// prediction. This is the model the user actually applies; the sweep only
+/// characterises how quality scales.
+#[tauri::command]
+pub fn ml_train_model(
+    app: AppHandle,
+    db: State<DbState>,
+    state: State<MlState>,
+    options: CurveOptions,
+) -> Result<TrainSummary, String> {
+    let split = build_split(&app, &db, &state, &options)?;
+    let mut all = Samples::new(split.feature_dim);
+    for s in &split.per_frame {
+        all.extend(s);
+    }
+
+    let (head, metrics) = train::train_head_with(
+        &all,
+        &split.val,
+        split.classes,
+        &train_config(&options),
+        &mut |p| emit_train(&app, p),
+    )?;
+
+    let summary = TrainSummary {
+        train_frames: split.per_frame.len(),
+        val_frames: split.val_frames,
+        feature_dim: split.feature_dim,
+        classes: split.classes,
+        encoder: options.encoder_id.clone(),
+        metrics: metrics.clone(),
+    };
+
+    *state.model.lock() = Some(TrainedModel {
+        head,
+        feature_dim: split.feature_dim,
+        classes: split.classes,
+        label_order: split.order,
+        encoder_id: options.encoder_id.clone(),
+        working_size: options.working_size.unwrap_or(384),
+        metrics,
+        train_frames: split.per_frame.len(),
+    });
+
+    Ok(summary)
+}
+
+/// Whether a head is loaded, and what it was fitted with.
+#[tauri::command]
+pub fn ml_model_status(state: State<MlState>) -> Option<TrainSummary> {
+    state.model.lock().as_ref().map(|m| TrainSummary {
+        train_frames: m.train_frames,
+        val_frames: 0,
+        feature_dim: m.feature_dim,
+        classes: m.classes,
+        encoder: m.encoder_id.clone(),
+        metrics: m.metrics.clone(),
+    })
+}
+
+/// Apply the loaded head to one frame, optionally conditioned on scribbles.
+#[tauri::command]
+pub fn ml_predict_frame(
+    app: AppHandle,
+    db: State<DbState>,
+    state: State<MlState>,
+    frame_id: i64,
+    scribbles: Option<ScribbleInput>,
+) -> Result<PredictedFrame, String> {
+    let guard = state.model.lock();
+    let model = guard
+        .as_ref()
+        .ok_or_else(|| "no trained head yet — train one first".to_string())?;
+
+    ensure_encoder(&app, &state, &model.encoder_id)?;
+    let mut enc_guard = state.encoder.lock();
+    let encoder = if model.encoder_id.is_some() {
+        enc_guard.as_mut().map(|(_, e)| e)
+    } else {
+        None
+    };
+
+    predict::predict_frame(&db, model, frame_id, encoder, scribbles.as_ref())
 }
 
 #[cfg(test)]

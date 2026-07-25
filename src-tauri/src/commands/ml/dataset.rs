@@ -229,6 +229,54 @@ fn stack(parts: Vec<Array3<f32>>, h: usize, w: usize) -> Array3<f32> {
     out
 }
 
+/// Assemble the feature volume for one frame: local basis, then optional
+/// encoder channels, then the scribble distances.
+///
+/// **This is the single definition of channel order.** Training and inference
+/// both go through it, because a head trained on one ordering and applied to
+/// another fails silently — the numbers stay plausible while meaning nothing.
+pub fn assemble_stack(
+    image: &Array3<f32>,
+    encoder_part: Option<&Array3<f32>>,
+    scribbles: &scribble::Scribbles,
+    fb: &FilterBankConfig,
+) -> Array3<f32> {
+    let (h, w) = (image.shape()[1], image.shape()[2]);
+    let (local, _names) = filters::compute(image, fb);
+
+    let ch = scribble::channels(scribbles);
+    let mut scr = Array3::<f32>::zeros((SCRIBBLE_CHANNELS, h, w));
+    for (c, plane) in ch.iter().enumerate() {
+        for y in 0..h {
+            for x in 0..w {
+                scr[[c, y, x]] = plane[y * w + x];
+            }
+        }
+    }
+
+    let mut parts = vec![local];
+    if let Some(e) = encoder_part {
+        parts.push(e.clone());
+    }
+    parts.push(scr);
+    stack(parts, h, w)
+}
+
+/// Decode a frame and resample it to working resolution.
+/// Shared by training and inference so both see the same pixels.
+pub fn load_working_image(
+    db: &DbState,
+    frame_id: i64,
+    working_size: u32,
+) -> Result<(Array3<f32>, usize, usize), String> {
+    let (_meta, bytes) = crate::commands::frame::read_frame_bytes(db, frame_id)
+        .map_err(|e| format!("frame {frame_id}: {e}"))?;
+    let image = decode_image(&bytes)?;
+    let (src_w, src_h) = (image.shape()[2], image.shape()[1]);
+    let (w, h) = working_dims(src_w, src_h, working_size);
+    Ok((resize_bilinear(&image, h, w), w, h))
+}
+
 /// Build the sample table for one annotated frame.
 pub fn build_frame_samples(
     db: &DbState,
@@ -238,12 +286,7 @@ pub fn build_frame_samples(
     encoder: Option<&mut EncoderSession>,
     rng: &mut Rng,
 ) -> Result<Samples, String> {
-    let (_meta, bytes) = crate::commands::frame::read_frame_bytes(db, frame_id)
-        .map_err(|e| format!("frame {frame_id}: {e}"))?;
-    let image = decode_image(&bytes)?;
-    let (src_w, src_h) = (image.shape()[2], image.shape()[1]);
-    let (w, h) = working_dims(src_w, src_h, cfg.working_size);
-    let image = resize_bilinear(&image, h, w);
+    let (image, w, h) = load_working_image(db, frame_id, cfg.working_size)?;
 
     // Rasterise labels at native size, then downscale with nearest.
     let (native_w, native_h) = db
@@ -294,8 +337,6 @@ pub fn build_frame_samples(
         } else {
             jitter(&image, rng)
         };
-        let (local, _names) = filters::compute(&view, &fb);
-
         let s = scribble::simulate(
             &binary,
             w,
@@ -304,22 +345,7 @@ pub fn build_frame_samples(
             cfg.stroke_len,
             rng,
         );
-        let ch = scribble::channels(&s);
-        let mut scr = Array3::<f32>::zeros((SCRIBBLE_CHANNELS, h, w));
-        for (c, plane) in ch.iter().enumerate() {
-            for y in 0..h {
-                for x in 0..w {
-                    scr[[c, y, x]] = plane[y * w + x];
-                }
-            }
-        }
-
-        let mut parts = vec![local];
-        if let Some(e) = &encoder_part {
-            parts.push(e.clone());
-        }
-        parts.push(scr);
-        let feats = stack(parts, h, w);
+        let feats = assemble_stack(&view, encoder_part.as_ref(), &s, &fb);
 
         let acc = out.get_or_insert_with(|| Samples::new(feats.shape()[0]));
         sample_pixels(&feats, &labels, cfg.pixels_per_frame, rng, acc);

@@ -145,6 +145,20 @@ fn predict<B: Backend>(model: &SegHead<B>, s: &Samples, device: &B::Device) -> V
     idx.iter::<i64>().map(|v| v as i32).collect()
 }
 
+/// Argmax class per row for a raw `[n, d]` feature matrix.
+///
+/// The dense-inference entry point: callers chunk large frames through this
+/// rather than materialising one enormous tensor.
+pub fn predict_rows(model: &SegHead<InferBackend>, x: &[f32], n: usize, d: usize) -> Vec<i32> {
+    if n == 0 || d == 0 {
+        return Vec::new();
+    }
+    let device = Default::default();
+    let t = Tensor::<InferBackend, 2>::from_data(TensorData::new(x.to_vec(), [n, d]), &device);
+    let idx = model.forward(t).argmax(1).into_data();
+    idx.iter::<i64>().map(|v| v as i32).collect()
+}
+
 /// Accuracy plus per-class Dice against a reference labelling.
 pub fn evaluate(pred: &[i32], truth: &[i32], n_classes: usize) -> EvalMetrics {
     if pred.is_empty() || pred.len() != truth.len() {
@@ -187,12 +201,41 @@ pub fn evaluate(pred: &[i32], truth: &[i32], n_classes: usize) -> EvalMetrics {
     }
 }
 
+/// A tick from inside the optimisation loop.
+///
+/// Training dominates a sweep's wall-clock, so it reports per epoch rather than
+/// per fit — a silent progress bar during the slowest phase reads as a hang.
+/// `loss` is included because a falling loss is the signal that tells a user
+/// the run is healthy, not merely alive.
+#[derive(Debug, Clone, Copy)]
+pub struct TrainProgress {
+    pub budget: usize,
+    pub repeat: usize,
+    pub epoch: usize,
+    pub epochs: usize,
+    pub loss: f32,
+    /// Position within a sweep; both zero for a single fit.
+    pub point: usize,
+    pub points: usize,
+}
+
 /// Fit a head on `train` and score it on `val`.
 pub fn train_head(
     train: &Samples,
     val: &Samples,
     n_classes: usize,
     cfg: &TrainConfig,
+) -> Result<(SegHead<InferBackend>, EvalMetrics), String> {
+    train_head_with(train, val, n_classes, cfg, &mut |_| {})
+}
+
+/// As [`train_head`], reporting each epoch to `on`.
+pub fn train_head_with(
+    train: &Samples,
+    val: &Samples,
+    n_classes: usize,
+    cfg: &TrainConfig,
+    on: &mut dyn FnMut(TrainProgress),
 ) -> Result<(SegHead<InferBackend>, EvalMetrics), String> {
     if train.is_empty() {
         return Err("no training samples".into());
@@ -209,7 +252,8 @@ pub fn train_head(
     let batch = cfg.batch.min(train.n).max(1);
     let batches_per_epoch = (train.n + batch - 1) / batch;
 
-    for _epoch in 0..cfg.epochs {
+    for epoch in 0..cfg.epochs {
+        let mut epoch_loss = 0.0f32;
         for _ in 0..batches_per_epoch {
             // Sample a minibatch with replacement — cheap, and avoids
             // materialising a shuffled index per epoch.
@@ -231,9 +275,24 @@ pub fn train_head(
 
             let logits = model.forward(x);
             let loss = loss_fn.forward(logits, y);
+            epoch_loss += loss
+                .clone()
+                .into_data()
+                .iter::<f32>()
+                .next()
+                .unwrap_or(0.0);
             let grads = GradientsParams::from_grads(loss.backward(), &model);
             model = optim.step(cfg.lr, model, grads);
         }
+        on(TrainProgress {
+            budget: 0,
+            repeat: 0,
+            epoch: epoch + 1,
+            epochs: cfg.epochs,
+            loss: epoch_loss / batches_per_epoch.max(1) as f32,
+            point: 0,
+            points: 0,
+        });
     }
 
     let model = model.valid();
@@ -273,12 +332,42 @@ pub fn learning_curve(
     repeats: usize,
     cfg: &TrainConfig,
 ) -> Result<Vec<CurvePoint>, String> {
+    learning_curve_with(per_frame, val, n_classes, budgets, repeats, cfg, &mut |_| {})
+}
+
+/// As [`learning_curve`], reporting every epoch of every fit to `on`.
+pub fn learning_curve_with(
+    per_frame: &[Samples],
+    val: &Samples,
+    n_classes: usize,
+    budgets: &[usize],
+    repeats: usize,
+    cfg: &TrainConfig,
+    on: &mut dyn FnMut(TrainProgress),
+) -> Result<Vec<CurvePoint>, String> {
     if per_frame.is_empty() {
         return Err("no annotated training frames".into());
     }
     let d = per_frame[0].d;
     let mut out = Vec::new();
     let mut rng = Rng::new(cfg.seed ^ 0xC0FFEE);
+
+    // Total fits, known up front so the UI can show real overall progress
+    // rather than a bar that restarts at every budget.
+    let total_points: usize = budgets
+        .iter()
+        .map(|&b| {
+            let b = b.min(per_frame.len());
+            if b == 0 {
+                0
+            } else if b == per_frame.len() {
+                1
+            } else {
+                repeats.max(1)
+            }
+        })
+        .sum();
+    let mut point = 0usize;
 
     for &budget in budgets {
         let budget = budget.min(per_frame.len());
@@ -308,7 +397,16 @@ pub fn learning_curve(
             sub.seed = cfg.seed
                 .wrapping_add((budget as u64) << 32)
                 .wrapping_add(repeat as u64);
-            let (_, metrics) = train_head(&train, val, n_classes, &sub)?;
+            let (_, metrics) = train_head_with(&train, val, n_classes, &sub, &mut |p| {
+                on(TrainProgress {
+                    budget,
+                    repeat,
+                    point,
+                    points: total_points,
+                    ..p
+                });
+            })?;
+            point += 1;
             out.push(CurvePoint {
                 n_frames: budget,
                 repeat,

@@ -148,11 +148,47 @@
   }
 }
 
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.hint {
+  margin-top: 0.7rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .prog {
   margin-top: 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
+}
+
+.prog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+// Loss trace for the current fit: a falling line is the signal that the run
+// is healthy, not merely still alive.
+.spark {
+  width: 240px;
+  height: 34px;
+  flex: 0 0 auto;
+
+  path {
+    fill: none;
+    stroke: var(--p-primary-color, #7a5cff);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
 }
 
 .chart-wrap {
