@@ -1,13 +1,17 @@
 //! Tauri surface for the segmentation-head lab.
 //!
-//! Long-running work (feature extraction, the budget sweep) lives in
-//! *synchronous* commands: Tauri runs those off the main thread, which matches
-//! how the existing heavy commands (`superpixel_refine`, `crf_refine`) behave
-//! and keeps `State<DbState>` usable without fighting `Send` across awaits.
-//! Only the download is `async`, because the HTTP client is.
+//! Long-running work (feature extraction, the budget sweep, prediction) is
+//! declared `#[tauri::command(async)]`. The bodies stay synchronous — which
+//! keeps `State<DbState>` usable without fighting `Send` across awaits — but
+//! the attribute is what moves them onto a worker thread.
 //!
-//! Progress is streamed as `ml-progress` events rather than returned, so a
-//! sweep over dozens of frames shows movement instead of appearing hung.
+//! This matters more than it looks: a plain `#[tauri::command]` runs on the
+//! **main thread**, so a multi-minute sweep freezes the window and starves the
+//! very event loop that is meant to deliver progress. The bar would sit at zero
+//! until the whole job finished, which is indistinguishable from a hang.
+//!
+//! Progress is streamed as `ml-progress` / `ml-train-progress` events rather
+//! than returned, so a sweep over dozens of frames shows movement throughout.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -337,7 +341,7 @@ struct TrainTick {
 ///
 /// The validation split is by **frame**, drawn once and shared by every budget,
 /// so points differ only in how much training data they saw.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ml_run_learning_curve(
     app: AppHandle,
     db: State<DbState>,
@@ -386,7 +390,7 @@ pub struct TrainSummary {
 /// Fit one head on every available training frame and keep it for per-frame
 /// prediction. This is the model the user actually applies; the sweep only
 /// characterises how quality scales.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ml_train_model(
     app: AppHandle,
     db: State<DbState>,
@@ -444,7 +448,7 @@ pub fn ml_model_status(state: State<MlState>) -> Option<TrainSummary> {
 }
 
 /// Apply the loaded head to one frame, optionally conditioned on scribbles.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ml_predict_frame(
     app: AppHandle,
     db: State<DbState>,

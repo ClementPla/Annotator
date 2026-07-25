@@ -1,4 +1,11 @@
-import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
+import {
+  Component,
+  NgZone,
+  OnDestroy,
+  OnInit,
+  computed,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
@@ -77,22 +84,31 @@ export class ModelLabComponent implements OnInit, OnDestroy {
 
   private unlisten: UnlistenFn[] = [];
 
-  constructor(private messages: MessageService) {}
+  constructor(
+    private messages: MessageService,
+    private zone: NgZone,
+  ) {}
 
   async ngOnInit(): Promise<void> {
+    // Tauri event callbacks fire outside Angular's zone, so a signal set here
+    // marks the component dirty but nothing ever schedules change detection —
+    // the UI would silently never repaint. `TauriEventBase` exists in this
+    // codebase for the same reason; these listeners need the same treatment.
     this.unlisten.push(
       await listen<MlProgress>('ml-progress', (e) =>
-        this.progress.set(e.payload),
+        this.zone.run(() => this.progress.set(e.payload)),
       ),
-      await listen<TrainTick>('ml-train-progress', (e) => {
-        const t = e.payload;
-        this.tick.set(t);
-        // Reset the trace when a new fit starts, so the sparkline shows this
-        // fit's convergence rather than every fit concatenated.
-        this.lossHistory.update((h) =>
-          t.epoch <= 1 ? [t.loss] : [...h.slice(-199), t.loss],
-        );
-      }),
+      await listen<TrainTick>('ml-train-progress', (e) =>
+        this.zone.run(() => {
+          const t = e.payload;
+          this.tick.set(t);
+          // Reset the trace when a new fit starts, so the sparkline shows this
+          // fit's convergence rather than every fit concatenated.
+          this.lossHistory.update((h) =>
+            t.epoch <= 1 ? [t.loss] : [...h.slice(-199), t.loss],
+          );
+        }),
+      ),
     );
     await this.refresh();
   }
