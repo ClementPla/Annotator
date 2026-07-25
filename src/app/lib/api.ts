@@ -268,6 +268,76 @@ export interface PropagationReport {
   skipped: { frameId: number; reason: PropagationSkipReason }[];
 }
 
+// ── Segmentation-head lab ────────────────────────────────────────────────────
+
+/** A downloadable frozen encoder, plus whether its weights are on disk. */
+export interface EncoderStatus {
+  id: string;
+  name: string;
+  description: string;
+  repo_id: string;
+  filename: string;
+  patch: number;
+  embed_dim: number;
+  input_size: number;
+  approx_mb: number;
+  domain: string;
+  cached: boolean;
+}
+
+export interface DatasetSummary {
+  annotated_frames: number;
+  labels: number;
+  /** Labels plus background. */
+  classes: number;
+}
+
+export interface EvalMetrics {
+  accuracy: number;
+  /** Mean over classes present in the reference; absent classes are excluded. */
+  meanDice: number;
+  perClassDice: number[];
+}
+
+export interface CurvePoint {
+  /** Annotated frames the head was allowed to see. */
+  nFrames: number;
+  /** Which random subset draw this is, for the same budget. */
+  repeat: number;
+  metrics: EvalMetrics;
+}
+
+export interface CurveReport {
+  points: CurvePoint[];
+  trainFrames: number;
+  valFrames: number;
+  featureDim: number;
+  classes: number;
+  encoder: string | null;
+  budgets: number[];
+}
+
+export interface CurveOptions {
+  /** Omit for the local feature basis alone — the encoder ablation. */
+  encoderId?: string | null;
+  workingSize?: number;
+  pixelsPerFrame?: number;
+  augmentRepeats?: number;
+  budgets?: number[];
+  curveRepeats?: number;
+  epochs?: number;
+  hidden?: number;
+  valFraction?: number;
+  seed?: number;
+}
+
+/** Payload of the `ml-progress` event emitted during a sweep. */
+export interface MlProgress {
+  stage: string;
+  done: number;
+  total: number;
+}
+
 export const api = {
   getLabels: () => invoke<LabelInfo[]>('get_labels'),
 
@@ -414,6 +484,14 @@ export const api = {
     invoke<ProjectConfig>('open_project', { path }),
 
   closeProject: () => invoke('close_project'),
+
+  // ── Segmentation-head lab ─────────────────────────────────────────────────
+  mlListEncoders: () => invoke<EncoderStatus[]>('ml_list_encoders'),
+  mlDownloadEncoder: (encoderId: string) =>
+    invoke<string>('ml_download_encoder', { encoderId }),
+  mlDatasetSummary: () => invoke<DatasetSummary>('ml_dataset_summary'),
+  mlRunLearningCurve: (options: CurveOptions) =>
+    invoke<CurveReport>('ml_run_learning_curve', { options }),
 
   scanAndImportFolder: (options: {
     folder_path: string;

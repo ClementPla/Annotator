@@ -174,6 +174,15 @@ pub fn run() {
             commands::registration::delete_registration,
             commands::registration::inference_connect,
             commands::registration::find_keypoints_prefill,
+            // Segmentation-head lab (encoder download, budget sweep)
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_list_encoders,
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_download_encoder,
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_dataset_summary,
+            #[cfg(not(target_os = "android"))]
+            commands::ml::commands::ml_run_learning_curve,
 
 
         ])

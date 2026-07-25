@@ -67,6 +67,17 @@
       >
       </p-button>
       <p-button
+        routerLink="model-lab/"
+        icon="pi pi-chart-line"
+        pTooltip="Segmentation head lab"
+        tooltipPosition="right"
+        [rounded]="true"
+        [text]="true"
+        [disabled]="!isProjectStarted()"
+        [raised]="true"
+      >
+      </p-button>
+      <p-button
         routerLink="export/"
         icon="pi pi-file-export"
         [rounded]="true"

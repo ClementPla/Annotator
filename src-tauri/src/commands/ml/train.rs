@@ -119,6 +119,7 @@ impl<B: Backend> SegHead<B> {
 
 /// Held-out quality for one trained head.
 #[derive(Debug, Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EvalMetrics {
     pub accuracy: f32,
     /// Mean Dice over classes actually present in the reference.
@@ -248,6 +249,7 @@ pub fn train_head(
 
 /// One point of a learning curve.
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CurvePoint {
     /// How many annotated frames the head was allowed to see.
     pub n_frames: usize,

@@ -28,6 +28,7 @@
 //! The head is multi-class over whatever labels the project defines — nothing
 //! here assumes a particular modality, organ, or binary foreground.
 
+pub mod commands;
 pub mod dataset;
 pub mod encoder;
 pub mod filters;

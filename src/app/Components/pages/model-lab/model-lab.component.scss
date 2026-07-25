@@ -1,0 +1,202 @@
+.lab {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.lab-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+
+  h1 {
+    margin: 0 0 0.2rem;
+    font-size: 1.5rem;
+  }
+}
+
+.sub,
+.muted {
+  color: var(--p-text-muted-color, #8b8b93);
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+.foot {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.warn {
+  color: var(--p-orange-400, #f59e0b);
+  font-size: 0.9rem;
+  margin: 0.6rem 0 0;
+}
+
+.err {
+  color: var(--p-red-400, #ef4444);
+  font-size: 0.88rem;
+  margin: 0.8rem 0 0;
+  white-space: pre-wrap;
+}
+
+.stats {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+
+    .v {
+      font-size: 1.6rem;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .k {
+      font-size: 0.8rem;
+      color: var(--p-text-muted-color, #8b8b93);
+    }
+  }
+}
+
+// Encoder picker rows
+.enc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 0.9rem;
+  margin-top: 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--p-content-border-color, #33333b);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--p-content-hover-background, rgba(127, 127, 127, 0.08));
+  }
+  &.sel {
+    border-color: var(--p-primary-color, #7a5cff);
+    background: color-mix(
+      in srgb,
+      var(--p-primary-color, #7a5cff) 12%,
+      transparent
+    );
+  }
+  // Not downloaded yet: dimmed, but the Download button stays usable.
+  &:disabled {
+    opacity: 0.75;
+    cursor: default;
+  }
+}
+
+.enc-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.enc-name {
+  font-weight: 600;
+}
+
+.enc-desc {
+  font-size: 0.86rem;
+  color: var(--p-text-muted-color, #8b8b93);
+  line-height: 1.45;
+}
+
+.enc-meta {
+  font-size: 0.76rem;
+  color: var(--p-text-muted-color, #8b8b93);
+  opacity: 0.8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.opts {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 1rem;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--p-text-muted-color, #8b8b93);
+  }
+
+  input {
+    width: 8rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 7px;
+    border: 1px solid var(--p-content-border-color, #33333b);
+    background: var(--p-content-background, transparent);
+    color: inherit;
+  }
+}
+
+.prog {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chart-wrap {
+  margin: 0.5rem 0 1rem;
+}
+
+.chart {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+
+  .grid {
+    stroke: var(--p-content-border-color, #33333b);
+    stroke-width: 1;
+  }
+  .tick,
+  .xlabel {
+    fill: var(--p-text-muted-color, #8b8b93);
+    font-size: 11px;
+  }
+  .tick {
+    text-anchor: end;
+  }
+  .xlabel {
+    text-anchor: middle;
+  }
+  .band {
+    fill: var(--p-primary-color, #7a5cff);
+    opacity: 0.16;
+  }
+  .line {
+    fill: none;
+    stroke: var(--p-primary-color, #7a5cff);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+  .dot {
+    fill: var(--p-primary-color, #7a5cff);
+  }
+}
+
+.axis-note {
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color, #8b8b93);
+  margin: 0.3rem 0 0;
+  text-align: center;
+}

@@ -188,6 +188,30 @@ pub fn find(id: &str) -> Option<EncoderSpec> {
     catalog().into_iter().find(|s| s.id == id)
 }
 
+/// Where an encoder's weights live once downloaded.
+///
+/// Mirrors the layout `dl::model_manager` writes to, so the two agree without
+/// the downloader having to hand a path back.
+pub fn cache_path(
+    app: &tauri::AppHandle,
+    spec: &EncoderSpec,
+) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    let cache = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("cannot resolve cache dir: {e}"))?;
+    Ok(cache
+        .join("models")
+        .join(&spec.cache_subdir)
+        .join(&spec.filename))
+}
+
+/// Whether the weights are already on disk (drives the UI's Download button).
+pub fn is_cached(app: &tauri::AppHandle, spec: &EncoderSpec) -> bool {
+    cache_path(app, spec).map(|p| p.is_file()).unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
