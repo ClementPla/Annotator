@@ -60,6 +60,13 @@ reqwest = { version = "0.13.3", default-features = false, features = ["json", "s
 serde_bytes = "0.11.19"
 [target.'cfg(not(target_os = "android"))'.dependencies]
 ort = { version = "=2.0.0-rc.10", features = ["cuda", "copy-dylibs"] }
+# In-app training of the scribble-conditioned segmentation head (see
+# `commands::ml`). Autodiff on the CPU (ndarray) backend: the head is tiny and
+# trains on cached encoder features, so this needs no CUDA/wgpu toolchain.
+# `burn-train`'s Learner/TUI is deliberately not used — the loop is hand-rolled
+# so it can stream progress through Tauri events instead of a terminal
+# dashboard.
+burn = { version = "0.21", default-features = false, features = ["std", "ndarray", "autodiff"] }
 # Desktop auto-update (GitHub releases). Registered under #[cfg(desktop)].
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
