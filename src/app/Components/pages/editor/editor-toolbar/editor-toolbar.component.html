@@ -79,6 +79,37 @@
         </p-button>
       </div>
 
+      <div class="flex gap-2 items-center vector-tool-group">
+        <span class="opacity-60 vector-tool-group__label">Model</span>
+        <p-button
+          severity="secondary"
+          [outlined]="true"
+          pTooltip="Predict this frame with the trained head, conditioned on what you have already drawn. Ctrl+Z reverts."
+          tooltipPosition="bottom"
+          [loading]="prediction.running()"
+          (onClick)="predict(true)"
+        >
+          <span class="flex gap-2 items-center">
+            <i class="pi pi-bolt"></i>
+            <div class="hidden lg:block">Predict</div>
+          </span>
+        </p-button>
+
+        <p-button
+          severity="secondary"
+          [outlined]="true"
+          pTooltip="Predict without using your strokes as hints — the honest read of what the model does unaided"
+          tooltipPosition="bottom"
+          [loading]="prediction.running()"
+          (onClick)="predict(false)"
+        >
+          <span class="flex gap-2 items-center">
+            <i class="pi pi-sparkles"></i>
+            <div class="hidden lg:block">Unaided</div>
+          </span>
+        </p-button>
+      </div>
+
       @if (editorService.isToolWithBrushSize()) {
         <div class="flex flex-col" style="min-width: 9rem">
           <input

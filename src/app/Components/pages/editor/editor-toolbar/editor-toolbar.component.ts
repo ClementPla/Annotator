@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { EditorService } from '../services/editor.service';
 import { ConvertService } from '../drawable-canvas/service/convert.service';
 import { VectorEditorService } from '../drawable-canvas/service/vector-editor.service';
+import { PredictionService } from '../../../../Services/prediction.service';
 import { SliderModule } from 'primeng/slider';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { BlockUIModule } from 'primeng/blockui';
@@ -47,12 +48,22 @@ export class EditorToolbarComponent {
   constructor(
     public editorService: EditorService,
     public vectorEditor: VectorEditorService,
+    public prediction: PredictionService,
     private convertService: ConvertService,
   ) {}
 
   /** Burn the selected shape (or the active label's shapes) into the masks. */
   rasterize(): void {
     this.convertService.rasterize();
+  }
+
+  /**
+   * Run the trained head on this frame.
+   *
+   * @param useScribbles feed the current annotation in as conditioning.
+   */
+  predict(useScribbles: boolean): void {
+    void this.prediction.predictCurrentFrame(useScribbles);
   }
 
   /** Slider position [0, brushSteps] mapped logarithmically from lineWidth. */
