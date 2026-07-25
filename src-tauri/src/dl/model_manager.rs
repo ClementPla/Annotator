@@ -187,8 +187,15 @@ async fn download_model(
 
     println!("Total size: {} bytes", total_size);
 
-    // Create temporary file
+    // Create temporary file. `filename` may itself contain directories (Hub
+    // repos commonly serve `onnx/model.onnx`), so the parent has to exist
+    // before the file is opened — `models_dir` alone is not enough.
     let temp_path = output_path.with_extension("tmp");
+    if let Some(parent) = temp_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Failed to create model directory: {}", e))?;
+    }
     let mut file = tokio::fs::File::create(&temp_path)
         .await
         .map_err(|e| format!("Failed to create file: {}", e))?;
