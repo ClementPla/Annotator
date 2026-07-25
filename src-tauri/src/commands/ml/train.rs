@@ -217,7 +217,25 @@ pub struct TrainProgress {
     /// Position within a sweep; both zero for a single fit.
     pub point: usize,
     pub points: usize,
+    /// Wall-clock for the epoch just finished.
+    pub epoch_ms: f32,
+    /// Wall-clock since this fit started.
+    pub elapsed_ms: f32,
+    /// Projected time left across the *whole* job, not just this fit.
+    pub eta_ms: f32,
+    /// Where the optimisation is actually running. Worth surfacing: this
+    /// backend is CPU-only, so a user expecting GPU acceleration should be
+    /// told rather than left to infer it from the speed.
+    pub device: &'static str,
+    pub samples: usize,
+    pub features: usize,
 }
+
+/// The compute device the head trains on.
+///
+/// burn's ndarray backend is CPU. The head is small and trains on cached
+/// features, so this is a deliberate trade — but it must not be a silent one.
+pub const DEVICE_LABEL: &str = "CPU (burn ndarray)";
 
 /// Fit a head on `train` and score it on `val`.
 pub fn train_head(
@@ -252,7 +270,14 @@ pub fn train_head_with(
     let batch = cfg.batch.min(train.n).max(1);
     let batches_per_epoch = (train.n + batch - 1) / batch;
 
+    println!(
+        "[ml] fit start — device={} samples={} features={} classes={} epochs={} batch={}",
+        DEVICE_LABEL, train.n, train.d, n_classes, cfg.epochs, batch
+    );
+    let fit_start = std::time::Instant::now();
+
     for epoch in 0..cfg.epochs {
+        let epoch_start = std::time::Instant::now();
         let mut epoch_loss = 0.0f32;
         for _ in 0..batches_per_epoch {
             // Sample a minibatch with replacement — cheap, and avoids
@@ -284,16 +309,42 @@ pub fn train_head_with(
             let grads = GradientsParams::from_grads(loss.backward(), &model);
             model = optim.step(cfg.lr, model, grads);
         }
+        let epoch_ms = epoch_start.elapsed().as_secs_f32() * 1000.0;
+        let elapsed_ms = fit_start.elapsed().as_secs_f32() * 1000.0;
+        let avg_ms = elapsed_ms / (epoch + 1) as f32;
+        let loss = epoch_loss / batches_per_epoch.max(1) as f32;
+
+        println!(
+            "[ml] epoch {}/{} — loss {:.4} — {:.0} ms (avg {:.0} ms)",
+            epoch + 1,
+            cfg.epochs,
+            loss,
+            epoch_ms,
+            avg_ms
+        );
+
         on(TrainProgress {
             budget: 0,
             repeat: 0,
             epoch: epoch + 1,
             epochs: cfg.epochs,
-            loss: epoch_loss / batches_per_epoch.max(1) as f32,
+            loss,
             point: 0,
             points: 0,
+            epoch_ms,
+            elapsed_ms,
+            // Remaining epochs of this fit only; the sweep wrapper widens this
+            // to cover the fits still queued behind it.
+            eta_ms: avg_ms * (cfg.epochs.saturating_sub(epoch + 1)) as f32,
+            device: DEVICE_LABEL,
+            samples: train.n,
+            features: train.d,
         });
     }
+    println!(
+        "[ml] fit done — {:.1} s",
+        fit_start.elapsed().as_secs_f32()
+    );
 
     let model = model.valid();
     let infer_device = Default::default();
@@ -397,12 +448,28 @@ pub fn learning_curve_with(
             sub.seed = cfg.seed
                 .wrapping_add((budget as u64) << 32)
                 .wrapping_add(repeat as u64);
+            println!(
+                "[ml] curve point {}/{} — budget {} frames, draw {}",
+                point + 1,
+                total_points,
+                budget,
+                repeat + 1
+            );
             let (_, metrics) = train_head_with(&train, val, n_classes, &sub, &mut |p| {
+                // Widen the per-fit ETA to the whole sweep: the fits still
+                // queued behind this one cost roughly a full fit each.
+                let per_epoch = if p.epoch > 0 {
+                    p.elapsed_ms / p.epoch as f32
+                } else {
+                    0.0
+                };
+                let remaining_fits = total_points.saturating_sub(point + 1);
                 on(TrainProgress {
                     budget,
                     repeat,
                     point,
                     points: total_points,
+                    eta_ms: p.eta_ms + per_epoch * (remaining_fits * p.epochs) as f32,
                     ..p
                 });
             })?;

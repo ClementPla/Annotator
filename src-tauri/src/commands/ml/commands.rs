@@ -101,14 +101,34 @@ pub struct CurveReport {
 }
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Progress<'a> {
     stage: &'a str,
     done: usize,
     total: usize,
+    /// Milliseconds spent on the most recent frame — feature extraction is the
+    /// other slow phase, and its per-frame cost is what a user needs in order
+    /// to judge whether the working size is sane.
+    last_ms: f32,
+    eta_ms: f32,
 }
 
-fn emit(app: &AppHandle, stage: &str, done: usize, total: usize) {
-    let _ = app.emit("ml-progress", Progress { stage, done, total });
+fn emit(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f32) {
+    let eta_ms = if done > 0 {
+        last_ms * total.saturating_sub(done) as f32
+    } else {
+        0.0
+    };
+    let _ = app.emit(
+        "ml-progress",
+        Progress {
+            stage,
+            done,
+            total,
+            last_ms,
+            eta_ms,
+        },
+    );
 }
 
 /// Default budget ladder: powers of two up to the pool size, always including
@@ -216,8 +236,10 @@ fn build_split(
     let mut val = Samples::new(0);
     let mut feature_dim = 0usize;
     for &fid in val_ids {
+        let t0 = std::time::Instant::now();
         let mut rng = Rng::new(seed ^ (fid as u64).wrapping_mul(0x9E37));
         let s = dataset::build_frame_samples(db, fid, &order, &val_cfg, encoder.as_deref_mut(), &mut rng)?;
+        let ms = t0.elapsed().as_secs_f32() * 1000.0;
         if s.n > 0 {
             if val.n == 0 {
                 val = Samples::new(s.d);
@@ -226,19 +248,23 @@ fn build_split(
             val.extend(&s);
         }
         done += 1;
-        emit(&app, "features", done, total);
+        println!("[ml] features val frame {fid} — {ms:.0} ms ({done}/{total})");
+        emit(app, "features", done, total, ms);
     }
 
     let mut per_frame: Vec<Samples> = Vec::new();
     for &fid in train_ids {
+        let t0 = std::time::Instant::now();
         let mut rng = Rng::new(seed ^ (fid as u64).wrapping_mul(0x1F123));
         let s = dataset::build_frame_samples(db, fid, &order, &ds, encoder.as_deref_mut(), &mut rng)?;
+        let ms = t0.elapsed().as_secs_f32() * 1000.0;
         if s.n > 0 {
             feature_dim = s.d;
             per_frame.push(s);
         }
         done += 1;
-        emit(&app, "features", done, total);
+        println!("[ml] features train frame {fid} — {ms:.0} ms ({done}/{total})");
+        emit(app, "features", done, total, ms);
     }
 
     if per_frame.is_empty() {
@@ -279,6 +305,12 @@ fn emit_train(app: &AppHandle, p: train::TrainProgress) {
             loss: p.loss,
             point: p.point,
             points: p.points,
+            epoch_ms: p.epoch_ms,
+            elapsed_ms: p.elapsed_ms,
+            eta_ms: p.eta_ms,
+            device: p.device.to_string(),
+            samples: p.samples,
+            features: p.features,
         },
     );
 }
@@ -293,6 +325,12 @@ struct TrainTick {
     loss: f32,
     point: usize,
     points: usize,
+    epoch_ms: f32,
+    elapsed_ms: f32,
+    eta_ms: f32,
+    device: String,
+    samples: usize,
+    features: usize,
 }
 
 /// Run the annotation-budget sweep and report held-out quality at each point.

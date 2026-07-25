@@ -175,6 +175,26 @@
   flex-wrap: wrap;
 }
 
+.prog-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.prog-meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  color: var(--p-text-muted-color, #8b8b93);
+
+  .dev {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    opacity: 0.85;
+  }
+}
+
 // Loss trace for the current fit: a falling line is the signal that the run
 // is healthy, not merely still alive.
 .spark {

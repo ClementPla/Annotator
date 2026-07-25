@@ -336,6 +336,9 @@ export interface MlProgress {
   stage: string;
   done: number;
   total: number;
+  /** Milliseconds for the most recent frame. */
+  lastMs: number;
+  etaMs: number;
 }
 
 /**
@@ -351,6 +354,15 @@ export interface TrainTick {
   /** Fit index within a sweep; both 0 for a single training run. */
   point: number;
   points: number;
+  /** Wall-clock of the epoch just finished. */
+  epochMs: number;
+  elapsedMs: number;
+  /** Projected time left across the whole job, not just this fit. */
+  etaMs: number;
+  /** Where optimisation actually runs — surfaced so CPU is never implicit. */
+  device: string;
+  samples: number;
+  features: number;
 }
 
 export interface TrainSummary {

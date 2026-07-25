@@ -153,7 +153,17 @@
       <div class="prog">
         <p-progressBar [value]="progressPercent()" />
         <div class="prog-row">
-          <span class="muted">{{ progressLabel() }}</span>
+          <div class="prog-text">
+            <span class="muted">{{ progressLabel() }}</span>
+            <span class="prog-meta">
+              @if (etaLabel(); as eta) {
+                <span>{{ eta }}</span>
+              }
+              @if (deviceLabel(); as dev) {
+                <span class="dev">{{ dev }}</span>
+              }
+            </span>
+          </div>
           @if (lossPath(); as d) {
             <svg viewBox="0 0 240 34" class="spark" aria-label="training loss">
               <path [attr.d]="d" />

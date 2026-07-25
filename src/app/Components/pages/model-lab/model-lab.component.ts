@@ -235,11 +235,30 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     if (t) {
       const fit =
         t.points > 1 ? `fit ${t.point + 1}/${t.points} · ${t.budget} frames · ` : '';
-      return `Training — ${fit}epoch ${t.epoch}/${t.epochs} · loss ${t.loss.toFixed(4)}`;
+      return `Training — ${fit}epoch ${t.epoch}/${t.epochs} · loss ${t.loss.toFixed(4)} · ${Math.round(t.epochMs)} ms/epoch`;
     }
     const p = this.progress();
-    if (p) return `Extracting features — frame ${p.done}/${p.total}`;
+    if (p) {
+      return `Extracting features — frame ${p.done}/${p.total} · ${Math.round(p.lastMs)} ms/frame`;
+    }
     return this.job() === 'train' ? 'Preparing…' : 'Starting…';
+  });
+
+  /** Remaining time for the whole job, from whichever phase is live. */
+  readonly etaLabel = computed(() => {
+    const ms = this.tick()?.etaMs ?? this.progress()?.etaMs ?? 0;
+    if (ms <= 0) return null;
+    const s = Math.round(ms / 1000);
+    if (s < 60) return `~${s}s left`;
+    const m = Math.floor(s / 60);
+    return m < 60 ? `~${m}m ${s % 60}s left` : `~${Math.floor(m / 60)}h ${m % 60}m left`;
+  });
+
+  /** Device + workload, so compute placement is never left implicit. */
+  readonly deviceLabel = computed(() => {
+    const t = this.tick();
+    if (!t) return null;
+    return `${t.device} · ${t.samples.toLocaleString()} samples × ${t.features} features`;
   });
 
   /** Sparkline path for the current fit's loss trace. */
