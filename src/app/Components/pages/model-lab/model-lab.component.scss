@@ -16,12 +16,35 @@
   // Wide enough for the curve table and chart to breathe on a large monitor,
   // still centred rather than stretched edge-to-edge on an ultrawide.
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 4rem;
+  padding: 0.9rem 1.1rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 0.7rem;
+  // Fill exactly one viewport so the page does not scroll at a normal window
+  // size; the host keeps overflow-y:auto, so a short window still scrolls
+  // rather than clipping.
+  min-height: 100%;
+}
+
+// Two columns on wide screens so setup and results sit side by side instead of
+// stacking into a page-long scroll. Named `lab-grid`, not `grid`: the chart's
+// SVG gridlines already use `.grid`, and a bare `.grid` rule would style them
+// as a CSS grid container.
+.lab-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.7rem;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 1000px) {
+  .lab-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 // Below this the two-column rows stack rather than overflow.
@@ -210,11 +233,33 @@
 
 // Percentage and phase as plain text above the bar, so progress is legible
 // even if the bar itself fails to render or blends into the theme.
+// Pinned to the top of the scroll area: during a run this is what the user is
+// watching, and it must not slide away when results push the page down.
+.prog {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--p-content-border-color, #33333b);
+  background: var(--p-content-background, #16161a);
+  // Opaque, or content scrolling underneath shows through.
+  backdrop-filter: blur(6px);
+}
+
 .prog-headline {
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
   font-size: 0.95rem;
+
+  .phase {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .pct {
     font-size: 1.3rem;
@@ -305,4 +350,74 @@
   color: var(--p-text-muted-color, #8b8b93);
   margin: 0.3rem 0 0;
   text-align: center;
+}
+
+// ── Density pass ─────────────────────────────────────────────────────────────
+// The page is meant to fit one viewport. These override the roomier defaults
+// above rather than replacing them, so the intent of each block stays readable.
+
+.lab-head h1 {
+  font-size: 1.15rem;
+}
+.lab-head .sub {
+  font-size: 0.82rem;
+  max-width: 60ch;
+}
+
+.stats .stat .v {
+  font-size: 1.25rem;
+}
+
+// The encoder list is the tallest element on the page and grows with the
+// catalog, so it scrolls within its card instead of pushing everything else
+// off-screen.
+.enc {
+  padding: 0.5rem 0.65rem;
+  margin-top: 0.4rem;
+  gap: 0.15rem;
+}
+.enc-desc {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.enc-meta {
+  font-size: 0.7rem;
+}
+
+.opts {
+  gap: 0.6rem;
+  margin: 0.2rem 0 0.7rem;
+
+  input {
+    width: 6.5rem;
+    padding: 0.3rem 0.45rem;
+  }
+}
+
+.hint {
+  font-size: 0.78rem;
+  margin-top: 0.5rem;
+}
+
+.chart {
+  max-height: 210px;
+}
+
+.spark {
+  width: 150px;
+  height: 26px;
+}
+
+// Cards carry their own padding; trim it so four of them fit vertically.
+:host ::ng-deep .lab-card .p-card-body {
+  padding: 0.75rem 0.9rem;
+}
+:host ::ng-deep .lab-card .p-card-title {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
 }

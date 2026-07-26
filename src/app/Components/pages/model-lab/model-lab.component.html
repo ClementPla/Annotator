@@ -18,6 +18,34 @@
     />
   </header>
 
+  <!-- Pinned above the content: during a run this is the thing the user is
+       watching, and burying it inside a card meant scrolling to find it.
+       Gated on any live signal so a disagreement between the job flag and the
+       event stream cannot hide it. -->
+  @if (running() || progress() || tick()) {
+    <div class="prog">
+      <div class="prog-headline">
+        <span class="pct">{{ progressPercent() }}%</span>
+        <span class="phase">{{ progressLabel() }}</span>
+        @if (lossPath(); as d) {
+          <svg viewBox="0 0 240 34" class="spark" aria-label="training loss">
+            <path [attr.d]="d" />
+          </svg>
+        }
+      </div>
+      <p-progressBar [value]="progressPercent()" />
+      <div class="prog-meta">
+        @if (etaLabel(); as eta) {
+          <span>{{ eta }}</span>
+        }
+        @if (deviceLabel(); as dev) {
+          <span class="dev">{{ dev }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="lab-grid">
   <!-- Project state -->
   <p-card styleClass="lab-card">
     <ng-template pTemplate="title">Project</ng-template>
@@ -149,36 +177,6 @@
       leave a usable model behind.
     </p>
 
-    <!-- Gate on any live signal, not just `running()`: if the job flag and the
-         event stream ever disagree, progress must still be visible. -->
-    @if (running() || progress() || tick()) {
-      <div class="prog">
-        <div class="prog-headline">
-          <span class="pct">{{ progressPercent() }}%</span>
-          <span>{{ progressLabel() }}</span>
-        </div>
-        <p-progressBar [value]="progressPercent()" />
-        <div class="prog-row">
-          <div class="prog-text">
-            <span class="muted">{{ progressLabel() }}</span>
-            <span class="prog-meta">
-              @if (etaLabel(); as eta) {
-                <span>{{ eta }}</span>
-              }
-              @if (deviceLabel(); as dev) {
-                <span class="dev">{{ dev }}</span>
-              }
-            </span>
-          </div>
-          @if (lossPath(); as d) {
-            <svg viewBox="0 0 240 34" class="spark" aria-label="training loss">
-              <path [attr.d]="d" />
-            </svg>
-          }
-        </div>
-      </div>
-    }
-
     @if (error(); as e) {
       <p class="err">{{ e }}</p>
     }
@@ -288,4 +286,5 @@
       </p>
     </p-card>
   }
+  </div>
 </div>
