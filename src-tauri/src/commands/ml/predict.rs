@@ -15,6 +15,7 @@
 
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
+use ndarray::Array3;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
@@ -47,10 +48,23 @@ pub struct TrainedModel {
 ///
 /// The encoder is cached because opening a ViT graph costs about as long as a
 /// whole prediction — reloading per frame would dominate interactive latency.
+/// Identifies a cached encoder result. Working size is part of the key because
+/// it changes the image fed to the encoder, and therefore the tokens.
+pub type FeatureKey = (i64, String, u32);
+
 #[derive(Default)]
 pub struct MlState {
     pub model: Mutex<Option<TrainedModel>>,
     pub encoder: Mutex<Option<(String, EncoderSession)>>,
+    /// Last frame's encoder output, so re-predicting the same frame with
+    /// different scribbles does not re-run the ViT.
+    ///
+    /// Holds the **patch token grid**, not the upsampled volume: tokens are
+    /// ~1 MB where the volume is a couple of hundred, and re-upsampling costs
+    /// almost nothing next to an encoder forward. One entry is enough — the
+    /// interactive loop revisits the same frame repeatedly, and a larger cache
+    /// would trade real memory for a case that rarely occurs.
+    pub features: Mutex<Option<(FeatureKey, Array3<f32>)>>,
 }
 
 /// Scribbles supplied by the UI, as flat pixel indices at native resolution.
@@ -119,17 +133,35 @@ pub fn predict_frame(
     model: &TrainedModel,
     frame_id: i64,
     encoder: Option<&mut EncoderSession>,
+    cache: &mut Option<(FeatureKey, Array3<f32>)>,
     scribbles: Option<&ScribbleInput>,
     on_stage: &dyn Fn(&str, usize, usize),
 ) -> Result<PredictedFrame, String> {
     on_stage("decoding frame", 0, 4);
     let (image, w, h) = dataset::load_working_image(db, frame_id, model.working_size)?;
 
-    on_stage("encoder", 1, 4);
-    let encoder_part = match encoder {
-        Some(enc) => Some(resize_bilinear(&enc.embed(&image)?.data, h, w)),
-        None => None,
-    };
+    // Encoder output is a function of the image alone — scribbles never reach
+    // it — so re-predicting the same frame after adding strokes can reuse it.
+    // This is what makes the scribble/correct loop interactive rather than
+    // paying a full ViT forward per stroke.
+    let key: FeatureKey = (
+        frame_id,
+        model.encoder_id.clone().unwrap_or_default(),
+        model.working_size,
+    );
+    if let Some(enc) = encoder {
+        let hit = cache.as_ref().is_some_and(|(k, _)| *k == key);
+        if !hit {
+            on_stage("encoder", 1, 4);
+            *cache = Some((key.clone(), enc.embed(&image)?.data));
+        }
+    } else {
+        *cache = None;
+    }
+    let encoder_part = cache
+        .as_ref()
+        .filter(|(k, _)| *k == key)
+        .map(|(_, tokens)| resize_bilinear(tokens, h, w));
 
     let (native_w, native_h) = db
         .with_conn(|conn| crate::storage::queries::get_frame_dimensions(conn, frame_id))

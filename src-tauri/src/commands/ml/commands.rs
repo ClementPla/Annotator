@@ -490,9 +490,16 @@ pub fn ml_predict_frame(
         None
     };
 
-    predict::predict_frame(&db, model, frame_id, encoder, scribbles.as_ref(), &|stage, done, total| {
-        emit(&app, stage, done, total, 0.0);
-    })
+    let mut features = state.features.lock();
+    predict::predict_frame(
+        &db,
+        model,
+        frame_id,
+        encoder,
+        &mut features,
+        scribbles.as_ref(),
+        &|stage, done, total| emit(&app, stage, done, total, 0.0),
+    )
 }
 
 #[cfg(test)]
