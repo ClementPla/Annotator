@@ -18,10 +18,43 @@
 
 use ndarray::{Array3, Array4};
 use ort::{
+    execution_providers::{
+        CUDAExecutionProvider, CoreMLExecutionProvider, DirectMLExecutionProvider,
+        ExecutionProvider, TensorRTExecutionProvider,
+    },
     session::{builder::GraphOptimizationLevel, Session},
     value::Tensor,
 };
 use std::path::Path;
+
+/// Which accelerator the encoder will actually use, decided once at startup.
+///
+/// `ort` silently falls back to CPU when a provider is unavailable, so the only
+/// way a user learns their GPU is idle is if we ask and report it. This is a
+/// best-effort probe: it says what was *offered* to the session in priority
+/// order, and the first available one wins.
+pub fn detect_accelerator() -> &'static str {
+    if CUDAExecutionProvider::default().is_available().unwrap_or(false) {
+        "CUDA (GPU)"
+    } else if TensorRTExecutionProvider::default()
+        .is_available()
+        .unwrap_or(false)
+    {
+        "TensorRT (GPU)"
+    } else if DirectMLExecutionProvider::default()
+        .is_available()
+        .unwrap_or(false)
+    {
+        "DirectML (GPU)"
+    } else if CoreMLExecutionProvider::default()
+        .is_available()
+        .unwrap_or(false)
+    {
+        "CoreML"
+    } else {
+        "CPU"
+    }
+}
 
 use super::registry::EncoderSpec;
 
@@ -45,12 +78,25 @@ impl EncoderSession {
     /// Open a cached `.onnx` file. Execution providers mirror `dl::model` so
     /// the GPU is used when present and CPU is the fallback.
     pub fn load(path: &Path, spec: EncoderSpec) -> Result<Self, String> {
+        // Register accelerators in priority order, mirroring `dl::model`.
+        // Without this the session is CPU-only no matter how `ort` was built —
+        // which is the difference between a ViT forward taking milliseconds and
+        // taking most of a second per frame.
+        let accel = detect_accelerator();
+        println!("[ml] encoder session — accelerator: {accel}");
         let session = Session::builder()
             .map_err(|e| format!("session builder: {e}"))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| format!("optimization level: {e}"))?
             .with_intra_threads(4)
             .map_err(|e| format!("intra threads: {e}"))?
+            .with_execution_providers([
+                CUDAExecutionProvider::default().build(),
+                TensorRTExecutionProvider::default().build(),
+                DirectMLExecutionProvider::default().build(),
+                CoreMLExecutionProvider::default().build(),
+            ])
+            .map_err(|e| format!("execution providers: {e}"))?
             .commit_from_file(path)
             .map_err(|e| format!("failed to open {}: {e}", path.display()))?;
 

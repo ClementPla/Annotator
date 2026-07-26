@@ -91,7 +91,9 @@
         >
           <span class="flex gap-2 items-center">
             <i class="pi pi-bolt"></i>
-            <div class="hidden lg:block">Predict</div>
+            <div class="hidden lg:block">
+              {{ prediction.stage() ?? 'Predict' }}
+            </div>
           </span>
         </p-button>
 

@@ -110,15 +110,22 @@ fn to_working(
 }
 
 /// Run a trained head over one frame and return per-label masks at native size.
+///
+/// `on_stage(stage, done, total)` reports coarse progress. Prediction on a large
+/// frame takes seconds — long enough that a button spinner alone leaves the user
+/// unsure whether anything is happening.
 pub fn predict_frame(
     db: &DbState,
     model: &TrainedModel,
     frame_id: i64,
     encoder: Option<&mut EncoderSession>,
     scribbles: Option<&ScribbleInput>,
+    on_stage: &dyn Fn(&str, usize, usize),
 ) -> Result<PredictedFrame, String> {
+    on_stage("decoding frame", 0, 4);
     let (image, w, h) = dataset::load_working_image(db, frame_id, model.working_size)?;
 
+    on_stage("encoder", 1, 4);
     let encoder_part = match encoder {
         Some(enc) => Some(resize_bilinear(&enc.embed(&image)?.data, h, w)),
         None => None,
@@ -133,6 +140,7 @@ pub fn predict_frame(
         None => Scribbles::empty(w, h),
     };
 
+    on_stage("features", 2, 4);
     let feats = dataset::assemble_stack(&image, encoder_part.as_ref(), &scr, &FilterBankConfig::default());
     let d = feats.shape()[0];
     if d != model.feature_dim {
@@ -160,6 +168,7 @@ pub fn predict_frame(
         }
         classes.extend(predict_rows(&model.head, &buf, end - start, d));
         start = end;
+        on_stage("classifying", 3, 4);
     }
 
     // Upscale the class map to native resolution with nearest, for the same

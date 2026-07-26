@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, NgZone, signal } from '@angular/core';
+import { listen } from '@tauri-apps/api/event';
 
 import { LabelsService } from './Labels/labels.service';
 import { SequenceService } from './sequence.service';
@@ -25,6 +26,8 @@ import { api, ScribbleInput } from '../lib/api';
 export class PredictionService {
   readonly running = signal(false);
   readonly lastError = signal<string | null>(null);
+  /** Coarse phase of the in-flight prediction, e.g. "encoder". */
+  readonly stage = signal<string | null>(null);
 
   constructor(
     private labelService: LabelsService,
@@ -34,7 +37,17 @@ export class PredictionService {
     private undoRedo: UndoRedoService,
     private io: IOService,
     private notifications: NotificationService,
-  ) {}
+    private zone: NgZone,
+  ) {
+    // Prediction on a large frame takes seconds; a bare spinner leaves the user
+    // guessing. Tauri callbacks fire outside Angular's zone, so this must be
+    // wrapped or the signal updates without ever repainting.
+    void listen<{ stage: string }>('ml-progress', (e) =>
+      this.zone.run(() => {
+        if (this.running()) this.stage.set(e.payload.stage);
+      }),
+    );
+  }
 
   /**
    * Turn what the user has already drawn into scribble conditioning.
@@ -128,6 +141,7 @@ export class PredictionService {
       this.notifications.error('Prediction failed', message);
     } finally {
       this.running.set(false);
+      this.stage.set(null);
     }
   }
 }

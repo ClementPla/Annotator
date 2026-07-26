@@ -312,7 +312,13 @@ fn emit_train(app: &AppHandle, p: train::TrainProgress) {
             epoch_ms: p.epoch_ms,
             elapsed_ms: p.elapsed_ms,
             eta_ms: p.eta_ms,
-            device: p.device.to_string(),
+            // Two different devices are in play and conflating them misleads:
+            // the encoder can be on CUDA while the head is always on CPU.
+            device: format!(
+                "head {} · encoder {}",
+                p.device,
+                super::encoder::detect_accelerator()
+            ),
             samples: p.samples,
             features: p.features,
         },
@@ -469,7 +475,9 @@ pub fn ml_predict_frame(
         None
     };
 
-    predict::predict_frame(&db, model, frame_id, encoder, scribbles.as_ref())
+    predict::predict_frame(&db, model, frame_id, encoder, scribbles.as_ref(), &|stage, done, total| {
+        emit(&app, stage, done, total, 0.0);
+    })
 }
 
 #[cfg(test)]
