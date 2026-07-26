@@ -175,6 +175,23 @@
   flex-wrap: wrap;
 }
 
+// Percentage and phase as plain text above the bar, so progress is legible
+// even if the bar itself fails to render or blends into the theme.
+.prog-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+
+  .pct {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--p-primary-color, #7a5cff);
+    min-width: 3.5rem;
+  }
+}
+
 .prog-text {
   display: flex;
   flex-direction: column;
