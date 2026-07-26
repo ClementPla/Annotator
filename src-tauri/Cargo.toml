@@ -59,7 +59,12 @@ rusqlite = { version = "0.39.0", features = ["bundled"] }
 reqwest = { version = "0.13.3", default-features = false, features = ["json", "stream"] }
 serde_bytes = "0.11.19"
 [target.'cfg(not(target_os = "android"))'.dependencies]
-ort = { version = "=2.0.0-rc.10", features = ["cuda", "copy-dylibs"] }
+# DirectML is listed alongside CUDA so Windows gets GPU inference with no
+# system prerequisites: the CUDA provider needs a CUDA runtime *and* cuDNN 9
+# supplied by the user, whereas DirectML needs only DX12 and ships its own DLL.
+# `commands::ml::encoder` registers providers one at a time and reports which
+# actually took, so this widens the fallback chain rather than forcing a choice.
+ort = { version = "=2.0.0-rc.10", features = ["cuda", "directml", "copy-dylibs"] }
 # In-app training of the scribble-conditioned segmentation head (see
 # `commands::ml`). Autodiff on the CPU (ndarray) backend: the head is tiny and
 # trains on cached encoder features, so this needs no CUDA/wgpu toolchain.
