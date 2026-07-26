@@ -27,33 +27,51 @@ use ort::{
 };
 use std::path::Path;
 
-/// Which accelerator the encoder will actually use, decided once at startup.
+/// The accelerator the encoder is *actually* running on.
 ///
-/// `ort` silently falls back to CPU when a provider is unavailable, so the only
-/// way a user learns their GPU is idle is if we ask and report it. This is a
-/// best-effort probe: it says what was *offered* to the session in priority
-/// order, and the first available one wins.
+/// Set by [`EncoderSession::load`] from the provider that genuinely registered,
+/// not from what was merely offered. Defaults to CPU until an encoder loads.
+static ACTIVE_ACCELERATOR: parking_lot::Mutex<&'static str> = parking_lot::Mutex::new("CPU");
+
+/// Report the accelerator in use. See [`ACTIVE_ACCELERATOR`].
 pub fn detect_accelerator() -> &'static str {
-    if CUDAExecutionProvider::default().is_available().unwrap_or(false) {
-        "CUDA (GPU)"
-    } else if TensorRTExecutionProvider::default()
-        .is_available()
-        .unwrap_or(false)
-    {
-        "TensorRT (GPU)"
-    } else if DirectMLExecutionProvider::default()
-        .is_available()
-        .unwrap_or(false)
-    {
-        "DirectML (GPU)"
-    } else if CoreMLExecutionProvider::default()
-        .is_available()
-        .unwrap_or(false)
-    {
-        "CoreML"
-    } else {
-        "CPU"
+    *ACTIVE_ACCELERATOR.lock()
+}
+
+/// Attach the best available accelerator, returning which one took.
+///
+/// `is_available()` is **not** sufficient: it reports whether a provider was
+/// compiled into `ort`, not whether it can load. A CUDA build whose machine
+/// lacks `cudnn64_9.dll` answers "available" and then fails at registration —
+/// and `with_execution_providers` logs that failure and silently continues on
+/// CPU. Registering one at a time and checking the result is the only way to
+/// know what is really executing, which is the difference between reporting
+/// "CUDA" and reporting the truth.
+fn attach_accelerator(
+    builder: ort::session::builder::SessionBuilder,
+) -> (ort::session::builder::SessionBuilder, &'static str) {
+    macro_rules! try_ep {
+        ($builder:expr, $ep:expr, $label:literal) => {{
+            let mut b = $builder;
+            let ep = $ep;
+            match ep.is_available() {
+                Ok(true) => match ep.register(&mut b) {
+                    Ok(()) => return (b, $label),
+                    Err(e) => {
+                        println!("[ml] {} present but failed to register: {e}", $label);
+                    }
+                },
+                _ => {}
+            }
+            b
+        }};
     }
+
+    let builder = try_ep!(builder, CUDAExecutionProvider::default(), "CUDA (GPU)");
+    let builder = try_ep!(builder, TensorRTExecutionProvider::default(), "TensorRT (GPU)");
+    let builder = try_ep!(builder, DirectMLExecutionProvider::default(), "DirectML (GPU)");
+    let builder = try_ep!(builder, CoreMLExecutionProvider::default(), "CoreML");
+    (builder, "CPU")
 }
 
 use super::registry::EncoderSpec;
@@ -78,25 +96,27 @@ impl EncoderSession {
     /// Open a cached `.onnx` file. Execution providers mirror `dl::model` so
     /// the GPU is used when present and CPU is the fallback.
     pub fn load(path: &Path, spec: EncoderSpec) -> Result<Self, String> {
-        // Register accelerators in priority order, mirroring `dl::model`.
-        // Without this the session is CPU-only no matter how `ort` was built —
-        // which is the difference between a ViT forward taking milliseconds and
-        // taking most of a second per frame.
-        let accel = detect_accelerator();
-        println!("[ml] encoder session — accelerator: {accel}");
-        let session = Session::builder()
+        let builder = Session::builder()
             .map_err(|e| format!("session builder: {e}"))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| format!("optimization level: {e}"))?
             .with_intra_threads(4)
-            .map_err(|e| format!("intra threads: {e}"))?
-            .with_execution_providers([
-                CUDAExecutionProvider::default().build(),
-                TensorRTExecutionProvider::default().build(),
-                DirectMLExecutionProvider::default().build(),
-                CoreMLExecutionProvider::default().build(),
-            ])
-            .map_err(|e| format!("execution providers: {e}"))?
+            .map_err(|e| format!("intra threads: {e}"))?;
+
+        let (builder, accel) = attach_accelerator(builder);
+        *ACTIVE_ACCELERATOR.lock() = accel;
+        if accel == "CPU" {
+            println!(
+                "[ml] encoder session — running on CPU. For NVIDIA acceleration \
+                 ort needs cuDNN 9 (cudnn64_9.dll) on PATH alongside the CUDA \
+                 runtime; without it the CUDA provider reports as available but \
+                 fails to load."
+            );
+        } else {
+            println!("[ml] encoder session — accelerator: {accel}");
+        }
+
+        let session = builder
             .commit_from_file(path)
             .map_err(|e| format!("failed to open {}: {e}", path.display()))?;
 
