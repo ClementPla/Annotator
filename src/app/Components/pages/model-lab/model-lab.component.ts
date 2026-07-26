@@ -97,16 +97,16 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     this.unlisten.push(
       await listen<MlProgress>('ml-progress', (e) =>
         this.zone.run(() => {
-          // Deliberate: if the UI ever looks frozen again, devtools tells you
-          // immediately whether events are arriving (a render problem) or not
-          // (a backend problem). Cheap, and it isolates the half at fault.
-          console.debug('[ml-progress]', e.payload);
+          // console.log, not console.debug: debug maps to DevTools' Verbose
+          // level, which is hidden by default -- a diagnostic nobody can see
+          // is worse than none, because it reads as "no events arrived".
+          console.log('[ml-progress]', e.payload);
           this.progress.set(e.payload);
         }),
       ),
       await listen<TrainTick>('ml-train-progress', (e) =>
         this.zone.run(() => {
-          console.debug('[ml-train-progress]', e.payload);
+          console.log('[ml-train-progress]', e.payload);
           const t = e.payload;
           this.tick.set(t);
           // Reset the trace when a new fit starts, so the sparkline shows this

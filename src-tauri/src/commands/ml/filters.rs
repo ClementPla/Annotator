@@ -29,6 +29,7 @@
 //!   still reaches the head without multiplying the channel count by three.
 
 use ndarray::{Array2, Array3};
+use rayon::prelude::*;
 
 /// Scales (in pixels, as Gaussian sigma) at which the differential features are
 /// evaluated. Spanning a decade covers fine texture through coarse anatomy.
@@ -265,24 +266,41 @@ pub fn compute(image: &Array3<f32>, cfg: &FilterBankConfig) -> (Array3<f32>, Vec
     }
 
     let gray = robust_normalize(&luminance(image));
-    let mut idx = c;
-    for &sigma in &cfg.scales {
-        let smoothed = gaussian_blur(&gray, sigma);
-        let grad = gradient_magnitude(&smoothed);
-        // Laplacian == trace of the Hessian; gamma-normalised alongside it.
-        let (lxx, lyy, _) = hessian_components(&smoothed, sigma);
-        let log = &lxx + &lyy;
-        let (e1, e2) = hessian_eigenvalues(&smoothed, sigma);
-        let std = local_std(&gray, sigma);
 
-        for (plane, tag) in [
-            (smoothed, "gauss"),
-            (grad, "grad"),
-            (log, "log"),
-            (e1, "hess1"),
-            (e2, "hess2"),
-            (std, "std"),
-        ] {
+    // Scales are fully independent and each involves several separable
+    // convolutions, which dominate the cost of building a training set. Running
+    // them in parallel is the cheapest large win available here.
+    //
+    // Parallelism stops at this level on purpose: nesting rayon inside the
+    // convolutions as well would oversubscribe the pool, and the caller already
+    // processes frames in sequence. `par_iter().map().collect()` preserves
+    // order, so the channel layout stays deterministic — which matters, because
+    // a head is only valid against the ordering it was trained on.
+    let per_scale: Vec<[(Array2<f32>, &'static str); PER_SCALE]> = cfg
+        .scales
+        .par_iter()
+        .map(|&sigma| {
+            let smoothed = gaussian_blur(&gray, sigma);
+            let grad = gradient_magnitude(&smoothed);
+            // Laplacian == trace of the Hessian; gamma-normalised alongside it.
+            let (lxx, lyy, _) = hessian_components(&smoothed, sigma);
+            let log = &lxx + &lyy;
+            let (e1, e2) = hessian_eigenvalues(&smoothed, sigma);
+            let std = local_std(&gray, sigma);
+            [
+                (smoothed, "gauss"),
+                (grad, "grad"),
+                (log, "log"),
+                (e1, "hess1"),
+                (e2, "hess2"),
+                (std, "std"),
+            ]
+        })
+        .collect();
+
+    let mut idx = c;
+    for (&sigma, planes) in cfg.scales.iter().zip(per_scale) {
+        for (plane, tag) in planes {
             out.index_axis_mut(ndarray::Axis(0), idx).assign(&plane);
             names.push(format!("s{sigma}/{tag}"));
             idx += 1;

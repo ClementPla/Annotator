@@ -117,9 +117,13 @@ struct Progress<'a> {
     eta_ms: f32,
 }
 
-fn emit(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f32) {
+/// `avg_ms` drives the ETA rather than `last_ms`: per-frame cost varies several
+/// -fold (a training frame runs every augmentation repeat, a validation frame
+/// runs one), so extrapolating from the most recent frame makes the estimate
+/// lurch by 3x between updates and reads as unreliable.
+fn emit_avg(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f32, avg_ms: f32) {
     let eta_ms = if done > 0 {
-        last_ms * total.saturating_sub(done) as f32
+        avg_ms * total.saturating_sub(done) as f32
     } else {
         0.0
     };
@@ -133,6 +137,11 @@ fn emit(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f32) {
             eta_ms,
         },
     );
+}
+
+/// Single-shot progress with no history to average over.
+fn emit(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f32) {
+    emit_avg(app, stage, done, total, last_ms, last_ms);
 }
 
 /// Default budget ladder: powers of two up to the pool size, always including
@@ -230,6 +239,7 @@ fn build_split(
 
     let total = shuffled.len();
     let mut done = 0usize;
+    let mut spent_ms = 0.0f32;
 
     // Validation frames are augmentation-free: held-out scores should measure
     // the model, not how lucky a jittered copy was.
@@ -252,8 +262,9 @@ fn build_split(
             val.extend(&s);
         }
         done += 1;
+        spent_ms += ms;
         println!("[ml] features val frame {fid} — {ms:.0} ms ({done}/{total})");
-        emit(app, "features", done, total, ms);
+        emit_avg(app, "features", done, total, ms, spent_ms / done as f32);
     }
 
     let mut per_frame: Vec<Samples> = Vec::new();
@@ -267,8 +278,9 @@ fn build_split(
             per_frame.push(s);
         }
         done += 1;
+        spent_ms += ms;
         println!("[ml] features train frame {fid} — {ms:.0} ms ({done}/{total})");
-        emit(app, "features", done, total, ms);
+        emit_avg(app, "features", done, total, ms, spent_ms / done as f32);
     }
 
     if per_frame.is_empty() {
@@ -354,6 +366,9 @@ pub fn ml_run_learning_curve(
     state: State<MlState>,
     options: CurveOptions,
 ) -> Result<CurveReport, String> {
+    // Fired before any heavy work: if this never reaches the UI, the event
+    // channel itself is at fault rather than anything being slow or blocked.
+    emit(&app, "starting", 0, 1, 0.0);
     let split = build_split(&app, &db, &state, &options)?;
     let budgets = options
         .budgets
