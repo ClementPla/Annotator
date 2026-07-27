@@ -35,7 +35,7 @@ use crate::storage::{queries, DbState};
 use super::encoder::{resize_bilinear, EncoderSession};
 use super::filters::{self, FilterBankConfig};
 use super::scribble::{self, Rng, SCRIBBLE_CHANNELS};
-use super::train::Samples;
+use super::train::{Samples, PATCH};
 
 #[derive(Debug, Clone)]
 pub struct DatasetConfig {
@@ -139,31 +139,46 @@ pub fn jitter(image: &Array3<f32>, rng: &mut Rng) -> Array3<f32> {
     image.mapv(|v| (v.clamp(0.0, 1.0).powf(gamma) * gain + bias).clamp(0.0, 1.0))
 }
 
-/// Draw `k` random pixels into a sample table.
+/// Draw `k_pixels` worth of random patches into a sample table.
 ///
-/// Uniform over pixels, with no class rebalancing: the curve should reflect the
-/// class prior the annotator actually produced. Rebalancing here would make
-/// sparse structures look easier than they are.
-pub fn sample_pixels(
+/// Patches, because the head is convolutional and needs neighbours. Origins are
+/// uniform over valid positions with no class rebalancing: the curve should
+/// reflect the class prior the annotator actually produced, and rebalancing
+/// would make sparse structures look easier than they are.
+///
+/// A frame smaller than one patch is skipped rather than padded — padding would
+/// feed the head invented context it will never see at inference.
+pub fn sample_patches(
     features: &Array3<f32>,
     labels: &[i32],
-    k: usize,
+    k_pixels: usize,
     rng: &mut Rng,
     out: &mut Samples,
 ) {
     let (d, h, w) = (features.shape()[0], features.shape()[1], features.shape()[2]);
-    let n_px = h * w;
-    if n_px == 0 || labels.len() < n_px {
+    if h < PATCH || w < PATCH || labels.len() < h * w {
         return;
     }
-    let mut buf = vec![0.0f32; d];
-    for _ in 0..k {
-        let i = rng.below(n_px);
-        let (y, x) = (i / w, i % w);
+    let n_patches = (k_pixels / Samples::patch_pixels()).max(1);
+    let mut fbuf = vec![0.0f32; d * Samples::patch_pixels()];
+    let mut lbuf = vec![0i32; Samples::patch_pixels()];
+    for _ in 0..n_patches {
+        let oy = rng.below(h - PATCH + 1);
+        let ox = rng.below(w - PATCH + 1);
         for c in 0..d {
-            buf[c] = features[[c, y, x]];
+            for py in 0..PATCH {
+                for px in 0..PATCH {
+                    fbuf[c * Samples::patch_pixels() + py * PATCH + px] =
+                        features[[c, oy + py, ox + px]];
+                }
+            }
         }
-        out.push(&buf, labels[i]);
+        for py in 0..PATCH {
+            for px in 0..PATCH {
+                lbuf[py * PATCH + px] = labels[(oy + py) * w + ox + px];
+            }
+        }
+        out.push_patch(&fbuf, &lbuf);
     }
 }
 
@@ -348,7 +363,7 @@ pub fn build_frame_samples(
         let feats = assemble_stack(&view, encoder_part.as_ref(), &s, &fb);
 
         let acc = out.get_or_insert_with(|| Samples::new(feats.shape()[0]));
-        sample_pixels(&feats, &labels, cfg.pixels_per_frame, rng, acc);
+        sample_patches(&feats, &labels, cfg.pixels_per_frame, rng, acc);
     }
 
     Ok(out.unwrap_or_else(|| Samples::new(0)))
@@ -411,33 +426,49 @@ mod tests {
     }
 
     #[test]
-    fn sampling_produces_matching_features_and_labels() {
-        let (d, h, w) = (3usize, 5usize, 4usize);
-        // Channel 0 encodes the flat pixel index so we can verify alignment.
+    fn sampled_patches_keep_features_and_labels_aligned() {
+        // Channel 0 encodes the flat pixel index, so a patch can be checked
+        // against the labels it should have been cut from.
+        let (d, h, w) = (2usize, PATCH + 6, PATCH + 9);
         let feats = Array3::from_shape_fn((d, h, w), |(c, y, x)| {
             if c == 0 { (y * w + x) as f32 } else { 0.0 }
         });
         let labels: Vec<i32> = (0..h * w).map(|i| (i % 3) as i32).collect();
         let mut out = Samples::new(d);
-        let mut rng = Rng::new(3);
-        sample_pixels(&feats, &labels, 25, &mut rng, &mut out);
+        sample_patches(&feats, &labels, Samples::patch_pixels() * 3, &mut Rng::new(3), &mut out);
 
-        assert_eq!(out.n, 25);
-        assert_eq!(out.x.len(), 25 * d);
+        assert_eq!(out.n, 3);
+        assert_eq!(out.x.len(), 3 * d * Samples::patch_pixels());
+        assert_eq!(out.y.len(), 3 * Samples::patch_pixels());
         for k in 0..out.n {
-            let idx = out.x[k * d] as usize;
-            assert_eq!(
-                out.y[k], labels[idx],
-                "sample {k} pairs pixel {idx} with the wrong label"
-            );
+            let base = k * d * Samples::patch_pixels();
+            for py in 0..PATCH {
+                for px in 0..PATCH {
+                    let idx = out.x[base + py * PATCH + px] as usize;
+                    assert_eq!(
+                        out.y[k * Samples::patch_pixels() + py * PATCH + px],
+                        labels[idx],
+                        "patch {k} pixel ({py},{px}) pairs source {idx} with the wrong label"
+                    );
+                }
+            }
         }
     }
 
     #[test]
-    fn sampling_rejects_short_label_buffers() {
-        let feats = Array3::<f32>::zeros((2, 3, 3));
+    fn sampling_skips_frames_smaller_than_a_patch() {
+        // Padding would feed the head context that cannot occur at inference,
+        // so an undersized frame yields nothing rather than a padded patch.
+        let feats = Array3::<f32>::zeros((2, PATCH - 1, PATCH - 1));
+        let labels = vec![0i32; (PATCH - 1) * (PATCH - 1)];
         let mut out = Samples::new(2);
-        sample_pixels(&feats, &[0, 1], 5, &mut Rng::new(1), &mut out);
-        assert_eq!(out.n, 0, "must not sample against a truncated label map");
+        sample_patches(&feats, &labels, 10_000, &mut Rng::new(1), &mut out);
+        assert_eq!(out.n, 0);
+
+        // A truncated label buffer is also refused.
+        let big = Array3::<f32>::zeros((2, PATCH, PATCH));
+        let mut out = Samples::new(2);
+        sample_patches(&big, &[0, 1], 10_000, &mut Rng::new(1), &mut out);
+        assert_eq!(out.n, 0);
     }
 }

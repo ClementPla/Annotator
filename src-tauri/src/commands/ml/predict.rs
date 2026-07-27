@@ -25,11 +25,11 @@ use super::dataset::{self, downscale_nearest};
 use super::encoder::{resize_bilinear, EncoderSession};
 use super::filters::FilterBankConfig;
 use super::scribble::Scribbles;
-use super::train::{predict_rows, EvalMetrics, SegHead, InferBackend};
+use super::train::{predict_map, EvalMetrics, Head};
 
 /// A fitted head plus everything needed to rebuild identical features.
 pub struct TrainedModel {
-    pub head: SegHead<InferBackend>,
+    pub head: Head,
     pub feature_dim: usize,
     pub classes: usize,
     /// Label ids in project order; class `i + 1` is `label_order[i]`.
@@ -183,25 +183,12 @@ pub fn predict_frame(
         ));
     }
 
-    // Chunked so a large frame never allocates one huge tensor.
-    const CHUNK: usize = 16_384;
-    let n_px = w * h;
-    let mut classes = Vec::with_capacity(n_px);
-    let mut buf = Vec::with_capacity(CHUNK * d);
-    let mut start = 0usize;
-    while start < n_px {
-        let end = (start + CHUNK).min(n_px);
-        buf.clear();
-        for i in start..end {
-            let (y, x) = (i / w, i % w);
-            for c in 0..d {
-                buf.push(feats[[c, y, x]]);
-            }
-        }
-        classes.extend(predict_rows(&model.head, &buf, end - start, d));
-        start = end;
-        on_stage("classifying", 3, 4);
-    }
+    // One pass over the whole map: a convolutional head must see the frame
+    // intact, and chunking by pixel would destroy the very neighbourhood it
+    // exists to use.
+    on_stage("classifying", 3, 4);
+    let flat: Vec<f32> = feats.iter().copied().collect();
+    let classes = predict_map(&model.head, &flat, d, h, w, model.classes);
 
     // Upscale the class map to native resolution with nearest, for the same
     // reason masks are downscaled that way: interpolating ids invents classes.

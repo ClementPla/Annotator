@@ -2,41 +2,56 @@
 //!
 //! # Shape of the model
 //!
-//! The head is an MLP applied per pixel: a feature vector (encoder channels ⊕
-//! local basis ⊕ scribble distances) maps to one logit per class. Applied
-//! densely this is identical to a stack of 1x1 convolutions, but phrasing it as
-//! an MLP over sampled pixels keeps training cheap — a dense `[D, H, W]` volume
-//! is hundreds of megabytes, while a sample of pixels from the same image is a
-//! small matrix. All spatial context arrives through the multi-scale features,
-//! not through the head's receptive field.
+//! The head is a small dilated CNN over feature patches: `[d, 48, 48]` in, one
+//! logit per class per pixel out. It replaced a per-pixel MLP, which could not
+//! consult a neighbouring pixel at any capacity — so shape, context and
+//! topology were unreachable, and scribble channels had nothing able to
+//! propagate them.
 //!
-//! # Why sampled pixels, and why that is honest
+//! Patches rather than whole frames keep training affordable: a dense feature
+//! volume is hundreds of megabytes, while a batch of patches is a few.
 //!
-//! Sampling changes the class balance seen during optimisation, so the loop
-//! samples pixels per frame without rebalancing classes, and every reported
-//! metric is computed on held-out *frames* rather than held-out pixels. Pixels
-//! from one image are strongly correlated; scoring on held-out pixels of a
-//! trained-on image would inflate the curve badly.
+//! # Why this stays honest
+//!
+//! Patches are drawn without class rebalancing, so the loss sees the prior the
+//! annotator actually produced. Every reported metric is computed on held-out
+//! *frames*, never held-out pixels or patches of a trained-on frame: pixels
+//! within an image are strongly correlated, and scoring that way would inflate
+//! the curve badly.
 
-use burn::backend::{Autodiff, NdArray};
 use burn::module::{AutodiffModule, Module};
 use burn::nn::loss::CrossEntropyLossConfig;
-use burn::nn::{Linear, LinearConfig, Relu};
+use burn::nn::conv::{Conv2d, Conv2dConfig};
+use burn::nn::{PaddingConfig2d, Relu};
 use burn::optim::{AdamConfig, GradientsParams, Optimizer};
-use burn::tensor::backend::Backend;
+use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::tensor::{Int, Tensor, TensorData};
 
+use super::backend::{CpuInfer, CpuTrain, Selection};
+#[cfg(feature = "gpu")]
+use super::backend::{GpuInfer, GpuTrain};
 use super::scribble::Rng;
 
-pub type TrainBackend = Autodiff<NdArray>;
-pub type InferBackend = NdArray;
+/// Square side of a training patch.
+///
+/// Large enough that the dilated stack's ~15px receptive field sits well inside
+/// it (so most pixels see real context rather than padding), small enough that a
+/// batch stays cheap.
+pub const PATCH: usize = 48;
 
-/// A flat table of per-pixel samples: `x` is row-major `[n, d]`.
+/// A batch of feature patches: `x` is `[n, d, PATCH, PATCH]`, `y` is
+/// `[n, PATCH, PATCH]`.
+///
+/// Patches rather than loose pixels because the head is convolutional now — it
+/// needs neighbours to look at. The field name `d` still means channels, so the
+/// feature-width checks elsewhere continue to line up.
 #[derive(Debug, Clone, Default)]
 pub struct Samples {
     pub x: Vec<f32>,
     pub y: Vec<i32>,
+    /// Number of patches.
     pub n: usize,
+    /// Feature channels.
     pub d: usize,
 }
 
@@ -50,11 +65,19 @@ impl Samples {
         }
     }
 
-    pub fn push(&mut self, features: &[f32], label: i32) {
-        debug_assert_eq!(features.len(), self.d);
+    /// Append one patch: `features` is `[d, PATCH, PATCH]`, `labels` is
+    /// `[PATCH, PATCH]`, both row-major.
+    pub fn push_patch(&mut self, features: &[f32], labels: &[i32]) {
+        debug_assert_eq!(features.len(), self.d * PATCH * PATCH);
+        debug_assert_eq!(labels.len(), PATCH * PATCH);
         self.x.extend_from_slice(features);
-        self.y.push(label);
+        self.y.extend_from_slice(labels);
         self.n += 1;
+    }
+
+    /// Pixels per patch, for loss and metric shapes.
+    pub const fn patch_pixels() -> usize {
+        PATCH * PATCH
     }
 
     pub fn extend(&mut self, other: &Samples) {
@@ -87,31 +110,44 @@ impl Default for TrainConfig {
             depth: 3,
             epochs: 40,
             lr: 1e-3,
-            batch: 512,
+            // Patches, not pixels: each carries PATCH^2 supervised pixels.
+            batch: 16,
             seed: 0,
         }
     }
 }
 
-/// Per-pixel MLP head with configurable width and depth.
+/// Dilation schedule for the 3x3 stack.
 ///
-/// Depth and width are exposed because they are cheap to try, but be aware of
-/// what they cannot buy: this head consumes one pixel's feature vector at a
-/// time, so no amount of capacity lets it consider a neighbouring pixel.
-/// Anything needing shape, context or topology is out of reach here by
-/// construction — that requires a receptive field, i.e. a convolutional head.
+/// 1, 2, 4 gives a receptive field of 1 + 2*(1+2+4) = 15 px without any
+/// downsampling, so the head gains context while every output pixel keeps its
+/// exact position. Striding or pooling would blur boundaries — the precise
+/// thing a segmentation head must not do.
+const DILATIONS: [usize; 3] = [1, 2, 4];
+
+/// Convolutional segmentation head.
+///
+/// The predecessor was an MLP over single pixels, which could not consider a
+/// neighbour at any capacity: shape, context and topology were unreachable by
+/// construction, and scribble-distance channels degenerated into "paint near
+/// the strokes" because nothing could propagate them. A receptive field is what
+/// fixes both, so the head is convolutional and trains on patches.
+///
+/// Structure: 1x1 to project the wide feature stack down to `hidden`, then the
+/// dilated 3x3 stack, then 1x1 to class logits. The leading 1x1 matters for
+/// cost — with an encoder attached `d_in` can be ~475, and running 3x3 kernels
+/// at that width would dominate the whole budget.
 #[derive(Module, Debug)]
 pub struct SegHead<B: Backend> {
-    layers: Vec<Linear<B>>,
-    out: Linear<B>,
+    project: Conv2d<B>,
+    blocks: Vec<Conv2d<B>>,
+    out: Conv2d<B>,
     act: Relu,
 }
 
 impl<B: Backend> SegHead<B> {
-    pub fn new(d_in: usize, hidden: usize, n_classes: usize, device: &B::Device) -> Self {
-        Self::with_depth(d_in, hidden, 2, n_classes, device)
-    }
-
+    /// `depth` counts dilated 3x3 blocks; the dilation schedule repeats if
+    /// depth exceeds it, which keeps growing the receptive field.
     pub fn with_depth(
         d_in: usize,
         hidden: usize,
@@ -120,25 +156,59 @@ impl<B: Backend> SegHead<B> {
         device: &B::Device,
     ) -> Self {
         let depth = depth.max(1);
-        let mut layers = Vec::with_capacity(depth);
-        for i in 0..depth {
-            let from = if i == 0 { d_in } else { hidden };
-            layers.push(LinearConfig::new(from, hidden).init(device));
-        }
+        let blocks = (0..depth)
+            .map(|i| {
+                let d = DILATIONS[i % DILATIONS.len()];
+                // padding == dilation keeps 3x3 output the same size as input.
+                Conv2dConfig::new([hidden, hidden], [3, 3])
+                    .with_dilation([d, d])
+                    .with_padding(PaddingConfig2d::Explicit(d, d, d, d))
+                    .init(device)
+            })
+            .collect();
         Self {
-            layers,
-            out: LinearConfig::new(hidden, n_classes).init(device),
+            project: Conv2dConfig::new([d_in, hidden], [1, 1]).init(device),
+            blocks,
+            out: Conv2dConfig::new([hidden, n_classes], [1, 1]).init(device),
             act: Relu::new(),
         }
     }
 
-    /// `[n, d] -> [n, n_classes]` logits.
-    pub fn forward(&self, x: Tensor<B, 2>) -> Tensor<B, 2> {
-        let mut h = x;
-        for layer in &self.layers {
-            h = self.act.forward(layer.forward(h));
+    /// `[n, d, h, w] -> [n, n_classes, h, w]` logits, spatial size preserved.
+    pub fn forward(&self, x: Tensor<B, 4>) -> Tensor<B, 4> {
+        let mut h = self.act.forward(self.project.forward(x));
+        for block in &self.blocks {
+            // Residual so a deeper stack cannot do worse than a shallower one
+            // at initialisation, which matters when depth is user-configurable.
+            h = h.clone() + self.act.forward(block.forward(h));
         }
         self.out.forward(h)
+    }
+}
+
+/// A fitted head, together with the backend it lives on.
+///
+/// A burn tensor belongs to its backend's device, so a head trained on CUDA
+/// cannot be handed a CPU tensor — the two are different Rust types. Rather
+/// than convert weights across (which would mean a second, slower inference
+/// path for no benefit), the head simply stays where it was fitted and this
+/// enum records where that is. Callers go through [`predict_map`] and never
+/// name a backend.
+#[derive(Debug)]
+pub enum Head {
+    Cpu(SegHead<CpuInfer>),
+    #[cfg(feature = "gpu")]
+    Cuda(SegHead<GpuInfer>),
+}
+
+impl Head {
+    /// Which backend this head runs on, for logs and the UI.
+    pub const fn device(&self) -> &'static str {
+        match self {
+            Head::Cpu(_) => Selection::Cpu.label(),
+            #[cfg(feature = "gpu")]
+            Head::Cuda(_) => Selection::Cuda.label(),
+        }
     }
 }
 
@@ -152,36 +222,83 @@ pub struct EvalMetrics {
     pub per_class_dice: Vec<f32>,
 }
 
-fn to_x<B: Backend>(s: &Samples, device: &B::Device) -> Tensor<B, 2> {
-    Tensor::<B, 2>::from_data(TensorData::new(s.x.clone(), [s.n, s.d]), device)
+/// `[n, d, PATCH, PATCH]` from a patch batch.
+fn to_x<B: Backend>(x: Vec<f32>, n: usize, d: usize, device: &B::Device) -> Tensor<B, 4> {
+    Tensor::<B, 4>::from_data(TensorData::new(x, [n, d, PATCH, PATCH]), device)
 }
 
-fn to_y<B: Backend>(s: &Samples, device: &B::Device) -> Tensor<B, 1, Int> {
-    Tensor::<B, 1, Int>::from_data(TensorData::new(s.y.clone(), [s.n]), device)
+/// Flatten `[n, C, H, W]` logits to `[n*H*W, C]` so the loss and argmax operate
+/// per pixel regardless of how pixels were grouped into patches.
+fn flatten_logits<B: Backend>(logits: Tensor<B, 4>, n_classes: usize) -> Tensor<B, 2> {
+    let [n, c, h, w] = logits.dims();
+    debug_assert_eq!(c, n_classes);
+    // [n, c, h, w] -> [n, h, w, c] -> [n*h*w, c]
+    logits.permute([0, 2, 3, 1]).reshape([n * h * w, c])
 }
 
-/// Argmax predictions for a sample table.
-fn predict<B: Backend>(model: &SegHead<B>, s: &Samples, device: &B::Device) -> Vec<i32> {
+/// Argmax class per pixel across a patch batch, in patch-row-major order.
+fn predict<B: Backend>(
+    model: &SegHead<B>,
+    s: &Samples,
+    n_classes: usize,
+    device: &B::Device,
+) -> Vec<i32> {
     if s.is_empty() {
         return Vec::new();
     }
-    let logits = model.forward(to_x::<B>(s, device));
-    let idx = logits.argmax(1).into_data();
+    let mut out = Vec::with_capacity(s.n * Samples::patch_pixels());
+    // Chunked so a large validation set never becomes one huge tensor.
+    const CHUNK: usize = 16;
+    let stride = s.d * Samples::patch_pixels();
+    let mut start = 0usize;
+    while start < s.n {
+        let end = (start + CHUNK).min(s.n);
+        let slice = s.x[start * stride..end * stride].to_vec();
+        let logits = model.forward(to_x::<B>(slice, end - start, s.d, device));
+        let idx = flatten_logits(logits, n_classes).argmax(1).into_data();
+        out.extend(idx.iter::<i64>().map(|v| v as i32));
+        start = end;
+    }
+    out
+}
+
+/// Argmax class per pixel for one whole feature map `[d, h, w]`, on whichever
+/// backend `model` was fitted on.
+fn predict_map_on<B: Backend>(
+    model: &SegHead<B>,
+    x: &[f32],
+    d: usize,
+    h: usize,
+    w: usize,
+    n_classes: usize,
+) -> Vec<i32> {
+    let device = Default::default();
+    let t = Tensor::<B, 4>::from_data(TensorData::new(x.to_vec(), [1, d, h, w]), &device);
+    let idx = flatten_logits(model.forward(t), n_classes).argmax(1).into_data();
     idx.iter::<i64>().map(|v| v as i32).collect()
 }
 
-/// Argmax class per row for a raw `[n, d]` feature matrix.
+/// Argmax class per pixel for one whole feature map `[d, h, w]`.
 ///
-/// The dense-inference entry point: callers chunk large frames through this
-/// rather than materialising one enormous tensor.
-pub fn predict_rows(model: &SegHead<InferBackend>, x: &[f32], n: usize, d: usize) -> Vec<i32> {
-    if n == 0 || d == 0 {
+/// The dense-inference entry point. A convolutional head must see the map
+/// intact — chunking by pixel as the MLP did would destroy exactly the
+/// neighbourhood the head exists to use — so the frame is run in one pass.
+pub fn predict_map(
+    head: &Head,
+    x: &[f32],
+    d: usize,
+    h: usize,
+    w: usize,
+    n_classes: usize,
+) -> Vec<i32> {
+    if d == 0 || h == 0 || w == 0 {
         return Vec::new();
     }
-    let device = Default::default();
-    let t = Tensor::<InferBackend, 2>::from_data(TensorData::new(x.to_vec(), [n, d]), &device);
-    let idx = model.forward(t).argmax(1).into_data();
-    idx.iter::<i64>().map(|v| v as i32).collect()
+    match head {
+        Head::Cpu(m) => predict_map_on(m, x, d, h, w, n_classes),
+        #[cfg(feature = "gpu")]
+        Head::Cuda(m) => predict_map_on(m, x, d, h, w, n_classes),
+    }
 }
 
 /// Accuracy plus per-class Dice against a reference labelling.
@@ -256,39 +373,67 @@ pub struct TrainProgress {
     pub features: usize,
 }
 
-/// The compute device the head trains on.
-///
-/// burn's ndarray backend is CPU. The head is small and trains on cached
-/// features, so this is a deliberate trade — but it must not be a silent one.
-pub const DEVICE_LABEL: &str = "CPU (burn ndarray)";
-
 /// Fit a head on `train` and score it on `val`.
 pub fn train_head(
     train: &Samples,
     val: &Samples,
     n_classes: usize,
     cfg: &TrainConfig,
-) -> Result<(SegHead<InferBackend>, EvalMetrics), String> {
+) -> Result<(Head, EvalMetrics), String> {
     train_head_with(train, val, n_classes, cfg, &mut |_| {})
 }
 
 /// As [`train_head`], reporting each epoch to `on`.
+///
+/// Backend choice happens here, once, after the cheap rejections — spinning up
+/// a CUDA context only to discover the request was degenerate would add a
+/// second of latency to an error.
 pub fn train_head_with(
     train: &Samples,
     val: &Samples,
     n_classes: usize,
     cfg: &TrainConfig,
     on: &mut dyn FnMut(TrainProgress),
-) -> Result<(SegHead<InferBackend>, EvalMetrics), String> {
+) -> Result<(Head, EvalMetrics), String> {
     if train.is_empty() {
         return Err("no training samples".into());
     }
     if n_classes < 2 {
         return Err("need at least two classes".into());
     }
+    match Selection::detect() {
+        #[cfg(feature = "gpu")]
+        sel @ Selection::Cuda => fit::<GpuTrain>(train, val, n_classes, cfg, sel.label(), on)
+            .map(|(h, m)| (Head::Cuda(h), m)),
+        sel @ Selection::Cpu => fit::<CpuTrain>(train, val, n_classes, cfg, sel.label(), on)
+            .map(|(h, m)| (Head::Cpu(h), m)),
+    }
+}
+
+/// The optimisation loop, generic over the backend it runs on.
+///
+/// Everything device-specific is confined to `device` and the tensor types, so
+/// CPU and GPU runs are the same code and cannot drift apart — a real risk if
+/// the two paths were written separately, since a subtle difference would show
+/// up as "the GPU gives different numbers" rather than as a compile error.
+///
+/// Note that identical *code* is not identical *numbers*: `cfg.seed` drives
+/// batch selection, which is CPU-side and reproducible, but weight
+/// initialisation uses the backend's own RNG. Two runs of the same config on
+/// different backends are therefore comparable in distribution, not
+/// element-wise — a caveat that matters when reading a learning curve produced
+/// on one machine against a curve produced on another.
+fn fit<B: AutodiffBackend>(
+    train: &Samples,
+    val: &Samples,
+    n_classes: usize,
+    cfg: &TrainConfig,
+    device_label: &'static str,
+    on: &mut dyn FnMut(TrainProgress),
+) -> Result<(SegHead<B::InnerBackend>, EvalMetrics), String> {
     let device = Default::default();
     let mut model =
-        SegHead::<TrainBackend>::with_depth(train.d, cfg.hidden, cfg.depth, n_classes, &device);
+        SegHead::<B>::with_depth(train.d, cfg.hidden, cfg.depth, n_classes, &device);
     let mut optim = AdamConfig::new().init();
     let loss_fn = CrossEntropyLossConfig::new().init(&device);
     let mut rng = Rng::new(cfg.seed);
@@ -298,7 +443,7 @@ pub fn train_head_with(
 
     println!(
         "[ml] fit start — device={} samples={} features={} classes={} hidden={}x{} epochs={} batch={}",
-        DEVICE_LABEL, train.n, train.d, n_classes, cfg.hidden, cfg.depth, cfg.epochs, batch
+        device_label, train.n, train.d, n_classes, cfg.hidden, cfg.depth, cfg.epochs, batch
     );
     let fit_start = std::time::Instant::now();
 
@@ -308,23 +453,24 @@ pub fn train_head_with(
         for _ in 0..batches_per_epoch {
             // Sample a minibatch with replacement — cheap, and avoids
             // materialising a shuffled index per epoch.
-            let mut bx = Vec::with_capacity(batch * train.d);
-            let mut by = Vec::with_capacity(batch);
+            let px = Samples::patch_pixels();
+            let xstride = train.d * px;
+            let mut bx = Vec::with_capacity(batch * xstride);
+            let mut by = Vec::with_capacity(batch * px);
             for _ in 0..batch {
                 let i = rng.below(train.n);
-                bx.extend_from_slice(&train.x[i * train.d..(i + 1) * train.d]);
-                by.push(train.y[i]);
+                bx.extend_from_slice(&train.x[i * xstride..(i + 1) * xstride]);
+                by.extend_from_slice(&train.y[i * px..(i + 1) * px]);
             }
-            let x = Tensor::<TrainBackend, 2>::from_data(
-                TensorData::new(bx, [batch, train.d]),
-                &device,
-            );
-            let y = Tensor::<TrainBackend, 1, Int>::from_data(
-                TensorData::new(by, [batch]),
+            let x = to_x::<B>(bx, batch, train.d, &device);
+            // Every pixel of every patch contributes to the loss, so a small
+            // patch batch still carries batch*2304 supervised pixels.
+            let y = Tensor::<B, 1, Int>::from_data(
+                TensorData::new(by, [batch * px]),
                 &device,
             );
 
-            let logits = model.forward(x);
+            let logits = flatten_logits(model.forward(x), n_classes);
             let loss = loss_fn.forward(logits, y);
             epoch_loss += loss
                 .clone()
@@ -362,7 +508,7 @@ pub fn train_head_with(
             // Remaining epochs of this fit only; the sweep wrapper widens this
             // to cover the fits still queued behind it.
             eta_ms: avg_ms * (cfg.epochs.saturating_sub(epoch + 1)) as f32,
-            device: DEVICE_LABEL,
+            device: device_label,
             samples: train.n,
             features: train.d,
         });
@@ -373,11 +519,11 @@ pub fn train_head_with(
     );
 
     let model = model.valid();
-    let infer_device = Default::default();
     let metrics = if val.is_empty() {
         EvalMetrics::default()
     } else {
-        let pred = predict::<InferBackend>(&model, val, &infer_device);
+        let infer_device = Default::default();
+        let pred = predict::<B::InnerBackend>(&model, val, n_classes, &infer_device);
         evaluate(&pred, &val.y, n_classes)
     };
     Ok((model, metrics))
@@ -514,17 +660,24 @@ pub fn learning_curve_with(
 mod tests {
     use super::*;
 
-    /// Two Gaussian-ish blobs in feature space, linearly separable-ish.
+    /// Minimal config: these tests check wiring, not capacity.
+    fn tiny() -> TrainConfig {
+        TrainConfig { epochs: 1, hidden: 4, depth: 1, batch: 2, ..Default::default() }
+    }
+
+    /// `n` patches whose class is constant per patch and encoded in the
+    /// features, so a working head must reach high accuracy.
     fn synth(n: usize, d: usize, seed: u64) -> Samples {
         let mut s = Samples::new(d);
         let mut rng = Rng::new(seed);
+        let px = Samples::patch_pixels();
         for i in 0..n {
             let cls = (i % 2) as i32;
             let centre = if cls == 0 { -1.0 } else { 1.0 };
-            let f: Vec<f32> = (0..d)
+            let feats: Vec<f32> = (0..d * px)
                 .map(|_| centre + (rng.unit() - 0.5) * 0.8)
                 .collect();
-            s.push(&f, cls);
+            s.push_patch(&feats, &vec![cls; px]);
         }
         s
     }
@@ -559,10 +712,18 @@ mod tests {
 
     #[test]
     fn head_learns_a_separable_problem() {
-        let train = synth(400, 6, 1);
-        let val = synth(200, 6, 2);
+        let train = synth(4, 3, 1);
+        let val = synth(2, 3, 2);
+        // A 48x48 patch is expensive on CPU, so the budget is spent on *steps*
+        // rather than data: four patches and a high learning rate. The problem
+        // is separable by the sign of a single channel, so what is being tested
+        // is that gradients flow end to end, not that the head has capacity.
         let cfg = TrainConfig {
-            epochs: 30,
+            epochs: 20,
+            hidden: 8,
+            depth: 1,
+            batch: 4,
+            lr: 1e-1,
             ..Default::default()
         };
         let (_, m) = train_head(&train, &val, 2, &cfg).unwrap();
@@ -576,19 +737,43 @@ mod tests {
 
     #[test]
     fn training_rejects_degenerate_requests() {
+        // These reject before any backend is selected, so they cost nothing
+        // even on a machine where initialising CUDA is slow.
         let empty = Samples::new(4);
-        let val = synth(10, 4, 3);
-        assert!(train_head(&empty, &val, 2, &TrainConfig::default()).is_err());
-        let train = synth(10, 4, 4);
-        assert!(train_head(&train, &val, 1, &TrainConfig::default()).is_err());
+        let val = synth(2, 4, 3);
+        assert!(train_head(&empty, &val, 2, &tiny()).is_err());
+        let train = synth(2, 4, 4);
+        assert!(train_head(&train, &val, 1, &tiny()).is_err());
+    }
+
+    #[test]
+    fn dispatch_picks_a_backend_and_fits() {
+        // Whichever backend this machine selects, the public entry point must
+        // return a usable head and report where it ran.
+        let train = synth(4, 3, 7);
+        let val = synth(2, 3, 8);
+        let (head, _) = train_head(&train, &val, 2, &tiny()).unwrap();
+        assert!(!head.device().is_empty());
+
+        // The fitted head must be usable for dense inference on its own
+        // backend — the step that would break if weights and device diverged.
+        let d = 3;
+        let (h, w) = (16, 16);
+        let x = vec![0.5f32; d * h * w];
+        let out = predict_map(&head, &x, d, h, w, 2);
+        assert_eq!(out.len(), h * w);
+        assert!(out.iter().all(|&c| c == 0 || c == 1));
     }
 
     #[test]
     fn learning_curve_covers_requested_budgets() {
-        let per_frame: Vec<Samples> = (0..6).map(|i| synth(60, 5, 100 + i)).collect();
-        let val = synth(120, 5, 999);
+        let per_frame: Vec<Samples> = (0..6).map(|i| synth(1, 3, 100 + i)).collect();
+        let val = synth(2, 3, 999);
         let cfg = TrainConfig {
-            epochs: 4,
+            epochs: 1,
+            hidden: 4,
+            depth: 1,
+            batch: 2,
             ..Default::default()
         };
         let pts = learning_curve(&per_frame, &val, 2, &[1, 3, 6], 2, &cfg).unwrap();
@@ -605,7 +790,7 @@ mod tests {
 
     #[test]
     fn learning_curve_needs_training_frames() {
-        let val = synth(10, 3, 1);
-        assert!(learning_curve(&[], &val, 2, &[1], 1, &TrainConfig::default()).is_err());
+        let val = synth(2, 3, 1);
+        assert!(learning_curve(&[], &val, 2, &[1], 1, &tiny()).is_err());
     }
 }

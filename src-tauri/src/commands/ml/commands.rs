@@ -335,7 +335,8 @@ fn emit_train(app: &AppHandle, p: train::TrainProgress) {
             elapsed_ms: p.elapsed_ms,
             eta_ms: p.eta_ms,
             // Two different devices are in play and conflating them misleads:
-            // the encoder can be on CUDA while the head is always on CPU.
+            // the encoder (ort) and the head (burn) choose independently, so
+            // one can be on the GPU while the other has fallen back to CPU.
             device: format!(
                 "head {} · encoder {}",
                 p.device,
@@ -416,6 +417,10 @@ pub struct TrainSummary {
     pub classes: usize,
     pub encoder: Option<String>,
     pub metrics: train::EvalMetrics,
+    /// Where the head was fitted. Reported because backend selection happens
+    /// automatically: a user who expects the GPU and silently got the CPU
+    /// should be able to see that rather than infer it from the run time.
+    pub device: String,
 }
 
 /// Fit one head on every available training frame and keep it for per-frame
@@ -449,6 +454,7 @@ pub fn ml_train_model(
         classes: split.classes,
         encoder: options.encoder_id.clone(),
         metrics: metrics.clone(),
+        device: head.device().to_string(),
     };
 
     *state.model.lock() = Some(TrainedModel {
@@ -475,6 +481,7 @@ pub fn ml_model_status(state: State<MlState>) -> Option<TrainSummary> {
         classes: m.classes,
         encoder: m.encoder_id.clone(),
         metrics: m.metrics.clone(),
+        device: m.head.device().to_string(),
     })
 }
 

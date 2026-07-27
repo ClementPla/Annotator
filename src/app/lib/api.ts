@@ -372,6 +372,8 @@ export interface TrainSummary {
   classes: number;
   encoder: string | null;
   metrics: EvalMetrics;
+  /** Backend the head was fitted on, e.g. `CUDA (GPU)` or `CPU (burn ndarray)`. */
+  device: string;
 }
 
 export interface PredictedMask {

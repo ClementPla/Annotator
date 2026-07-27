@@ -205,9 +205,9 @@
         </div>
       </div>
       <p class="muted">
-        Feature source: {{ m.encoder ?? 'local basis only' }}. The head is held
-        in memory for this session — apply it per frame from the editor, or
-        retrain after annotating more.
+        Feature source: {{ m.encoder ?? 'local basis only' }} · trained on
+        {{ m.device }}. The head is held in memory for this session — apply it
+        per frame from the editor, or retrain after annotating more.
       </p>
     </p-card>
   }

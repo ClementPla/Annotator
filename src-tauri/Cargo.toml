@@ -13,6 +13,15 @@ rust-version = "1.85.2"
 name = "didascalie_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# On by default so a normal build gets GPU training. Both backends are compiled
+# in and `commands::ml::backend` picks at runtime, so this only decides whether
+# CUDA is *available* to fall back from — never whether the app runs.
+# Build with `--no-default-features` on a machine with no CUDA toolkit: burn's
+# CUDA backend needs NVRTC at compile time, which ships with the toolkit.
+default = ["gpu"]
+gpu = ["burn/cuda"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
 
