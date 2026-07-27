@@ -88,6 +88,7 @@ pub struct CurveOptions {
     pub curve_repeats: Option<usize>,
     pub epochs: Option<usize>,
     pub hidden: Option<usize>,
+    pub depth: Option<usize>,
     pub val_fraction: Option<f32>,
     pub seed: Option<u64>,
 }
@@ -241,10 +242,18 @@ fn build_split(
     let mut done = 0usize;
     let mut spent_ms = 0.0f32;
 
-    // Validation frames are augmentation-free: held-out scores should measure
-    // the model, not how lucky a jittered copy was.
+    // Validation frames are augmentation-free, and carry **no scribbles**.
+    //
+    // The latter fixes a leak that inflated every number this lab has
+    // reported: simulated strokes are drawn from a frame's own ground truth, so
+    // conditioning a validation frame on them shows the model strokes derived
+    // from the answer it is about to be scored against. The head can then score
+    // well by following the strokes rather than by reading the image. Held-out
+    // frames are now scored unconditioned, which is the honest question --
+    // "what does this model do on an image it has never seen?"
     let val_cfg = DatasetConfig {
         repeats: 1,
+        scribble_strokes: 0,
         ..ds.clone()
     };
     let mut val = Samples::new(0);
@@ -302,7 +311,8 @@ fn build_split(
 
 fn train_config(options: &CurveOptions) -> TrainConfig {
     TrainConfig {
-        hidden: options.hidden.unwrap_or(64),
+        hidden: options.hidden.unwrap_or(128),
+        depth: options.depth.unwrap_or(3),
         epochs: options.epochs.unwrap_or(40),
         seed: options.seed.unwrap_or(0),
         ..Default::default()

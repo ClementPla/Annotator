@@ -72,6 +72,8 @@ impl Samples {
 #[derive(Debug, Clone)]
 pub struct TrainConfig {
     pub hidden: usize,
+    /// Hidden layers before the output projection.
+    pub depth: usize,
     pub epochs: usize,
     pub lr: f64,
     pub batch: usize,
@@ -81,7 +83,8 @@ pub struct TrainConfig {
 impl Default for TrainConfig {
     fn default() -> Self {
         Self {
-            hidden: 64,
+            hidden: 128,
+            depth: 3,
             epochs: 40,
             lr: 1e-3,
             batch: 512,
@@ -90,20 +93,40 @@ impl Default for TrainConfig {
     }
 }
 
-/// Per-pixel MLP head.
+/// Per-pixel MLP head with configurable width and depth.
+///
+/// Depth and width are exposed because they are cheap to try, but be aware of
+/// what they cannot buy: this head consumes one pixel's feature vector at a
+/// time, so no amount of capacity lets it consider a neighbouring pixel.
+/// Anything needing shape, context or topology is out of reach here by
+/// construction — that requires a receptive field, i.e. a convolutional head.
 #[derive(Module, Debug)]
 pub struct SegHead<B: Backend> {
-    l1: Linear<B>,
-    l2: Linear<B>,
+    layers: Vec<Linear<B>>,
     out: Linear<B>,
     act: Relu,
 }
 
 impl<B: Backend> SegHead<B> {
     pub fn new(d_in: usize, hidden: usize, n_classes: usize, device: &B::Device) -> Self {
+        Self::with_depth(d_in, hidden, 2, n_classes, device)
+    }
+
+    pub fn with_depth(
+        d_in: usize,
+        hidden: usize,
+        depth: usize,
+        n_classes: usize,
+        device: &B::Device,
+    ) -> Self {
+        let depth = depth.max(1);
+        let mut layers = Vec::with_capacity(depth);
+        for i in 0..depth {
+            let from = if i == 0 { d_in } else { hidden };
+            layers.push(LinearConfig::new(from, hidden).init(device));
+        }
         Self {
-            l1: LinearConfig::new(d_in, hidden).init(device),
-            l2: LinearConfig::new(hidden, hidden).init(device),
+            layers,
             out: LinearConfig::new(hidden, n_classes).init(device),
             act: Relu::new(),
         }
@@ -111,8 +134,10 @@ impl<B: Backend> SegHead<B> {
 
     /// `[n, d] -> [n, n_classes]` logits.
     pub fn forward(&self, x: Tensor<B, 2>) -> Tensor<B, 2> {
-        let h = self.act.forward(self.l1.forward(x));
-        let h = self.act.forward(self.l2.forward(h));
+        let mut h = x;
+        for layer in &self.layers {
+            h = self.act.forward(layer.forward(h));
+        }
         self.out.forward(h)
     }
 }
@@ -262,7 +287,8 @@ pub fn train_head_with(
         return Err("need at least two classes".into());
     }
     let device = Default::default();
-    let mut model = SegHead::<TrainBackend>::new(train.d, cfg.hidden, n_classes, &device);
+    let mut model =
+        SegHead::<TrainBackend>::with_depth(train.d, cfg.hidden, cfg.depth, n_classes, &device);
     let mut optim = AdamConfig::new().init();
     let loss_fn = CrossEntropyLossConfig::new().init(&device);
     let mut rng = Rng::new(cfg.seed);
@@ -271,8 +297,8 @@ pub fn train_head_with(
     let batches_per_epoch = (train.n + batch - 1) / batch;
 
     println!(
-        "[ml] fit start — device={} samples={} features={} classes={} epochs={} batch={}",
-        DEVICE_LABEL, train.n, train.d, n_classes, cfg.epochs, batch
+        "[ml] fit start — device={} samples={} features={} classes={} hidden={}x{} epochs={} batch={}",
+        DEVICE_LABEL, train.n, train.d, n_classes, cfg.hidden, cfg.depth, cfg.epochs, batch
     );
     let fit_start = std::time::Instant::now();
 
