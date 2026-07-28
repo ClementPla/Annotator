@@ -322,6 +322,7 @@ export interface CurveOptions {
   encoderId?: string | null;
   workingSize?: number;
   patchesPerFrame?: number;
+  cacheFeatures?: boolean;
   augmentRepeats?: number;
   budgets?: number[];
   curveRepeats?: number;
@@ -363,6 +364,13 @@ export interface TrainTick {
   device: string;
   samples: number;
   features: number;
+}
+
+export interface StorageUsage {
+  featureBytes: number;
+  featureFiles: number;
+  modelBytes: number;
+  cacheDir: string;
 }
 
 export interface TrainSummary {
@@ -555,6 +563,9 @@ export const api = {
   mlModelStatus: () => invoke<TrainSummary | null>('ml_model_status'),
   /** Ask the running fit to stop at the next epoch; the head it has is kept. */
   mlStopTraining: () => invoke<void>('ml_stop_training'),
+  mlStorageUsage: () => invoke<StorageUsage>('ml_storage_usage'),
+  /** Deletes cached features only; downloaded encoder weights are kept. */
+  mlClearFeatureCache: () => invoke<number>('ml_clear_feature_cache'),
   mlPredictFrame: (frameId: number, scribbles?: ScribbleInput) =>
     invoke<PredictedFrame>('ml_predict_frame', { frameId, scribbles }),
 

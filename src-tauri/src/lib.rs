@@ -189,6 +189,8 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_model_status,
             commands::ml::commands::ml_stop_training,
+            commands::ml::commands::ml_storage_usage,
+            commands::ml::commands::ml_clear_feature_cache,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_predict_frame,
 

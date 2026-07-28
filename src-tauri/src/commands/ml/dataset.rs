@@ -31,6 +31,7 @@ use ndarray::{Array3, Axis};
 use crate::commands::annotation::decode_to_uint8;
 use crate::storage::{queries, DbState};
 
+use super::cache;
 use super::encoder::{resize_bilinear, EncoderSession};
 use super::filters::{self, FilterBankConfig};
 use super::scribble::{self, Rng, Scribbles, SCRIBBLE_CHANNELS};
@@ -362,6 +363,8 @@ pub fn build_frame_samples(
     order: &[i64],
     cfg: &DatasetConfig,
     encoder: Option<&mut EncoderSession>,
+    // Directory for the persistent encoder-feature cache; None skips it.
+    feature_cache: Option<&std::path::Path>,
     rng: &mut Rng,
 ) -> Result<Samples, String> {
     let (image, w, h) = load_working_image(db, frame_id, cfg.working_size)?;
@@ -392,8 +395,26 @@ pub fn build_frame_samples(
     // Encoder features once per frame (see module note on reuse).
     let encoder_part = match encoder {
         Some(enc) => {
-            let tokens = enc.embed(&image)?;
-            Some(resize_bilinear(&tokens.data, h, w))
+            // Cache the token grid, not the upsampled volume: tokens are about
+            // a megabyte where the volume is hundreds, and re-upsampling costs
+            // nothing beside a ViT forward.
+            let key = feature_cache
+                .map(|_| cache::Key::new(enc.encoder_id(), cfg.working_size, &image));
+            let cached = match (feature_cache, &key) {
+                (Some(dir), Some(k)) => cache::load(dir, k),
+                _ => None,
+            };
+            let tokens = match cached {
+                Some(t) => t,
+                None => {
+                    let t = enc.embed(&image)?.data;
+                    if let (Some(dir), Some(k)) = (feature_cache, &key) {
+                        cache::store(dir, k, &t);
+                    }
+                    t
+                }
+            };
+            Some(resize_bilinear(&tokens, h, w))
         }
         None => None,
     };

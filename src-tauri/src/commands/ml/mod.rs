@@ -33,6 +33,7 @@
 //! it cannot.
 
 pub mod backend;
+pub mod cache;
 pub mod commands;
 pub mod dataset;
 pub mod encoder;

@@ -26,6 +26,7 @@ import {
   EncoderStatus,
   MlProgress,
   TrainSummary,
+  StorageUsage,
   TrainTick,
 } from '../../../lib/api';
 
@@ -74,6 +75,10 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   /** Set once stop is requested, so the button reflects the pending state.
    * The fit finishes its current epoch, so the click is not instant. */
   readonly stopping = signal(false);
+  /** Persist encoder features to app data between runs. Opt-in: it writes
+   * derived image data to disk, which should be the user's choice. */
+  cacheFeatures = false;
+  readonly storage = signal<StorageUsage | null>(null);
   readonly model = signal<TrainSummary | null>(null);
   /** Rolling loss history for the current fit, for a sparkline. */
   readonly lossHistory = signal<number[]>([]);
@@ -136,6 +141,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       this.encoders.set(encoders);
       this.summary.set(summary);
       this.model.set(await api.mlModelStatus());
+      await this.refreshStorage();
     } catch (e) {
       this.error.set(String(e));
     }
@@ -186,6 +192,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       encoderId: this.selectedEncoder(),
       workingSize: this.workingSize,
       patchesPerFrame: this.patchesPerFrame,
+      cacheFeatures: this.cacheFeatures,
       epochs: this.epochs,
       curveRepeats: this.curveRepeats,
     };
@@ -216,6 +223,36 @@ export class ModelLabComponent implements OnInit, OnDestroy {
    * `trainModel` still stores a usable head and reports its Dice. The button
    * stays disabled afterwards because the request cannot be taken back.
    */
+  /** Human-readable size; MB is the right unit here — features run to
+   * hundreds of MB and weights to a few GB. */
+  fmtBytes(n: number): string {
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    if (n < 1024 * 1024 * 1024) return `${(n / 1048576).toFixed(0)} MB`;
+    return `${(n / 1073741824).toFixed(2)} GB`;
+  }
+
+  async refreshStorage(): Promise<void> {
+    try {
+      this.storage.set(await api.mlStorageUsage());
+    } catch {
+      this.storage.set(null);
+    }
+  }
+
+  async clearCache(): Promise<void> {
+    try {
+      const n = await api.mlClearFeatureCache();
+      this.messages.add({
+        severity: 'success',
+        summary: 'Cache cleared',
+        detail: `${n} cached feature file${n === 1 ? '' : 's'} removed`,
+      });
+      await this.refreshStorage();
+    } catch (e) {
+      this.error.set(String(e));
+    }
+  }
+
   async stop(): Promise<void> {
     this.stopping.set(true);
     try {

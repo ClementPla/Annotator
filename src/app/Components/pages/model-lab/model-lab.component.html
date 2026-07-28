@@ -143,6 +143,10 @@
         Patches / frame
         <input type="number" [(ngModel)]="patchesPerFrame" min="4" max="256" step="4" />
       </label>
+      <label class="opt-check">
+        <input type="checkbox" [(ngModel)]="cacheFeatures" />
+        Cache features
+      </label>
       <label>
         Epochs
         <input type="number" [(ngModel)]="epochs" min="1" max="500" />
@@ -191,6 +195,37 @@
       <p class="err">{{ e }}</p>
     }
   </p-card>
+
+  <!-- Storage -->
+  @if (storage(); as st) {
+    <p-card styleClass="lab-card">
+      <ng-template pTemplate="title">Storage</ng-template>
+      <div class="stats">
+        <div class="stat">
+          <span class="v">{{ fmtBytes(st.modelBytes) }}</span>
+          <span class="k">encoder weights</span>
+        </div>
+        <div class="stat">
+          <span class="v">{{ fmtBytes(st.featureBytes) }}</span>
+          <span class="k">cached features ({{ st.featureFiles }} files)</span>
+        </div>
+      </div>
+      <p class="muted">
+        Kept in local app data, never in the .dida — so features never travel
+        with a shared project. Clearing them only costs recomputation.
+      </p>
+      <div class="actions">
+        <p-button
+          label="Clear feature cache"
+          icon="pi pi-trash"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="running() || st.featureFiles === 0"
+          (onClick)="clearCache()"
+        />
+      </div>
+    </p-card>
+  }
 
   <!-- Trained model -->
   @if (model(); as m) {

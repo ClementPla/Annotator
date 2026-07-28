@@ -93,6 +93,8 @@ pub struct CurveOptions {
     pub encoder_id: Option<String>,
     pub working_size: Option<u32>,
     pub patches_per_frame: Option<usize>,
+    /// Persist encoder features to local app data between runs.
+    pub cache_features: Option<bool>,
     pub augment_repeats: Option<usize>,
     pub budgets: Option<Vec<usize>>,
     pub curve_repeats: Option<usize>,
@@ -240,6 +242,14 @@ fn build_split(
         ..Default::default()
     };
 
+    // Opt-in: caching features writes derived image data to disk, so it stays
+    // the user's choice rather than a silent default.
+    let feature_cache = if options.cache_features.unwrap_or(false) {
+        super::cache::cache_dir(app).ok()
+    } else {
+        None
+    };
+
     ensure_encoder(app, state, &options.encoder_id)?;
     let mut guard = state.encoder.lock();
     let mut encoder = if options.encoder_id.is_some() {
@@ -272,7 +282,7 @@ fn build_split(
     for &fid in val_ids {
         let t0 = std::time::Instant::now();
         let mut rng = Rng::new(seed ^ (fid as u64).wrapping_mul(0x9E37));
-        let s = dataset::build_frame_samples(db, fid, &order, &val_cfg, encoder.as_deref_mut(), &mut rng)?;
+        let s = dataset::build_frame_samples(db, fid, &order, &val_cfg, encoder.as_deref_mut(), feature_cache.as_deref(), &mut rng)?;
         let ms = t0.elapsed().as_secs_f32() * 1000.0;
         if s.n > 0 {
             if val.n == 0 {
@@ -291,7 +301,7 @@ fn build_split(
     for &fid in train_ids {
         let t0 = std::time::Instant::now();
         let mut rng = Rng::new(seed ^ (fid as u64).wrapping_mul(0x1F123));
-        let s = dataset::build_frame_samples(db, fid, &order, &ds, encoder.as_deref_mut(), &mut rng)?;
+        let s = dataset::build_frame_samples(db, fid, &order, &ds, encoder.as_deref_mut(), feature_cache.as_deref(), &mut rng)?;
         let ms = t0.elapsed().as_secs_f32() * 1000.0;
         if s.n > 0 {
             feature_dim = s.d;
@@ -501,6 +511,44 @@ pub fn ml_train_model(
 pub fn ml_stop_training(state: State<MlState>) {
     state.cancel.store(true, Ordering::Relaxed);
     println!("[ml] stop requested — finishing the current epoch");
+}
+
+/// Everything Didascalie keeps in local app data, broken down.
+///
+/// Reported as two figures rather than one total: encoder weights run to
+/// hundreds of megabytes each and usually dominate, so a single number would
+/// make clearing the feature cache look like it did nothing.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsage {
+    pub feature_bytes: u64,
+    pub feature_files: usize,
+    pub model_bytes: u64,
+    pub cache_dir: String,
+}
+
+#[tauri::command]
+pub fn ml_storage_usage(app: AppHandle) -> Result<StorageUsage, String> {
+    let features = super::cache::cache_dir(&app)?;
+    let models = super::cache::models_dir(&app)?;
+    let (feature_bytes, feature_files) = super::cache::usage(&features);
+    Ok(StorageUsage {
+        feature_bytes,
+        feature_files,
+        model_bytes: super::cache::dir_size(&models),
+        cache_dir: features.to_string_lossy().to_string(),
+    })
+}
+
+/// Delete every cached feature tensor. Downloaded encoder weights are left
+/// alone — re-downloading those is a much bigger cost than recomputing
+/// features, so they are not the same button.
+#[tauri::command]
+pub fn ml_clear_feature_cache(app: AppHandle) -> Result<usize, String> {
+    let dir = super::cache::cache_dir(&app)?;
+    let n = super::cache::clear(&dir);
+    println!("[ml] cleared {n} cached feature tensors");
+    Ok(n)
 }
 
 /// Whether a head is loaded, and what it was fitted with.

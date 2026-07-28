@@ -278,6 +278,11 @@ impl EncoderSession {
         Ok(PatchFeatures { data: grid })
     }
 
+    /// Catalog id of the loaded encoder, for cache keys and reporting.
+    pub fn encoder_id(&self) -> &str {
+        &self.spec.id
+    }
+
     pub fn spec(&self) -> &EncoderSpec {
         &self.spec
     }
