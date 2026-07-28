@@ -20,7 +20,7 @@ use ndarray::{Array3, Array4};
 use ort::{
     execution_providers::{
         CUDAExecutionProvider, CoreMLExecutionProvider, DirectMLExecutionProvider,
-        ExecutionProvider, TensorRTExecutionProvider,
+        ExecutionProvider,
     },
     session::{builder::GraphOptimizationLevel, Session},
     value::Tensor,
@@ -67,8 +67,12 @@ fn attach_accelerator(
         }};
     }
 
+    // TensorRT is deliberately not in the chain. It depends on CUDA *and*
+    // cuDNN, so it cannot rescue a machine where the CUDA provider failed to
+    // load; it additionally needs the TensorRT SDK, and builds engines on first
+    // run, which would turn a missing cuDNN into a multi-minute stall rather
+    // than a clear message.
     let builder = try_ep!(builder, CUDAExecutionProvider::default(), "CUDA (GPU)");
-    let builder = try_ep!(builder, TensorRTExecutionProvider::default(), "TensorRT (GPU)");
     let builder = try_ep!(builder, DirectMLExecutionProvider::default(), "DirectML (GPU)");
     let builder = try_ep!(builder, CoreMLExecutionProvider::default(), "CoreML");
     (builder, "CPU")
@@ -85,6 +89,10 @@ pub struct EncoderSession {
     /// axes accept it, fixed-axis graphs were authored for it).
     input_size: u32,
     spec: EncoderSpec,
+    /// Kept so the session can be reopened on CPU if the accelerator turns out
+    /// to be unable to execute this particular graph.
+    path: std::path::PathBuf,
+    cpu_only: bool,
 }
 
 /// Dense features from one image: `[D, grid_h, grid_w]`.
@@ -96,6 +104,16 @@ impl EncoderSession {
     /// Open a cached `.onnx` file. Execution providers mirror `dl::model` so
     /// the GPU is used when present and CPU is the fallback.
     pub fn load(path: &Path, spec: EncoderSpec) -> Result<Self, String> {
+        Self::open(path, spec, false)
+    }
+
+    /// As [`load`], but `force_cpu` skips accelerator registration entirely.
+    ///
+    /// Registering successfully is not the same as *executing* successfully:
+    /// DirectML in particular accepts graphs with dynamic spatial axes and then
+    /// fails inside a `Reshape` at run time. That is why this exists as a
+    /// separate entry point rather than being folded into the provider chain.
+    fn open(path: &Path, spec: EncoderSpec, force_cpu: bool) -> Result<Self, String> {
         let builder = Session::builder()
             .map_err(|e| format!("session builder: {e}"))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
@@ -103,7 +121,11 @@ impl EncoderSession {
             .with_intra_threads(4)
             .map_err(|e| format!("intra threads: {e}"))?;
 
-        let (builder, accel) = attach_accelerator(builder);
+        let (builder, accel) = if force_cpu {
+            (builder, "CPU")
+        } else {
+            attach_accelerator(builder)
+        };
         *ACTIVE_ACCELERATOR.lock() = accel;
         if accel == "CPU" {
             println!(
@@ -137,6 +159,8 @@ impl EncoderSession {
             output_names,
             input_size,
             spec,
+            path: path.to_path_buf(),
+            cpu_only: force_cpu,
         })
     }
 
@@ -167,7 +191,34 @@ impl EncoderSession {
     }
 
     /// Run the encoder and return dense patch features `[D, grid_h, grid_w]`.
+    ///
+    /// A GPU provider that registers can still fail to *execute* a given graph
+    /// — DirectML accepts dynamic spatial axes and then errors inside a
+    /// `Reshape`. Rather than surface that as a dead encoder, reopen once on
+    /// CPU and carry on: slower beats broken, and the user gets told which
+    /// happened. The retry is attempted a single time, after which the session
+    /// stays on CPU, so a genuinely malformed graph still fails fast.
     pub fn embed(&mut self, image: &Array3<f32>) -> Result<PatchFeatures, String> {
+        match self.run(image) {
+            Ok(out) => Ok(out),
+            Err(e) if !self.cpu_only => {
+                let accel = detect_accelerator();
+                println!(
+                    "[ml] encoder failed on {accel} ({e}); reopening on CPU. \
+                     This graph's dynamic shapes are not supported by that \
+                     provider — for NVIDIA acceleration install cuDNN 9 so the \
+                     CUDA provider can load."
+                );
+                let spec = self.spec.clone();
+                let reopened = Self::open(&self.path.clone(), spec, true)?;
+                *self = reopened;
+                self.run(image)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn run(&mut self, image: &Array3<f32>) -> Result<PatchFeatures, String> {
         let input = self.preprocess(image)?;
 
         let mut binding = self
@@ -226,6 +277,26 @@ impl EncoderSession {
 /// * `[B, T, D]` — a token sequence. Any leading non-patch tokens (CLS, and the
 ///   register tokens some DINOv2 variants add) are dropped by taking the
 ///   largest trailing perfect square, which avoids hard-coding a count.
+/// Open a graph and report its dense-feature grid, for verifying an export.
+///
+/// A catalog entry can be perfectly described and still be unusable: a graph
+/// may carry control flow that `ort` rejects at load, which no amount of
+/// correct metadata fixes. This is the check that distinguishes "the spec is
+/// right" from "the file works", and it needs a real download, so it is opt-in.
+///
+/// ```text
+/// DIDA_ENCODER_ONNX=<path> cargo test --lib encoder_graph_loads -- --ignored --nocapture
+/// ```
+#[cfg(test)]
+fn probe_graph(path: &Path, spec: EncoderSpec) -> Result<(usize, usize, usize), String> {
+    let size = spec.input_size as usize;
+    let mut session = EncoderSession::load(path, spec)?;
+    let image = Array3::<f32>::zeros((3, size, size));
+    let out = session.embed(&image)?;
+    let s = out.data.shape();
+    Ok((s[0], s[1], s[2]))
+}
+
 fn decode_tokens(shape: &[usize], data: Vec<f32>) -> Result<Array3<f32>, String> {
     match shape.len() {
         4 => {
@@ -353,5 +424,26 @@ mod tests {
                 up
             );
         }
+    }
+
+    /// Opt-in: proves a downloaded graph actually opens and produces a grid.
+    ///
+    /// Ignored because it needs real weights on disk. Point `DIDA_ENCODER_ONNX`
+    /// at a cached `model.onnx` and `DIDA_ENCODER_ID` at the catalog entry.
+    #[test]
+    #[ignore = "needs a downloaded encoder; set DIDA_ENCODER_ONNX"]
+    fn encoder_graph_loads() {
+        let Ok(path) = std::env::var("DIDA_ENCODER_ONNX") else {
+            panic!("set DIDA_ENCODER_ONNX to a cached model.onnx");
+        };
+        let id = std::env::var("DIDA_ENCODER_ID").unwrap_or_else(|_| "dinov3-vits16".into());
+        let spec = crate::commands::ml::registry::find(&id)
+            .unwrap_or_else(|| panic!("unknown encoder id '{id}'"));
+        let expect = (spec.input_size / spec.patch) as usize;
+
+        let (d, gh, gw) = probe_graph(std::path::Path::new(&path), spec)
+            .unwrap_or_else(|e| panic!("{id} failed to load: {e}"));
+        println!("[probe] {id} -> [{d}, {gh}, {gw}]");
+        assert_eq!((gh, gw), (expect, expect), "{id}: unexpected grid");
     }
 }

@@ -173,6 +173,18 @@ impl EncoderSpec {
 /// Note the licence difference — DINOv2 is Apache-2.0, DINOv3 ships under
 /// Meta's own licence. That is a distribution question for whoever packages
 /// Didascalie, not a technical one, so both generations stay available.
+///
+/// # Why there is no DINOv3 ConvNeXt entry
+///
+/// Its convolutional distillations would suit large frames — cost linear in
+/// pixels rather than quadratic in tokens — but every `onnx-community` export
+/// (tiny, small, base, large alike) is unloadable: the dynamo exporter captured
+/// the stage loop as a real ONNX `Loop` over a tensor *sequence*, and ORT's
+/// type inference rejects the `Concat` inside it, which binds `int64` and
+/// `float` to the same type parameter. That is a defect in the published file,
+/// not something a loader can route around, so the entries were removed rather
+/// than shipped as buttons that fail on click. A re-export with
+/// `dynamo=False` would produce a usable graph; until one exists, ViT it is.
 pub fn catalog() -> Vec<EncoderSpec> {
     vec![
         EncoderSpec::new(
@@ -190,42 +202,6 @@ pub fn catalog() -> Vec<EncoderSpec> {
             384,
             512,
             87,
-            "general",
-            Normalization::ImageNet,
-        )
-        .with_aux(&["onnx/model.onnx_data"]),
-        EncoderSpec::new(
-            "dinov3-convnext-tiny",
-            "DINOv3 ConvNeXt-T",
-            "Convolutional distillation of DINOv3. Cost grows linearly with \
-             pixels instead of quadratically with tokens, and it accepts any \
-             input size natively, so it is the option to reach for on very \
-             large frames. Stride 32 is coarse per pixel — it earns its \
-             resolution by being fed 1024px, not by a finer grid.",
-            "onnx-community/dinov3-convnext-tiny-pretrain-lvd1689m-ONNX",
-            "onnx/model.onnx",
-            "dinov3-convnext-tiny",
-            32,
-            768,
-            1024,
-            112,
-            "general",
-            Normalization::ImageNet,
-        )
-        .with_aux(&["onnx/model.onnx_data"]),
-        EncoderSpec::new(
-            "dinov3-convnext-small",
-            "DINOv3 ConvNeXt-S",
-            "Deeper ConvNeXt (27 blocks in stage 3 against 9) at the same \
-             channel widths as the tiny variant. Richer features for the same \
-             output grid; worth testing once the tiny model's curve is known.",
-            "onnx-community/dinov3-convnext-small-pretrain-lvd1689m-ONNX",
-            "onnx/model.onnx",
-            "dinov3-convnext-small",
-            32,
-            768,
-            1024,
-            199,
             "general",
             Normalization::ImageNet,
         )
@@ -395,14 +371,27 @@ mod tests {
 
     #[test]
     fn dinov3_entries_carry_their_weight_sidecars() {
-        let spec = find("dinov3-convnext-tiny").expect("convnext entry");
+        let spec = find("dinov3-vits16").expect("dinov3 entry");
         assert_eq!(spec.aux_files, vec!["onnx/model.onnx_data".to_string()]);
-        // Stride 32 with a 1024px input is the whole point: the grid comes
-        // from feeding it more pixels, not from a finer stride.
-        assert_eq!(spec.input_size / spec.patch, 32);
+        assert_eq!(spec.input_size / spec.patch, 32, "512/16 grid");
 
         // DINOv2 has no external data and must not have grown a sidecar.
         assert!(find("dinov2-small").unwrap().aux_files.is_empty());
+    }
+
+    #[test]
+    fn the_broken_convnext_exports_stay_out() {
+        // See the catalog comment: every `onnx-community` DINOv3 ConvNeXt
+        // export fails ORT type inference. Listing one would give the user a
+        // download button that cannot work.
+        for id in [
+            "dinov3-convnext-tiny",
+            "dinov3-convnext-small",
+            "dinov3-convnext-base",
+            "dinov3-convnext-large",
+        ] {
+            assert!(find(id).is_none(), "{id} is known-broken and must not ship");
+        }
     }
 
     #[test]
