@@ -46,6 +46,14 @@ pub struct DatasetConfig {
     /// Counted in patches, not pixels: the old pixel budget divided by a
     /// patch's 2304 pixels rounded down to *one* crop per frame, which starved
     /// training so badly that any small structure was unlearnable.
+    ///
+    /// Kept deliberately modest because this number is expensive twice over.
+    /// Every patch is materialised as dense `f32`, so the sample table costs
+    /// `patches * repeats * frames * d * 2304 * 4` bytes — with an encoder
+    /// attached `d` is ~410, and a value of 24 over 20 frames reaches 5 GB and
+    /// starts paging. It also sets the epoch length, so it multiplies training
+    /// time linearly. Raise it when a structure is genuinely hard; the local
+    /// basis alone (`d` ~26) affords far more of them than an encoder does.
     pub patches_per_frame: usize,
     /// Share of patches centred on an annotated pixel rather than placed at
     /// random. Without this, minority classes never reach the loss.
@@ -69,7 +77,7 @@ impl Default for DatasetConfig {
     fn default() -> Self {
         Self {
             working_size: 384,
-            patches_per_frame: 24,
+            patches_per_frame: 8,
             foreground_fraction: 0.5,
             repeats: 3,
             scribble_strokes: 3,

@@ -232,7 +232,7 @@ fn build_split(
 
     let ds = DatasetConfig {
         working_size: options.working_size.unwrap_or(384),
-        patches_per_frame: options.patches_per_frame.unwrap_or(24),
+        patches_per_frame: options.patches_per_frame.unwrap_or(8),
         repeats: options.augment_repeats.unwrap_or(3).max(1),
         seed,
         ..Default::default()

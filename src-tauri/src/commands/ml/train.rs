@@ -441,9 +441,25 @@ fn fit<B: AutodiffBackend>(
     let batch = cfg.batch.min(train.n).max(1);
     let batches_per_epoch = (train.n + batch - 1) / batch;
 
+    // Report the table's footprint and the total step count: both scale with
+    // patches-per-frame, and a budget that looks harmless per frame can reach
+    // gigabytes once an encoder widens `d` to a few hundred channels. Paging is
+    // indistinguishable from "training got slow" unless the number is visible.
+    let table_mb =
+        (train.n * train.d * Samples::patch_pixels() * std::mem::size_of::<f32>()) as f64 / 1e6;
     println!(
-        "[ml] fit start — device={} samples={} features={} classes={} hidden={}x{} epochs={} batch={}",
-        device_label, train.n, train.d, n_classes, cfg.hidden, cfg.depth, cfg.epochs, batch
+        "[ml] fit start — device={} samples={} features={} classes={} hidden={}x{} \
+         epochs={} batch={} steps={} table={:.0} MB",
+        device_label,
+        train.n,
+        train.d,
+        n_classes,
+        cfg.hidden,
+        cfg.depth,
+        cfg.epochs,
+        batch,
+        cfg.epochs * batches_per_epoch,
+        table_mb
     );
     let fit_start = std::time::Instant::now();
 
