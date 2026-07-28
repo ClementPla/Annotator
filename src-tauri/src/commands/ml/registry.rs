@@ -65,6 +65,16 @@ pub struct EncoderSpec {
     pub repo_id: String,
     /// Path of the ONNX file *within* the repo (may contain `/`).
     pub filename: String,
+    /// Sidecar files that must be downloaded alongside `filename`.
+    ///
+    /// Graphs over the 2 GB protobuf limit — and, in practice, anything
+    /// exported by `optimum` with `use_external_data_format` — keep their
+    /// weights in a separate `.onnx_data` blob. `ort` resolves that blob by the
+    /// *relative path recorded inside the graph*, so the sidecar has to land in
+    /// the same directory under its exact name or the session opens against a
+    /// weightless graph.
+    #[serde(default)]
+    pub aux_files: Vec<String>,
     /// Sub-directory under the app cache where the file is stored.
     pub cache_subdir: String,
     /// ViT patch stride: the token grid is `input_size / patch` per side.
@@ -104,6 +114,7 @@ impl EncoderSpec {
             description: description.into(),
             repo_id: repo_id.into(),
             filename: filename.into(),
+            aux_files: Vec::new(),
             cache_subdir: cache_subdir.into(),
             patch,
             embed_dim,
@@ -114,11 +125,33 @@ impl EncoderSpec {
         }
     }
 
+    /// Declare weight sidecars that must sit next to the graph.
+    fn with_aux(mut self, files: &[&str]) -> Self {
+        self.aux_files = files.iter().map(|f| (*f).to_string()).collect();
+        self
+    }
+
     /// The download descriptor understood by `dl::model_manager`.
     pub fn to_model_config(&self) -> ModelConfig {
+        self.config_for(&self.filename)
+    }
+
+    /// Descriptors for every file this encoder needs, graph first.
+    ///
+    /// Callers must fetch all of them: a cached graph whose sidecar is missing
+    /// looks downloaded but fails at session open, which is a far more
+    /// confusing failure than an incomplete download.
+    pub fn all_model_configs(&self) -> Vec<ModelConfig> {
+        std::iter::once(self.filename.clone())
+            .chain(self.aux_files.iter().cloned())
+            .map(|f| self.config_for(&f))
+            .collect()
+    }
+
+    fn config_for(&self, filename: &str) -> ModelConfig {
         ModelConfig {
             repo_id: self.repo_id.clone(),
-            filename: self.filename.clone(),
+            filename: filename.to_string(),
             cache_subdir: self.cache_subdir.clone(),
             // Sizes/hashes are not pinned: these are third-party mirrors that
             // may be re-exported upstream. The download is still verified for
@@ -130,8 +163,73 @@ impl EncoderSpec {
 }
 
 /// The built-in encoder catalog, best default first.
+///
+/// DINOv3 leads because of *Gram anchoring*: DINOv2's patch-level features
+/// degrade over long training even as its global features improve, and DINOv3
+/// adds a loss term specifically to stop that. Dense prediction is exactly the
+/// use that suffered, so the upgrade matters more here than the headline
+/// benchmark numbers suggest.
+///
+/// Note the licence difference — DINOv2 is Apache-2.0, DINOv3 ships under
+/// Meta's own licence. That is a distribution question for whoever packages
+/// Didascalie, not a technical one, so both generations stay available.
 pub fn catalog() -> Vec<EncoderSpec> {
     vec![
+        EncoderSpec::new(
+            "dinov3-vits16",
+            "DINOv3 ViT-S/16",
+            "Recommended default. Gram-anchored dense features — the property \
+             DINOv2 lacks — at stride 16, run at 512px for a 32x32 grid. Uses \
+             rotary position embeddings, so unlike DINOv2 it extrapolates to \
+             resolutions it was not trained at without interpolating position \
+             tables.",
+            "onnx-community/dinov3-vits16-pretrain-lvd1689m-ONNX",
+            "onnx/model.onnx",
+            "dinov3-vits16",
+            16,
+            384,
+            512,
+            87,
+            "general",
+            Normalization::ImageNet,
+        )
+        .with_aux(&["onnx/model.onnx_data"]),
+        EncoderSpec::new(
+            "dinov3-convnext-tiny",
+            "DINOv3 ConvNeXt-T",
+            "Convolutional distillation of DINOv3. Cost grows linearly with \
+             pixels instead of quadratically with tokens, and it accepts any \
+             input size natively, so it is the option to reach for on very \
+             large frames. Stride 32 is coarse per pixel — it earns its \
+             resolution by being fed 1024px, not by a finer grid.",
+            "onnx-community/dinov3-convnext-tiny-pretrain-lvd1689m-ONNX",
+            "onnx/model.onnx",
+            "dinov3-convnext-tiny",
+            32,
+            768,
+            1024,
+            112,
+            "general",
+            Normalization::ImageNet,
+        )
+        .with_aux(&["onnx/model.onnx_data"]),
+        EncoderSpec::new(
+            "dinov3-convnext-small",
+            "DINOv3 ConvNeXt-S",
+            "Deeper ConvNeXt (27 blocks in stage 3 against 9) at the same \
+             channel widths as the tiny variant. Richer features for the same \
+             output grid; worth testing once the tiny model's curve is known.",
+            "onnx-community/dinov3-convnext-small-pretrain-lvd1689m-ONNX",
+            "onnx/model.onnx",
+            "dinov3-convnext-small",
+            32,
+            768,
+            1024,
+            199,
+            "general",
+            Normalization::ImageNet,
+        )
+        .with_aux(&["onnx/model.onnx_data"]),
         EncoderSpec::new(
             "dinov2-small",
             "DINOv2 ViT-S/14",
@@ -208,8 +306,30 @@ pub fn cache_path(
 }
 
 /// Whether the weights are already on disk (drives the UI's Download button).
+///
+/// Every file is checked, not just the graph: an encoder whose `.onnx_data` is
+/// missing would otherwise report itself ready and then fail at session open.
 pub fn is_cached(app: &tauri::AppHandle, spec: &EncoderSpec) -> bool {
-    cache_path(app, spec).map(|p| p.is_file()).unwrap_or(false)
+    let Ok(graph) = cache_path(app, spec) else {
+        return false;
+    };
+    let Some(dir) = graph.parent() else {
+        return false;
+    };
+    graph.is_file()
+        && spec
+            .aux_files
+            .iter()
+            .all(|f| dir.join(file_stem_of(f)).is_file())
+}
+
+/// The on-disk name of a repo-relative file.
+///
+/// `dl::model_manager` writes each file under `cache_subdir/<filename>`,
+/// preserving the repo's own sub-directories, so the sidecar lands beside the
+/// graph exactly as the graph's internal reference expects.
+fn file_stem_of(repo_path: &str) -> &str {
+    repo_path.rsplit('/').next().unwrap_or(repo_path)
 }
 
 #[cfg(test)]
@@ -239,6 +359,50 @@ mod tests {
             );
         }
         assert!(find("nope").is_none());
+    }
+
+    #[test]
+    fn external_data_encoders_declare_every_file_they_need() {
+        // A graph exported with external data is useless without its sidecar,
+        // and the failure mode is a session that opens against no weights
+        // rather than a missing-file error — so the pairing is pinned here.
+        for spec in catalog() {
+            let cfgs = spec.all_model_configs();
+            assert_eq!(
+                cfgs.len(),
+                1 + spec.aux_files.len(),
+                "{}: download list must cover graph plus sidecars",
+                spec.id
+            );
+            assert_eq!(cfgs[0].filename, spec.filename, "{}: graph first", spec.id);
+            for cfg in &cfgs {
+                assert_eq!(cfg.repo_id, spec.repo_id);
+                assert_eq!(cfg.cache_subdir, spec.cache_subdir);
+            }
+            // Sidecars must land beside the graph, since that is how the
+            // reference recorded inside the graph resolves.
+            let graph_dir = spec.filename.rsplit_once('/').map(|(d, _)| d);
+            for aux in &spec.aux_files {
+                assert_eq!(
+                    aux.rsplit_once('/').map(|(d, _)| d),
+                    graph_dir,
+                    "{}: sidecar {aux} would not land next to the graph",
+                    spec.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dinov3_entries_carry_their_weight_sidecars() {
+        let spec = find("dinov3-convnext-tiny").expect("convnext entry");
+        assert_eq!(spec.aux_files, vec!["onnx/model.onnx_data".to_string()]);
+        // Stride 32 with a 1024px input is the whole point: the grid comes
+        // from feeding it more pixels, not from a finer stride.
+        assert_eq!(spec.input_size / spec.patch, 32);
+
+        // DINOv2 has no external data and must not have grown a sidecar.
+        assert!(find("dinov2-small").unwrap().aux_files.is_empty());
     }
 
     #[test]

@@ -51,7 +51,15 @@ pub fn ml_list_encoders(app: AppHandle) -> Vec<EncoderStatus> {
 pub async fn ml_download_encoder(app: AppHandle, encoder_id: String) -> Result<String, String> {
     let spec = registry::find(&encoder_id)
         .ok_or_else(|| format!("unknown encoder '{encoder_id}'"))?;
-    let path = ensure_model_cached(&app, &spec.to_model_config()).await?;
+    // The graph comes first and its path is what we report back, but every
+    // sidecar has to arrive too: `ort` resolves external weights relative to
+    // the graph, so a partial download opens a graph with no weights in it.
+    let mut graph_path = None;
+    for cfg in spec.all_model_configs() {
+        let path = ensure_model_cached(&app, &cfg).await?;
+        graph_path.get_or_insert(path);
+    }
+    let path = graph_path.ok_or_else(|| format!("encoder '{encoder_id}' declares no files"))?;
     Ok(path.to_string_lossy().to_string())
 }
 
