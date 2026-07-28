@@ -67,13 +67,24 @@ once_cell = "1.21.4"
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 reqwest = { version = "0.13.3", default-features = false, features = ["json", "stream"] }
 serde_bytes = "0.11.19"
+# DirectML is DirectX 12, so it exists only on Windows. Enabling its `ort`
+# feature everywhere made `DirectMLExecutionProvider::register` reference
+# `OrtSessionOptionsAppendExecutionProvider_DML`, which the Linux ONNX Runtime
+# does not export — the build compiled and then failed at link. Cargo unions
+# features across target blocks that both apply, so Windows gets
+# cuda + copy-dylibs + directml while everything else gets the base set.
+#
+# It earns the special case: the CUDA provider needs a CUDA runtime *and* a
+# user-supplied cuDNN 9, whereas DirectML needs only DX12 and ships its own DLL,
+# so it is the one GPU path with no prerequisites at all.
+[target.'cfg(windows)'.dependencies]
+ort = { version = "=2.0.0-rc.10", features = ["directml"] }
+
 [target.'cfg(not(target_os = "android"))'.dependencies]
-# DirectML is listed alongside CUDA so Windows gets GPU inference with no
-# system prerequisites: the CUDA provider needs a CUDA runtime *and* cuDNN 9
-# supplied by the user, whereas DirectML needs only DX12 and ships its own DLL.
 # `commands::ml::encoder` registers providers one at a time and reports which
-# actually took, so this widens the fallback chain rather than forcing a choice.
-ort = { version = "=2.0.0-rc.10", features = ["cuda", "directml", "copy-dylibs"] }
+# actually took, so extra providers widen the fallback chain rather than
+# forcing a choice. DirectML is *not* here — see the Windows-only block below.
+ort = { version = "=2.0.0-rc.10", features = ["cuda", "copy-dylibs"] }
 # In-app training of the scribble-conditioned segmentation head (see
 # `commands::ml`). Autodiff on the CPU (ndarray) backend: the head is tiny and
 # trains on cached encoder features, so this needs no CUDA/wgpu toolchain.
