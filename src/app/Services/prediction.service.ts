@@ -9,7 +9,8 @@ import { CanvasManagerService } from '../Components/pages/editor/drawable-canvas
 import { StateManagerService } from '../Components/pages/editor/drawable-canvas/service/state-manager.service';
 import { UndoRedoService } from '../Components/pages/editor/drawable-canvas/service/undo-redo.service';
 
-import { api, ScribbleInput } from '../lib/api';
+import { api, ScribbleInput, VectorShape, VectorNode } from '../lib/api';
+import { VectorEditorService } from '../Components/pages/editor/drawable-canvas/service/vector-editor.service';
 
 /**
  * Applies the trained segmentation head to the frame currently open in the
@@ -37,6 +38,7 @@ export class PredictionService {
     private undoRedo: UndoRedoService,
     private io: IOService,
     private notifications: NotificationService,
+    private vectorEditor: VectorEditorService,
     private zone: NgZone,
   ) {
     // Prediction on a large frame takes seconds; a bare spinner leaves the user
@@ -87,6 +89,87 @@ export class PredictionService {
    * @param useScribbles condition on the current annotation. Turning this off
    * shows what the model does unaided, which is the honest read of its quality.
    */
+  /**
+   * Turn a traced polygon into an editable path.
+   *
+   * Corner nodes (handles coincident with the anchor), not smoothed curves: the
+   * points come from a pixel contour, so inventing tangents would imply a
+   * precision the mask does not have and would pull the outline off the
+   * boundary the model actually predicted. The user can smooth what they want.
+   */
+  private polygonToShape(poly: number[][], labelId: number): VectorShape {
+    const nodes: VectorNode[] = poly.map(([x, y]) => ({
+      x,
+      y,
+      inX: x,
+      inY: y,
+      outX: x,
+      outY: y,
+      smooth: false,
+    }));
+    return {
+      id: crypto.randomUUID(),
+      labelId,
+      closed: true,
+      filled: true,
+      nodes,
+    };
+  }
+
+  /**
+   * Apply a prediction as vector shapes rather than painted pixels.
+   *
+   * The model still predicts a raster mask — this vectorises its output. That
+   * keeps the dense training signal the head needs while giving back something
+   * the node editor can actually adjust.
+   */
+  async predictCurrentFrameAsVectors(useScribbles = true): Promise<void> {
+    const frame = this.sequenceService.currentFrame();
+    if (!frame) return;
+
+    this.running.set(true);
+    this.lastError.set(null);
+    try {
+      const scribbles = useScribbles ? this.deriveScribbles() : undefined;
+      const result = await api.mlPredictFrame(frame.id, scribbles);
+      const labels = this.labelService.listSegmentationLabels;
+
+      const shapes: VectorShape[] = [];
+      for (const m of result.masks) {
+        if (!labels.some((l) => l.id === m.labelId)) continue;
+        const polys = await api.vectorizeMask(
+          base64ToUint8(m.maskBase64),
+          result.width,
+          result.height,
+        );
+        for (const p of polys) shapes.push(this.polygonToShape(p, m.labelId));
+      }
+
+      if (!shapes.length) {
+        this.notifications.warn(
+          'Nothing applied',
+          'The prediction produced no traceable regions.',
+        );
+        return;
+      }
+
+      // addShapes commits its own undo entry, so the whole set reverts at once.
+      this.vectorEditor.addShapes(shapes);
+      this.notifications.notify({
+        severity: 'success',
+        summary: 'Prediction vectorised',
+        detail: `${shapes.length} shape${shapes.length === 1 ? '' : 's'} — Ctrl+Z to revert`,
+        life: 3000,
+      });
+    } catch (error) {
+      const message = String(error);
+      this.lastError.set(message);
+      this.notifications.error('Prediction failed', message);
+    } finally {
+      this.running.set(false);
+    }
+  }
+
   async predictCurrentFrame(useScribbles = true): Promise<void> {
     const frame = this.sequenceService.currentFrame();
     if (!frame) return;

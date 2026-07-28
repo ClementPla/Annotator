@@ -92,8 +92,13 @@ impl Default for DatasetConfig {
 /// Frames that carry at least one annotation.
 pub fn annotated_frame_ids(db: &DbState) -> Result<Vec<i64>, String> {
     db.with_conn(|conn| {
+        // Both tables: a frame drawn only with the path tool is annotated, and
+        // listing just `annotations` would exclude it from training entirely.
         let mut stmt = conn.prepare(
-            "SELECT DISTINCT frame_id FROM annotations ORDER BY frame_id",
+            "SELECT frame_id FROM annotations \
+             UNION \
+             SELECT frame_id FROM vector_annotations \
+             ORDER BY frame_id",
         )?;
         let rows = stmt.query_map([], |r| r.get::<_, i64>(0))?;
         let ids = rows.collect::<std::result::Result<Vec<_>, _>>()?;
@@ -133,6 +138,74 @@ pub fn downscale_nearest(src: &[u8], sw: usize, sh: usize, dw: usize, dh: usize)
         }
     }
     out
+}
+
+/// Rasterise a frame's vector shapes into per-label masks at working size.
+///
+/// Rasterised at native resolution and then downscaled, matching how painted
+/// annotations are handled, so the two representations land on exactly the same
+/// grid and a label drawn either way trains identically.
+fn vector_masks(
+    db: &DbState,
+    frame_id: i64,
+    native_w: u32,
+    native_h: u32,
+    w: usize,
+    h: usize,
+) -> Result<Vec<(i64, Vec<u8>)>, String> {
+    let rows: Vec<(i64, String)> = db
+        .with_conn(|conn| {
+            let mut stmt =
+                conn.prepare("SELECT label_id, shapes FROM vector_annotations WHERE frame_id = ?1")?;
+            let it = stmt.query_map([frame_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            Ok(it.collect::<std::result::Result<Vec<_>, _>>()?)
+        })
+        .map_err(|e| format!("frame {frame_id} vector annotations: {e}"))?;
+
+    let mut out = Vec::new();
+    for (label_id, json) in rows {
+        // A frame whose shapes fail to parse should not sink a whole training
+        // run: skip it the way an unreadable mask would be skipped.
+        let Ok(shapes) = serde_json::from_str::<Vec<crate::commands::vector::VectorShape>>(&json)
+        else {
+            println!("[ml] frame {frame_id}: unreadable vector shapes for label {label_id}, skipped");
+            continue;
+        };
+        if shapes.is_empty() {
+            continue;
+        }
+        let mut alpha = vec![0u8; (native_w as usize) * (native_h as usize)];
+        for s in &shapes {
+            crate::commands::vector::rasterize_shape(s, native_w, native_h, &mut alpha);
+        }
+        out.push((
+            label_id,
+            downscale_nearest(&alpha, native_w as usize, native_h as usize, w, h),
+        ));
+    }
+    Ok(out)
+}
+
+/// Union vector coverage into the painted masks, per label.
+///
+/// Union rather than replace: a label can legitimately carry both a painted
+/// region and a drawn path, and dropping either would quietly discard work the
+/// annotator did.
+fn merge_masks(
+    mut painted: Vec<(i64, Vec<u8>)>,
+    vectors: Vec<(i64, Vec<u8>)>,
+) -> Vec<(i64, Vec<u8>)> {
+    for (label_id, mask) in vectors {
+        match painted.iter_mut().find(|(id, _)| *id == label_id) {
+            Some((_, existing)) => {
+                for (a, b) in existing.iter_mut().zip(mask.iter()) {
+                    *a |= *b;
+                }
+            }
+            None => painted.push((label_id, mask)),
+        }
+    }
+    painted
 }
 
 /// Flatten per-label masks into one dense class map (0 = background).
@@ -390,6 +463,10 @@ pub fn build_frame_samples(
             (a.label_id, small)
         })
         .collect();
+    // Vector shapes are annotations too. Without this a frame labelled with the
+    // path tool trains nothing at all — silently, since it still looks
+    // annotated everywhere else in the app.
+    let masks = merge_masks(masks, vector_masks(db, frame_id, native_w, native_h, w, h)?);
     let labels = combine_masks(&masks, order, w * h);
 
     // Encoder features once per frame (see module note on reuse).
@@ -592,6 +669,32 @@ mod tests {
         // Must not divide by zero or loop forever on an empty foreground set.
         sample_patches(&feats, &labels, 4, 1.0, &mut Rng::new(9), &mut out);
         assert_eq!(out.n, 4);
+    }
+
+    #[test]
+    fn vector_coverage_unions_into_painted_masks() {
+        // Same label drawn both ways: neither contribution may be lost.
+        let painted = vec![(7i64, vec![1u8, 0, 0, 0])];
+        let vectors = vec![(7i64, vec![0u8, 1, 0, 0])];
+        let merged = merge_masks(painted, vectors);
+        assert_eq!(merged.len(), 1, "one label must stay one mask");
+        assert_eq!(merged[0].1, vec![1, 1, 0, 0], "coverage must union");
+    }
+
+    #[test]
+    fn a_vector_only_label_becomes_its_own_mask() {
+        let merged = merge_masks(vec![(1i64, vec![1u8, 0])], vec![(2i64, vec![0u8, 1])]);
+        assert_eq!(merged.len(), 2);
+        assert!(merged.iter().any(|(id, m)| *id == 2 && m == &vec![0, 1]));
+    }
+
+    #[test]
+    fn merging_a_vector_only_label_reaches_the_class_map() {
+        // The end-to-end point of the fix: a label with no painted mask at all
+        // must still produce a non-background class.
+        let merged = merge_masks(Vec::new(), vec![(5i64, vec![0u8, 1, 1, 0])]);
+        let classes = combine_masks(&merged, &[5], 4);
+        assert_eq!(classes, vec![0, 1, 1, 0], "vector-only label must train");
     }
 
     #[test]

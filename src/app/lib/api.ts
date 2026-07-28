@@ -498,6 +498,18 @@ export const api = {
    * simplified outer-contour polygons (image-pixel coords). Empty when the
    * clicked pixel is background.
    */
+  /**
+   * Trace every component of a mask into simplified polygons. `minArea` drops
+   * specks, which predicted masks carry and hand-drawn ones do not.
+   */
+  vectorizeMask: (mask: Uint8Array, width: number, height: number, minArea = 12) =>
+    invoke<number[][][]>('vectorize_mask', {
+      mask: mask.slice().buffer,
+      width,
+      height,
+      minArea,
+    }),
+
   vectorizeComponent: (
     mask: Uint8Array,
     width: number,
