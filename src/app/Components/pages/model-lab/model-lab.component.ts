@@ -78,7 +78,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   // Training knobs, deliberately few: these are the ones that change the
   // answer rather than the aesthetics.
   workingSize = 384;
-  pixelsPerFrame = 4000;
+  patchesPerFrame = 24;
   epochs = 40;
   curveRepeats = 3;
 
@@ -182,7 +182,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     return {
       encoderId: this.selectedEncoder(),
       workingSize: this.workingSize,
-      pixelsPerFrame: this.pixelsPerFrame,
+      patchesPerFrame: this.patchesPerFrame,
       epochs: this.epochs,
       curveRepeats: this.curveRepeats,
     };

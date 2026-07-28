@@ -6,16 +6,15 @@
 //!
 //! # Augmentation, and what is deliberately absent
 //!
-//! The head is a per-pixel MLP and the local basis is isotropic — Gaussian,
-//! LoG, gradient magnitude and local sigma are all rotation-invariant, and the
-//! Hessian eigenvalues are magnitude-ordered scalars, so they are too.
-//! Consequently a flip or a 90-degree rotation only permutes *which pixel*
-//! carries a given feature vector. Because training samples pixels and the head
-//! has no spatial extent, the resulting sample table is identical. Geometric
-//! augmentation here would cost real time and change nothing, so it is omitted
-//! on purpose rather than by oversight.
+//! Geometric augmentation is still omitted, but the reasoning that justified it
+//! no longer holds and the omission is now a *known gap*. It was sound while the
+//! head was a per-pixel MLP: the local basis is isotropic, so a flip only
+//! permuted which pixel carried a given feature vector, and a table of sampled
+//! pixels came out identical. A convolutional head has spatial extent, so flips
+//! and rotations do produce genuinely new training signal. Adding them is the
+//! next lever to pull if accuracy plateaus.
 //!
-//! What does augment this architecture:
+//! What augments this architecture today:
 //!
 //! * **Appearance jitter** (gamma / gain / bias) — genuinely moves feature
 //!   values, and is the realistic nuisance across scanners and acquisitions.
@@ -34,7 +33,7 @@ use crate::storage::{queries, DbState};
 
 use super::encoder::{resize_bilinear, EncoderSession};
 use super::filters::{self, FilterBankConfig};
-use super::scribble::{self, Rng, SCRIBBLE_CHANNELS};
+use super::scribble::{self, Rng, Scribbles, SCRIBBLE_CHANNELS};
 use super::train::{Samples, PATCH};
 
 #[derive(Debug, Clone)]
@@ -42,12 +41,27 @@ pub struct DatasetConfig {
     /// Longest side the frame is resampled to before feature extraction.
     /// Bounds cost per frame independently of acquisition size.
     pub working_size: u32,
-    /// Pixels sampled per frame per repeat.
-    pub pixels_per_frame: usize,
+    /// Patches sampled per frame per repeat.
+    ///
+    /// Counted in patches, not pixels: the old pixel budget divided by a
+    /// patch's 2304 pixels rounded down to *one* crop per frame, which starved
+    /// training so badly that any small structure was unlearnable.
+    pub patches_per_frame: usize,
+    /// Share of patches centred on an annotated pixel rather than placed at
+    /// random. Without this, minority classes never reach the loss.
+    pub foreground_fraction: f32,
     /// Number of augmented passes over each frame (1 = no augmentation).
     pub repeats: usize,
     pub scribble_strokes: usize,
     pub stroke_len: usize,
+    /// Probability that a repeat is built with *no* strokes at all.
+    ///
+    /// Training only ever with scribbles teaches the head to depend on them,
+    /// and then prediction without any produces a constant channel it has
+    /// never seen — a distribution shift that shows up as blank masks. Dropping
+    /// them for a share of repeats forces the head to work unaided and makes
+    /// scribbles a genuine refinement rather than a requirement.
+    pub scribble_dropout: f32,
     pub seed: u64,
 }
 
@@ -55,10 +69,12 @@ impl Default for DatasetConfig {
     fn default() -> Self {
         Self {
             working_size: 384,
-            pixels_per_frame: 4000,
+            patches_per_frame: 24,
+            foreground_fraction: 0.5,
             repeats: 3,
             scribble_strokes: 3,
             stroke_len: 40,
+            scribble_dropout: 0.5,
             seed: 0,
         }
     }
@@ -139,19 +155,28 @@ pub fn jitter(image: &Array3<f32>, rng: &mut Rng) -> Array3<f32> {
     image.mapv(|v| (v.clamp(0.0, 1.0).powf(gamma) * gain + bias).clamp(0.0, 1.0))
 }
 
-/// Draw `k_pixels` worth of random patches into a sample table.
+/// Draw `n_patches` patches into a sample table.
 ///
-/// Patches, because the head is convolutional and needs neighbours. Origins are
-/// uniform over valid positions with no class rebalancing: the curve should
-/// reflect the class prior the annotator actually produced, and rebalancing
-/// would make sparse structures look easier than they are.
+/// Patches, because the head is convolutional and needs neighbours.
+///
+/// # Why this rebalances, having previously refused to
+///
+/// The original rule was that origins stay uniform so the curve reflects the
+/// class prior the annotator actually produced. That is the right instinct for
+/// *reporting* and the wrong one for *sampling*: with an optic disc at ~1% of a
+/// frame, uniform crops put a positive pixel in front of the loss so rarely
+/// that the head converges to all-background and stays there. Balance is
+/// therefore applied to which crops are *drawn*, never to the loss weighting or
+/// the metrics — held-out Dice is still computed on unbalanced frames, so the
+/// numbers stay honest while the gradient stops being starved.
 ///
 /// A frame smaller than one patch is skipped rather than padded — padding would
 /// feed the head invented context it will never see at inference.
 pub fn sample_patches(
     features: &Array3<f32>,
     labels: &[i32],
-    k_pixels: usize,
+    n_patches: usize,
+    foreground_fraction: f32,
     rng: &mut Rng,
     out: &mut Samples,
 ) {
@@ -159,12 +184,42 @@ pub fn sample_patches(
     if h < PATCH || w < PATCH || labels.len() < h * w {
         return;
     }
-    let n_patches = (k_pixels / Samples::patch_pixels()).max(1);
+    let n_patches = n_patches.max(1);
+
+    // Where the annotator actually drew. Uniform sampling alone is hopeless for
+    // small structures: an optic disc covers ~1% of a fundus frame, so most
+    // random crops contain no positive pixel at all and the head converges to
+    // "always background" — a correct answer to that data, and a useless model.
+    // Biasing a share of crops to centre on a labelled pixel is what puts the
+    // minority class in front of the loss often enough to be learned.
+    let foreground: Vec<usize> = labels
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| **l > 0)
+        .map(|(i, _)| i)
+        .collect();
+    let want_fg = if foreground.is_empty() {
+        0
+    } else {
+        ((n_patches as f32) * foreground_fraction.clamp(0.0, 1.0)).round() as usize
+    };
+
     let mut fbuf = vec![0.0f32; d * Samples::patch_pixels()];
     let mut lbuf = vec![0i32; Samples::patch_pixels()];
-    for _ in 0..n_patches {
-        let oy = rng.below(h - PATCH + 1);
-        let ox = rng.below(w - PATCH + 1);
+    for k in 0..n_patches {
+        // Centre on a labelled pixel, clamped so the patch stays inside the
+        // frame. Clamping biases towards edges for structures near a border,
+        // which is preferable to discarding those examples entirely.
+        let (oy, ox) = if k < want_fg {
+            let p = foreground[rng.below(foreground.len())];
+            let (py, px) = (p / w, p % w);
+            (
+                py.saturating_sub(PATCH / 2).min(h - PATCH),
+                px.saturating_sub(PATCH / 2).min(w - PATCH),
+            )
+        } else {
+            (rng.below(h - PATCH + 1), rng.below(w - PATCH + 1))
+        };
         for c in 0..d {
             for py in 0..PATCH {
                 for px in 0..PATCH {
@@ -352,18 +407,25 @@ pub fn build_frame_samples(
         } else {
             jitter(&image, rng)
         };
-        let s = scribble::simulate(
-            &binary,
-            w,
-            h,
-            cfg.scribble_strokes,
-            cfg.stroke_len,
-            rng,
-        );
+        // Drop the strokes entirely for a share of repeats so the head is
+        // trained to stand on its own — see `scribble_dropout`.
+        let unaided = cfg.scribble_dropout > 0.0 && rng.unit() < cfg.scribble_dropout;
+        let s = if unaided || cfg.scribble_strokes == 0 {
+            Scribbles::empty(w, h)
+        } else {
+            scribble::simulate(&binary, w, h, cfg.scribble_strokes, cfg.stroke_len, rng)
+        };
         let feats = assemble_stack(&view, encoder_part.as_ref(), &s, &fb);
 
         let acc = out.get_or_insert_with(|| Samples::new(feats.shape()[0]));
-        sample_patches(&feats, &labels, cfg.pixels_per_frame, rng, acc);
+        sample_patches(
+            &feats,
+            &labels,
+            cfg.patches_per_frame,
+            cfg.foreground_fraction,
+            rng,
+            acc,
+        );
     }
 
     Ok(out.unwrap_or_else(|| Samples::new(0)))
@@ -435,7 +497,7 @@ mod tests {
         });
         let labels: Vec<i32> = (0..h * w).map(|i| (i % 3) as i32).collect();
         let mut out = Samples::new(d);
-        sample_patches(&feats, &labels, Samples::patch_pixels() * 3, &mut Rng::new(3), &mut out);
+        sample_patches(&feats, &labels, 3, 0.0, &mut Rng::new(3), &mut out);
 
         assert_eq!(out.n, 3);
         assert_eq!(out.x.len(), 3 * d * Samples::patch_pixels());
@@ -455,6 +517,54 @@ mod tests {
         }
     }
 
+    /// The regression behind "every prediction is background".
+    ///
+    /// A tiny structure in a large frame is almost never hit by a uniform crop,
+    /// so without foreground bias the sampler returns patches whose labels are
+    /// entirely zero and the head has nothing to learn from.
+    #[test]
+    fn foreground_bias_finds_a_small_structure_that_uniform_sampling_misses() {
+        let (w, h) = (200usize, 200usize);
+        let feats = Array3::<f32>::zeros((2, h, w));
+        // A 6x6 blob — 0.09% of the frame, comparable to an optic disc.
+        let mut labels = vec![0i32; w * h];
+        for y in 100..106 {
+            for x in 100..106 {
+                labels[y * w + x] = 1;
+            }
+        }
+
+        let positives = |s: &Samples| s.y.iter().filter(|&&v| v > 0).count();
+
+        let mut uniform = Samples::new(2);
+        sample_patches(&feats, &labels, 16, 0.0, &mut Rng::new(5), &mut uniform);
+
+        let mut biased = Samples::new(2);
+        sample_patches(&feats, &labels, 16, 0.5, &mut Rng::new(5), &mut biased);
+
+        assert_eq!(biased.n, 16);
+        assert!(
+            positives(&biased) > positives(&uniform),
+            "foreground bias must surface the structure: biased={} uniform={}",
+            positives(&biased),
+            positives(&uniform)
+        );
+        assert!(
+            positives(&biased) > 0,
+            "no positive pixel reached the sample table at all"
+        );
+    }
+
+    #[test]
+    fn foreground_bias_is_harmless_when_nothing_is_labelled() {
+        let feats = Array3::<f32>::zeros((2, 60, 60));
+        let labels = vec![0i32; 60 * 60];
+        let mut out = Samples::new(2);
+        // Must not divide by zero or loop forever on an empty foreground set.
+        sample_patches(&feats, &labels, 4, 1.0, &mut Rng::new(9), &mut out);
+        assert_eq!(out.n, 4);
+    }
+
     #[test]
     fn sampling_skips_frames_smaller_than_a_patch() {
         // Padding would feed the head context that cannot occur at inference,
@@ -462,13 +572,13 @@ mod tests {
         let feats = Array3::<f32>::zeros((2, PATCH - 1, PATCH - 1));
         let labels = vec![0i32; (PATCH - 1) * (PATCH - 1)];
         let mut out = Samples::new(2);
-        sample_patches(&feats, &labels, 10_000, &mut Rng::new(1), &mut out);
+        sample_patches(&feats, &labels, 4, 0.0, &mut Rng::new(1), &mut out);
         assert_eq!(out.n, 0);
 
         // A truncated label buffer is also refused.
         let big = Array3::<f32>::zeros((2, PATCH, PATCH));
         let mut out = Samples::new(2);
-        sample_patches(&big, &[0, 1], 10_000, &mut Rng::new(1), &mut out);
+        sample_patches(&big, &[0, 1], 4, 0.0, &mut Rng::new(1), &mut out);
         assert_eq!(out.n, 0);
     }
 }

@@ -321,7 +321,7 @@ export interface CurveOptions {
   /** Omit for the local feature basis alone — the encoder ablation. */
   encoderId?: string | null;
   workingSize?: number;
-  pixelsPerFrame?: number;
+  patchesPerFrame?: number;
   augmentRepeats?: number;
   budgets?: number[];
   curveRepeats?: number;

@@ -90,7 +90,7 @@ pub struct CurveOptions {
     /// whether the encoder is earning its download.
     pub encoder_id: Option<String>,
     pub working_size: Option<u32>,
-    pub pixels_per_frame: Option<usize>,
+    pub patches_per_frame: Option<usize>,
     pub augment_repeats: Option<usize>,
     pub budgets: Option<Vec<usize>>,
     pub curve_repeats: Option<usize>,
@@ -232,7 +232,7 @@ fn build_split(
 
     let ds = DatasetConfig {
         working_size: options.working_size.unwrap_or(384),
-        pixels_per_frame: options.pixels_per_frame.unwrap_or(4000),
+        patches_per_frame: options.patches_per_frame.unwrap_or(24),
         repeats: options.augment_repeats.unwrap_or(3).max(1),
         seed,
         ..Default::default()
@@ -262,6 +262,7 @@ fn build_split(
     let val_cfg = DatasetConfig {
         repeats: 1,
         scribble_strokes: 0,
+        scribble_dropout: 0.0,
         ..ds.clone()
     };
     let mut val = Samples::new(0);
