@@ -169,6 +169,16 @@
         [loading]="running() && job() === 'curve'"
         (onClick)="run()"
       />
+      @if (running()) {
+        <p-button
+          [label]="stopping() ? 'Stopping after this epoch…' : 'Stop'"
+          icon="pi pi-stop-circle"
+          severity="danger"
+          [outlined]="true"
+          [disabled]="stopping()"
+          (onClick)="stop()"
+        />
+      }
     </div>
     <p class="muted hint">
       <strong>Train model</strong> fits one head on every frame and keeps it for

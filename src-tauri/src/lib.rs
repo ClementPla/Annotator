@@ -188,6 +188,7 @@ pub fn run() {
             commands::ml::commands::ml_train_model,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_model_status,
+            commands::ml::commands::ml_stop_training,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_predict_frame,
 

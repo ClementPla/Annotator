@@ -65,6 +65,13 @@ pub struct MlState {
     /// interactive loop revisits the same frame repeatedly, and a larger cache
     /// would trade real memory for a case that rarely occurs.
     pub features: Mutex<Option<(FeatureKey, Array3<f32>)>>,
+    /// Set by `ml_stop_training` and polled between epochs.
+    ///
+    /// An atomic rather than a channel because the training loop is a plain
+    /// synchronous function on a worker thread: it needs to *check* a flag, not
+    /// await anything, and the stop command must not block behind the mutexes
+    /// the run already holds.
+    pub cancel: std::sync::atomic::AtomicBool,
 }
 
 /// Scribbles supplied by the UI, as flat pixel indices at native resolution.

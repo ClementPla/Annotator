@@ -380,7 +380,7 @@ pub fn train_head(
     n_classes: usize,
     cfg: &TrainConfig,
 ) -> Result<(Head, EvalMetrics), String> {
-    train_head_with(train, val, n_classes, cfg, &mut |_| {})
+    train_head_with(train, val, n_classes, cfg, &|| false, &mut |_| {})
 }
 
 /// As [`train_head`], reporting each epoch to `on`.
@@ -388,11 +388,17 @@ pub fn train_head(
 /// Backend choice happens here, once, after the cheap rejections — spinning up
 /// a CUDA context only to discover the request was degenerate would add a
 /// second of latency to an error.
+///
+/// `stop` is polled between epochs. A stopped fit is **not** an error: the
+/// weights at that point are a real model, just less trained, so it returns
+/// normally and the caller keeps a usable head. Treating interruption as
+/// failure would throw away work the user explicitly chose to keep.
 pub fn train_head_with(
     train: &Samples,
     val: &Samples,
     n_classes: usize,
     cfg: &TrainConfig,
+    stop: &dyn Fn() -> bool,
     on: &mut dyn FnMut(TrainProgress),
 ) -> Result<(Head, EvalMetrics), String> {
     if train.is_empty() {
@@ -403,9 +409,9 @@ pub fn train_head_with(
     }
     match Selection::detect() {
         #[cfg(feature = "gpu")]
-        sel @ Selection::Cuda => fit::<GpuTrain>(train, val, n_classes, cfg, sel.label(), on)
+        sel @ Selection::Cuda => fit::<GpuTrain>(train, val, n_classes, cfg, sel.label(), stop, on)
             .map(|(h, m)| (Head::Cuda(h), m)),
-        sel @ Selection::Cpu => fit::<CpuTrain>(train, val, n_classes, cfg, sel.label(), on)
+        sel @ Selection::Cpu => fit::<CpuTrain>(train, val, n_classes, cfg, sel.label(), stop, on)
             .map(|(h, m)| (Head::Cpu(h), m)),
     }
 }
@@ -429,6 +435,7 @@ fn fit<B: AutodiffBackend>(
     n_classes: usize,
     cfg: &TrainConfig,
     device_label: &'static str,
+    stop: &dyn Fn() -> bool,
     on: &mut dyn FnMut(TrainProgress),
 ) -> Result<(SegHead<B::InnerBackend>, EvalMetrics), String> {
     let device = Default::default();
@@ -464,6 +471,18 @@ fn fit<B: AutodiffBackend>(
     let fit_start = std::time::Instant::now();
 
     for epoch in 0..cfg.epochs {
+        // Checked between epochs rather than between batches: a partial epoch
+        // leaves the minibatch sampler mid-sweep for no benefit, and one epoch
+        // is already the granularity progress is reported at, so the user never
+        // waits longer than the interval they can see ticking.
+        if stop() {
+            println!(
+                "[ml] fit stopped by request after {} of {} epochs — keeping the \
+                 weights trained so far",
+                epoch, cfg.epochs
+            );
+            break;
+        }
         let epoch_start = std::time::Instant::now();
         let mut epoch_loss = 0.0f32;
         for _ in 0..batches_per_epoch {
@@ -571,7 +590,7 @@ pub fn learning_curve(
     repeats: usize,
     cfg: &TrainConfig,
 ) -> Result<Vec<CurvePoint>, String> {
-    learning_curve_with(per_frame, val, n_classes, budgets, repeats, cfg, &mut |_| {})
+    learning_curve_with(per_frame, val, n_classes, budgets, repeats, cfg, &|| false, &mut |_| {})
 }
 
 /// As [`learning_curve`], reporting every epoch of every fit to `on`.
@@ -582,6 +601,7 @@ pub fn learning_curve_with(
     budgets: &[usize],
     repeats: usize,
     cfg: &TrainConfig,
+    stop: &dyn Fn() -> bool,
     on: &mut dyn FnMut(TrainProgress),
 ) -> Result<Vec<CurvePoint>, String> {
     if per_frame.is_empty() {
@@ -643,7 +663,7 @@ pub fn learning_curve_with(
                 budget,
                 repeat + 1
             );
-            let (_, metrics) = train_head_with(&train, val, n_classes, &sub, &mut |p| {
+            let (_, metrics) = train_head_with(&train, val, n_classes, &sub, stop, &mut |p| {
                 // Widen the per-fit ETA to the whole sweep: the fits still
                 // queued behind this one cost roughly a full fit each.
                 let per_epoch = if p.epoch > 0 {

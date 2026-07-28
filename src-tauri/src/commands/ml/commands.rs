@@ -13,6 +13,8 @@
 //! Progress is streamed as `ml-progress` / `ml-train-progress` events rather
 //! than returned, so a sweep over dozens of frames shows movement throughout.
 
+use std::sync::atomic::Ordering;
+
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
@@ -389,6 +391,7 @@ pub fn ml_run_learning_curve(
     // Fired before any heavy work: if this never reaches the UI, the event
     // channel itself is at fault rather than anything being slow or blocked.
     emit(&app, "starting", 0, 1, 0.0);
+    state.cancel.store(false, Ordering::Relaxed);
     let split = build_split(&app, &db, &state, &options)?;
     let budgets = options
         .budgets
@@ -403,6 +406,7 @@ pub fn ml_run_learning_curve(
         &budgets,
         options.curve_repeats.unwrap_or(3),
         &train_config(&options),
+        &|| state.cancel.load(Ordering::Relaxed),
         &mut |p| emit_train(&app, p),
     )?;
 
@@ -442,6 +446,9 @@ pub fn ml_train_model(
     state: State<MlState>,
     options: CurveOptions,
 ) -> Result<TrainSummary, String> {
+    // Clear before building the split: a stop requested against a previous run
+    // must not cancel this one before it has trained a single epoch.
+    state.cancel.store(false, Ordering::Relaxed);
     let split = build_split(&app, &db, &state, &options)?;
     let mut all = Samples::new(split.feature_dim);
     for s in &split.per_frame {
@@ -453,6 +460,7 @@ pub fn ml_train_model(
         &split.val,
         split.classes,
         &train_config(&options),
+        &|| state.cancel.load(Ordering::Relaxed),
         &mut |p| emit_train(&app, p),
     )?;
 
@@ -478,6 +486,21 @@ pub fn ml_train_model(
     });
 
     Ok(summary)
+}
+
+/// Ask the running fit to stop at the next epoch boundary.
+///
+/// Deliberately not a kill: the loop finishes its current epoch, scores the
+/// weights it has, and stores them like any completed run. A half-trained head
+/// is a real model — throwing it away would punish the user for choosing to
+/// stop, which is the opposite of what the button is for.
+///
+/// Safe to call when nothing is running; the flag is cleared at the start of
+/// every fit, so a stale request cannot cancel the next one.
+#[tauri::command]
+pub fn ml_stop_training(state: State<MlState>) {
+    state.cancel.store(true, Ordering::Relaxed);
+    println!("[ml] stop requested — finishing the current epoch");
 }
 
 /// Whether a head is loaded, and what it was fitted with.

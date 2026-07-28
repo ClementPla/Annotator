@@ -71,6 +71,9 @@ export class ModelLabComponent implements OnInit, OnDestroy {
 
   /** What the running job is, so the UI can label it accurately. */
   readonly job = signal<'curve' | 'train' | null>(null);
+  /** Set once stop is requested, so the button reflects the pending state.
+   * The fit finishes its current epoch, so the click is not instant. */
+  readonly stopping = signal(false);
   readonly model = signal<TrainSummary | null>(null);
   /** Rolling loss history for the current fit, for a sparkline. */
   readonly lossHistory = signal<number[]>([]);
@@ -195,6 +198,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     this.progress.set(null);
     this.tick.set(null);
     this.lossHistory.set([]);
+    this.stopping.set(false);
   }
 
   private end(): void {
@@ -202,6 +206,24 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     this.job.set(null);
     this.progress.set(null);
     this.tick.set(null);
+    this.stopping.set(false);
+  }
+
+  /**
+   * Ask the backend to stop after the current epoch.
+   *
+   * Not a cancel: the run returns normally with whatever it has trained, so
+   * `trainModel` still stores a usable head and reports its Dice. The button
+   * stays disabled afterwards because the request cannot be taken back.
+   */
+  async stop(): Promise<void> {
+    this.stopping.set(true);
+    try {
+      await api.mlStopTraining();
+    } catch (e) {
+      this.error.set(String(e));
+      this.stopping.set(false);
+    }
   }
 
   async run(): Promise<void> {

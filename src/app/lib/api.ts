@@ -553,6 +553,8 @@ export const api = {
   mlTrainModel: (options: CurveOptions) =>
     invoke<TrainSummary>('ml_train_model', { options }),
   mlModelStatus: () => invoke<TrainSummary | null>('ml_model_status'),
+  /** Ask the running fit to stop at the next epoch; the head it has is kept. */
+  mlStopTraining: () => invoke<void>('ml_stop_training'),
   mlPredictFrame: (frameId: number, scribbles?: ScribbleInput) =>
     invoke<PredictedFrame>('ml_predict_frame', { frameId, scribbles }),
 
