@@ -113,6 +113,19 @@ impl EncoderSession {
     /// DirectML in particular accepts graphs with dynamic spatial axes and then
     /// fails inside a `Reshape` at run time. That is why this exists as a
     /// separate entry point rather than being folded into the provider chain.
+    ///
+    /// # Tried and rejected: pinning the symbolic dimensions
+    ///
+    /// ORT's own DirectML documentation prescribes
+    /// `SessionBuilder::with_dimension_override` for graphs with dynamic inputs,
+    /// and it looked like a clean fix here — this encoder only ever feeds
+    /// `[1, 3, input_size, input_size]`, so the axes are dynamic in name only.
+    /// It was implemented and **measured: it does not help.** Reopening with
+    /// `s4`/`s99`/`s100` pinned to 512 fails in the same `Reshape`, so the
+    /// defect is not shape inference. It only doubled the cost of the failure
+    /// path (15.4s against 7.5s) before falling back anyway, so the machinery
+    /// was removed. Do not re-add it without a graph that it demonstrably
+    /// rescues.
     fn open(path: &Path, spec: EncoderSpec, force_cpu: bool) -> Result<Self, String> {
         let builder = Session::builder()
             .map_err(|e| format!("session builder: {e}"))?
