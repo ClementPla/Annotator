@@ -66,6 +66,16 @@ export class EditorToolbarComponent {
     void this.prediction.predictCurrentFrame(useScribbles);
   }
 
+  /**
+   * Run the head and trace its output into editable paths instead of pixels.
+   *
+   * The model predicts a raster mask either way; this vectorises the result, so
+   * it is a choice about what you get back rather than about how it was fitted.
+   */
+  predictAsVectors(useScribbles: boolean): void {
+    void this.prediction.predictCurrentFrameAsVectors(useScribbles);
+  }
+
   /** Slider position [0, brushSteps] mapped logarithmically from lineWidth. */
   get brushSizeSlider(): number {
     const v = Math.min(this.brushMax, Math.max(this.brushMin, this.editorService.lineWidth));

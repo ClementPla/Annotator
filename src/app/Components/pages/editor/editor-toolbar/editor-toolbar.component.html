@@ -110,6 +110,20 @@
             <div class="hidden lg:block">Unaided</div>
           </span>
         </p-button>
+
+        <p-button
+          severity="secondary"
+          [outlined]="true"
+          pTooltip="Predict, then trace the result into editable paths rather than painting pixels. Nodes are corners you can adjust."
+          tooltipPosition="bottom"
+          [loading]="prediction.running()"
+          (onClick)="predictAsVectors(true)"
+        >
+          <span class="flex gap-2 items-center">
+            <i class="pi pi-pencil"></i>
+            <div class="hidden lg:block">As paths</div>
+          </span>
+        </p-button>
       </div>
 
       @if (editorService.isToolWithBrushSize()) {
