@@ -11,6 +11,7 @@ import { UndoRedoService } from '../Components/pages/editor/drawable-canvas/serv
 
 import { api, ScribbleInput, VectorShape, VectorNode } from '../lib/api';
 import { VectorEditorService } from '../Components/pages/editor/drawable-canvas/service/vector-editor.service';
+import { OrchestratorService } from '../Components/pages/editor/drawable-canvas/service/orchestrator.service';
 
 /**
  * Applies the trained segmentation head to the frame currently open in the
@@ -39,6 +40,7 @@ export class PredictionService {
     private io: IOService,
     private notifications: NotificationService,
     private vectorEditor: VectorEditorService,
+    private orchestrator: OrchestratorService,
     private zone: NgZone,
   ) {
     // Prediction on a large frame takes seconds; a bare spinner leaves the user
@@ -206,7 +208,11 @@ export class PredictionService {
         this.io.markLabelDirty(index);
       }
       this.undoRedo.endGroup();
-      this.stateManager.recomputeCanvasSum = true;
+      // Marks the composite stale *and* schedules a frame. Setting the flag
+      // alone left the prediction invisible until something else asked for a
+      // repaint — toggling a label, or the next brush stroke. The vector path
+      // never showed the bug because `addShapes` redraws on commit.
+      this.orchestrator.requestRedrawAllCanvas();
 
       const covered = result.masks
         .filter((m) => m.coverage > 0)
