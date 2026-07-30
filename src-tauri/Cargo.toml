@@ -119,7 +119,12 @@ opt-level = 3
 codegen-units = 16
 lto = "thin"
 opt-level = 2 # Prioritizes speed over binary size. Use `z` if you prefer smaller binary or `s` for in between.
-panic = "abort" # Higher performance by disabling panic handlers.
+# `panic = "abort"` is deliberately NOT set. `commands::ml::backend` detects CUDA
+# by running a real kernel inside `catch_unwind` — cubecl panics rather than
+# returning an error when the driver or NVRTC is missing — and aborting turns
+# that CPU fallback into a hard crash. It shipped that way once: a dev machine
+# with the toolkit on PATH never reproduces it, because the probe succeeds
+# there. The module raises a `compile_error!` if this line comes back.
 strip = true # Ensures debug symbols are removed.
 incremental = true
 

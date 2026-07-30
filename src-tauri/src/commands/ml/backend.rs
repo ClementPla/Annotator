@@ -66,11 +66,29 @@ impl Selection {
     }
 }
 
+// The probe below is only a fallback because the panic can be caught. Under
+// `panic = "abort"` there is nothing to catch: the process dies on the first
+// machine without a usable CUDA runtime, and it dies at the moment training
+// starts — after the user has waited through feature extraction.
+//
+// This shipped once. A developer machine with the toolkit on PATH never sees
+// it, because the probe succeeds there; the installed build inherits the system
+// PATH, fails to find NVRTC, and aborts. Fail the build instead.
+#[cfg(all(feature = "gpu", panic = "abort"))]
+compile_error!(
+    "`panic = \"abort\"` breaks the CUDA probe in this module: it relies on \
+     `catch_unwind` to fall back to the CPU backend, and abort turns that \
+     fallback into a hard crash on any machine without a usable CUDA runtime. \
+     Remove `panic = \"abort\"` from the release profile in Cargo.toml."
+);
+
 /// Whether a CUDA context can be created *and used* on this machine.
 ///
 /// Probed once. Allocation alone would prove nothing — burn is lazy, so a
 /// tensor can be "created" against a device that cannot execute anything; the
 /// probe forces a real kernel and reads the result back.
+///
+/// Correctness here depends on unwinding — see the `compile_error!` above.
 #[cfg(feature = "gpu")]
 pub fn cuda_works() -> bool {
     use burn::tensor::Tensor;
