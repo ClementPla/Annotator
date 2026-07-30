@@ -3,10 +3,10 @@
 <div class="lab">
   <header class="lab-head">
     <div>
-      <h1>Segmentation head lab</h1>
+      <h1>Model training</h1>
       <p class="sub">
-        Train a small head on the annotations already in this project, and see
-        how quality scales with the number of annotated frames.
+        Train a model on this project's annotations, then apply it to new frames
+        from the editor.
       </p>
     </div>
     <p-button
@@ -14,21 +14,17 @@
       severity="secondary"
       [text]="true"
       (onClick)="refresh()"
-      pTooltip="Reload project state"
+      pTooltip="Reload"
     />
   </header>
 
-  <!-- Pinned above the content: during a run this is the thing the user is
-       watching, and burying it inside a card meant scrolling to find it.
-       Gated on any live signal so a disagreement between the job flag and the
-       event stream cannot hide it. -->
   @if (running() || progress() || tick()) {
     <div class="prog">
       <div class="prog-headline">
         <span class="pct">{{ progressPercent() }}%</span>
         <span class="phase">{{ progressLabel() }}</span>
         @if (lossPath(); as d) {
-          <svg viewBox="0 0 240 34" class="spark" aria-label="training loss">
+          <svg viewBox="0 0 240 34" class="spark" aria-label="Training loss">
             <path [attr.d]="d" />
           </svg>
         }
@@ -46,312 +42,197 @@
   }
 
   <div class="lab-grid">
-  <!-- Project state -->
-  <p-card styleClass="lab-card">
-    <ng-template pTemplate="title">Project</ng-template>
-    @if (summary(); as s) {
-      <div class="stats">
-        <div class="stat">
-          <span class="v">{{ s.annotated_frames }}</span>
-          <span class="k">annotated frames</span>
-        </div>
-        <div class="stat">
-          <span class="v">{{ s.labels }}</span>
-          <span class="k">labels</span>
-        </div>
-        <div class="stat">
-          <span class="v">{{ s.classes }}</span>
-          <span class="k">classes (incl. background)</span>
-        </div>
-      </div>
-    } @else {
-      <p class="muted">Loading…</p>
-    }
-    @if (blockedReason(); as reason) {
-      <p class="warn">{{ reason }}</p>
-    }
-  </p-card>
+    <!-- ── Left column ─────────────────────────────────────────────────── -->
+    <div class="col">
+      <p-card styleClass="lab-card">
+        <ng-template pTemplate="title">Dataset</ng-template>
+        @if (summary(); as s) {
+          <div class="stats">
+            <div class="stat">
+              <span class="v">{{ s.annotated_frames }}</span>
+              <span class="k">annotated frames</span>
+            </div>
+            <div class="stat">
+              <span class="v">{{ s.labels }}</span>
+              <span class="k">labels</span>
+            </div>
+          </div>
+        } @else {
+          <p class="muted">Loading…</p>
+        }
+        @if (blockedReason(); as reason) {
+          <p class="warn">{{ reason }}</p>
+        }
+      </p-card>
 
-  <!-- Encoder selection -->
-  <p-card styleClass="lab-card">
-    <ng-template pTemplate="title">Feature source</ng-template>
-    <p class="muted">
-      The local feature basis always runs. An encoder adds semantic context on
-      top — comparing the two is the point of the experiment.
-    </p>
+      <p-card styleClass="lab-card">
+        <ng-template pTemplate="title">Labels to predict</ng-template>
+        @if (labels().length) {
+          <div class="chips">
+            @for (l of labels(); track l.id) {
+              <button
+                type="button"
+                class="chip"
+                [class.on]="selectedLabels().has(l.id)"
+                (click)="toggleLabel(l.id)"
+              >
+                <i class="pi" [class.pi-check]="selectedLabels().has(l.id)"></i>
+                {{ l.name }}
+              </button>
+            }
+          </div>
+        } @else {
+          <p class="muted">No labels defined.</p>
+        }
+      </p-card>
 
-    <button
-      type="button"
-      class="enc"
-      [class.sel]="selectedEncoder() === null"
-      (click)="selectEncoder(null)"
-    >
-      <div class="enc-main">
-        <span class="enc-name">Local feature basis only</span>
-        <p-tag value="no download" severity="success" />
-      </div>
-      <span class="enc-desc">
-        Multi-scale intensity, gradient, Laplacian, Hessian and texture
-        features at full resolution. Self-contained baseline.
-      </span>
-    </button>
+      @if (storage(); as st) {
+        <p-card styleClass="lab-card">
+          <ng-template pTemplate="title">Storage</ng-template>
+          <div class="rows">
+            <div class="row">
+              <span>Downloaded models</span>
+              <strong>{{ fmtBytes(st.modelBytes) }}</strong>
+            </div>
+            <div class="row">
+              <span>Saved features</span>
+              <strong>{{ fmtBytes(st.featureBytes) }}</strong>
+            </div>
+          </div>
+          <p-button
+            label="Clear saved features"
+            icon="pi pi-trash"
+            severity="secondary"
+            size="small"
+            [outlined]="true"
+            [disabled]="running() || st.featureFiles === 0"
+            (onClick)="clearCache()"
+          />
+        </p-card>
+      }
+    </div>
 
-    @for (enc of encoders(); track enc.id) {
-      <button
-        type="button"
-        class="enc"
-        [class.sel]="selectedEncoder() === enc.id"
-        [disabled]="!enc.cached"
-        (click)="enc.cached ? selectEncoder(enc.id) : null"
-      >
-        <div class="enc-main">
-          <span class="enc-name">{{ enc.name }}</span>
-          <p-tag [value]="enc.domain" severity="info" />
-          @if (enc.cached) {
-            <p-tag value="downloaded" severity="success" />
-          } @else {
-            <p-tag [value]="enc.approx_mb + ' MB'" severity="warn" />
+    <!-- ── Right column ────────────────────────────────────────────────── -->
+    <div class="col">
+      <p-card styleClass="lab-card">
+        <ng-template pTemplate="title">Features</ng-template>
+        <button
+          type="button"
+          class="enc"
+          [class.sel]="selectedEncoder() === null"
+          (click)="selectEncoder(null)"
+        >
+          <div class="enc-main">
+            <span class="enc-name">Built-in features</span>
+            <p-tag value="No download" severity="success" />
+          </div>
+          <span class="enc-desc">Fast, works offline, no setup.</span>
+        </button>
+
+        @for (enc of encoders(); track enc.id) {
+          <button
+            type="button"
+            class="enc"
+            [class.sel]="selectedEncoder() === enc.id"
+            [disabled]="!enc.cached"
+            (click)="enc.cached ? selectEncoder(enc.id) : null"
+          >
+            <div class="enc-main">
+              <span class="enc-name">{{ enc.name }}</span>
+              @if (enc.cached) {
+                <p-tag value="Ready" severity="success" />
+              } @else {
+                <p-tag [value]="enc.approx_mb + ' MB'" severity="warn" />
+              }
+            </div>
+            <span class="enc-desc">{{ enc.description }}</span>
+            @if (!enc.cached) {
+              <p-button
+                label="Download"
+                icon="pi pi-download"
+                size="small"
+                [loading]="downloading() === enc.id"
+                (onClick)="download(enc); $event.stopPropagation()"
+              />
+            }
+          </button>
+        }
+      </p-card>
+
+      <p-card styleClass="lab-card">
+        <ng-template pTemplate="title">Settings</ng-template>
+        <div class="fields">
+          <label class="field">
+            <span class="f-label">Image size</span>
+            <input type="number" [(ngModel)]="workingSize" min="64" max="1024" step="64" />
+            <span class="f-hint">Larger is more detailed and slower.</span>
+          </label>
+          <label class="field">
+            <span class="f-label">Samples per image</span>
+            <input type="number" [(ngModel)]="patchesPerFrame" min="4" max="256" step="4" />
+            <span class="f-hint">Raise it if results look coarse.</span>
+          </label>
+          <label class="field">
+            <span class="f-label">Training passes</span>
+            <input type="number" [(ngModel)]="epochs" min="1" max="500" />
+            <span class="f-hint">More passes take longer.</span>
+          </label>
+        </div>
+
+        <label class="toggle">
+          <input type="checkbox" [(ngModel)]="cacheFeatures" />
+          <span>
+            <strong>Save features to disk</strong>
+            <span class="f-hint">Makes later runs on the same images much faster.</span>
+          </span>
+        </label>
+      </p-card>
+
+      <p-card styleClass="lab-card">
+        <ng-template pTemplate="title">Train</ng-template>
+        <div class="actions">
+          <p-button
+            label="Train model"
+            icon="pi pi-bolt"
+            [disabled]="!canRun()"
+            [loading]="running() && job() === 'train'"
+            (onClick)="trainModel()"
+          />
+          @if (running()) {
+            <p-button
+              [label]="stopping() ? 'Stopping…' : 'Stop'"
+              icon="pi pi-stop-circle"
+              severity="danger"
+              [outlined]="true"
+              [disabled]="stopping()"
+              (onClick)="stop()"
+            />
           }
         </div>
-        <span class="enc-desc">{{ enc.description }}</span>
-        <span class="enc-meta">
-          patch {{ enc.patch }} · {{ enc.embed_dim }} dims ·
-          {{ enc.input_size }}px · {{ enc.repo_id }}
-        </span>
-        @if (!enc.cached) {
-          <p-button
-            label="Download"
-            icon="pi pi-download"
-            size="small"
-            [loading]="downloading() === enc.id"
-            (onClick)="download(enc); $event.stopPropagation()"
-          />
+
+        @if (model(); as m) {
+          <div class="result">
+            <div class="rows">
+              <div class="row">
+                <span>Accuracy on unseen images</span>
+                <strong>{{ fmt(m.metrics.meanDice) }}</strong>
+              </div>
+              <div class="row">
+                <span>Trained on</span>
+                <strong>{{ m.trainFrames }} images</strong>
+              </div>
+            </div>
+            <p class="muted">
+              Apply it to a frame from the editor toolbar. Training again
+              replaces it.
+            </p>
+          </div>
         }
-      </button>
-    }
-  </p-card>
 
-  <!-- Run -->
-  <p-card styleClass="lab-card">
-    <ng-template pTemplate="title">Run</ng-template>
-    <div class="opts">
-      <label>
-        Working size
-        <input type="number" [(ngModel)]="workingSize" min="64" max="1024" step="64" />
-      </label>
-      <label>
-        Patches / frame
-        <input type="number" [(ngModel)]="patchesPerFrame" min="4" max="256" step="4" />
-      </label>
-      <label class="opt-check">
-        <input type="checkbox" [(ngModel)]="cacheFeatures" />
-        Cache features
-      </label>
-    </div>
-
-    @if (labels().length) {
-      <p class="muted hint">
-        Labels to predict. Every extra class competes in the softmax, so a label
-        you are not working on costs accuracy on the ones you are.
-      </p>
-      <div class="opts">
-        @for (l of labels(); track l.id) {
-          <label class="opt-check">
-            <input
-              type="checkbox"
-              [checked]="selectedLabels().has(l.id)"
-              (change)="toggleLabel(l.id)"
-            />
-            {{ l.name }}
-          </label>
+        @if (error(); as e) {
+          <p class="err">{{ e }}</p>
         }
-      </div>
-    }
-
-    <div class="opts">
-      <label>
-        Epochs
-        <input type="number" [(ngModel)]="epochs" min="1" max="500" />
-      </label>
-      <label>
-        Draws / budget
-        <input type="number" [(ngModel)]="curveRepeats" min="1" max="10" />
-      </label>
+      </p-card>
     </div>
-
-    <div class="actions">
-      <p-button
-        label="Train model"
-        icon="pi pi-bolt"
-        [disabled]="!canRun()"
-        [loading]="running() && job() === 'train'"
-        (onClick)="trainModel()"
-      />
-      <p-button
-        label="Run learning curve"
-        icon="pi pi-chart-line"
-        severity="secondary"
-        [disabled]="!canRun()"
-        [loading]="running() && job() === 'curve'"
-        (onClick)="run()"
-      />
-      @if (running()) {
-        <p-button
-          [label]="stopping() ? 'Stopping after this epoch…' : 'Stop'"
-          icon="pi pi-stop-circle"
-          severity="danger"
-          [outlined]="true"
-          [disabled]="stopping()"
-          (onClick)="stop()"
-        />
-      }
-    </div>
-    <p class="muted hint">
-      <strong>Train model</strong> fits one head on every frame and keeps it for
-      per-frame prediction. <strong>Learning curve</strong> retrains at
-      increasing budgets to show how quality scales — slower, and it does not
-      leave a usable model behind.
-    </p>
-
-    @if (error(); as e) {
-      <p class="err">{{ e }}</p>
-    }
-  </p-card>
-
-  <!-- Storage -->
-  @if (storage(); as st) {
-    <p-card styleClass="lab-card">
-      <ng-template pTemplate="title">Storage</ng-template>
-      <div class="stats">
-        <div class="stat">
-          <span class="v">{{ fmtBytes(st.modelBytes) }}</span>
-          <span class="k">encoder weights</span>
-        </div>
-        <div class="stat">
-          <span class="v">{{ fmtBytes(st.featureBytes) }}</span>
-          <span class="k">cached features ({{ st.featureFiles }} files)</span>
-        </div>
-      </div>
-      <p class="muted">
-        Kept in local app data, never in the .dida — so features never travel
-        with a shared project. Clearing them only costs recomputation.
-      </p>
-      <div class="actions">
-        <p-button
-          label="Clear feature cache"
-          icon="pi pi-trash"
-          severity="secondary"
-          [outlined]="true"
-          [disabled]="running() || st.featureFiles === 0"
-          (onClick)="clearCache()"
-        />
-      </div>
-    </p-card>
-  }
-
-  <!-- Trained model -->
-  @if (model(); as m) {
-    <p-card styleClass="lab-card">
-      <ng-template pTemplate="title">Current model</ng-template>
-      <div class="stats">
-        <div class="stat">
-          <span class="v">{{ fmt(m.metrics.meanDice) }}</span>
-          <span class="k">held-out mean Dice</span>
-        </div>
-        <div class="stat">
-          <span class="v">{{ fmt(m.metrics.accuracy) }}</span>
-          <span class="k">accuracy</span>
-        </div>
-        <div class="stat">
-          <span class="v">{{ m.trainFrames }}</span>
-          <span class="k">frames trained on</span>
-        </div>
-        <div class="stat">
-          <span class="v">{{ m.featureDim }}</span>
-          <span class="k">features</span>
-        </div>
-      </div>
-      <p class="muted">
-        Feature source: {{ m.encoder ?? 'local basis only' }} · trained on
-        {{ m.device }}. The head is held in memory for this session — apply it
-        per frame from the editor, or retrain after annotating more.
-      </p>
-    </p-card>
-  }
-
-  <!-- Results -->
-  @if (report(); as r) {
-    <p-card styleClass="lab-card">
-      <ng-template pTemplate="title">Learning curve</ng-template>
-      <p class="muted">
-        {{ r.trainFrames }} training frames · {{ r.valFrames }} held-out frames ·
-        {{ r.featureDim }} features ·
-        {{ r.encoder ?? 'local basis only' }}
-      </p>
-
-      @if (chart(); as c) {
-        <div class="chart-wrap">
-          <svg [attr.viewBox]="'0 0 ' + c.w + ' ' + c.h" class="chart">
-            @for (t of c.yTicks; track t.label) {
-              <line
-                [attr.x1]="t.x1" [attr.y1]="t.y"
-                [attr.x2]="t.x2" [attr.y2]="t.y"
-                class="grid"
-              />
-              <text [attr.x]="c.padL - 8" [attr.y]="t.y + 4" class="tick">
-                {{ t.label }}
-              </text>
-            }
-            @if (hasSpread()) {
-              <polygon [attr.points]="c.band" class="band" />
-            }
-            <polyline [attr.points]="c.meanPts" class="line" />
-            @for (d of c.dots; track d.label) {
-              <circle [attr.cx]="d.cx" [attr.cy]="d.cy" r="4" class="dot" />
-              <text [attr.x]="d.lx" [attr.y]="d.ly" class="xlabel">
-                {{ d.label }}
-              </text>
-            }
-          </svg>
-          <p class="axis-note">
-            annotated frames (x) · mean Dice on held-out frames (y)
-            @if (hasSpread()) {
-              — shaded band spans best/worst draw
-            }
-          </p>
-        </div>
-      }
-
-      <p-table [value]="rows()" styleClass="p-datatable-sm">
-        <ng-template pTemplate="header">
-          <tr>
-            <th>Frames</th>
-            <th>Mean Dice</th>
-            <th>Worst</th>
-            <th>Best</th>
-            <th>Accuracy</th>
-            <th>Draws</th>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-row>
-          <tr>
-            <td>{{ row.nFrames }}</td>
-            <td><strong>{{ fmt(row.mean) }}</strong></td>
-            <td>{{ fmt(row.min) }}</td>
-            <td>{{ fmt(row.max) }}</td>
-            <td>{{ fmt(row.accuracy) }}</td>
-            <td>{{ row.runs }}</td>
-          </tr>
-        </ng-template>
-      </p-table>
-
-      <p class="muted foot">
-        Dice is averaged over classes present in each held-out reference;
-        classes absent from the reference are excluded rather than scored as a
-        free 1.0. Scores come from held-out <em>frames</em>, never held-out
-        pixels of a frame the head trained on.
-      </p>
-    </p-card>
-  }
   </div>
 </div>

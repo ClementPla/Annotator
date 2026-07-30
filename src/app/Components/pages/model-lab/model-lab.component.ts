@@ -292,6 +292,12 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     }
   }
 
+  // TODO(remove): the learning-curve sweep is a development diagnostic, not an
+  // end-user feature — it retrains at increasing dataset sizes to characterise
+  // how quality scales and leaves no usable model behind. Its button has been
+  // taken out of the page; `run`, `report`, `chart` and `curveRepeats` here and
+  // `ml_run_learning_curve` in the backend can go with it once the head's
+  // behaviour is settled and the numbers are no longer needed.
   async run(): Promise<void> {
     this.begin('curve');
     this.report.set(null);
