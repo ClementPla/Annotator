@@ -22,6 +22,7 @@ use crate::dl::model_manager::ensure_model_cached;
 use crate::storage::DbState;
 
 use super::dataset::{self, DatasetConfig};
+use super::filters;
 use super::encoder::EncoderSession;
 use super::predict::{self, MlState, PredictedFrame, ScribbleInput, TrainedModel};
 use super::registry;
@@ -203,6 +204,101 @@ fn ensure_encoder(
     Ok(())
 }
 
+/// Largest patches-per-frame that keeps the sample table inside a memory budget.
+///
+/// The table is dense `f32`, so it costs
+/// `patches * repeats * frames * (d + 1) * PATCH^2 * 4` bytes — linear in a
+/// number the user sets per *frame*, which makes it easy to ask for gigabytes
+/// without noticing. With an encoder attached `d` is ~410, and a laptop asked
+/// for 24 patches over 20 frames will allocate ~5 GB and freeze.
+///
+/// Budget is a fraction of what is *available*, not of what is installed: the
+/// rest of the app, the webview and the OS all need their share, and a machine
+/// that is already under pressure should train on less rather than tip over.
+fn patch_budget(requested: usize, frames: usize, repeats: usize, feature_dim: usize) -> usize {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_memory();
+    let available = sys.available_memory();
+    let cap = cap_for_budget(available, requested, frames, repeats, feature_dim);
+    if cap < requested {
+        println!(
+            "[ml] patches/frame {requested} -> {cap}: only {} MB free",
+            available / 1_048_576
+        );
+    }
+    cap
+}
+
+/// The arithmetic behind [`patch_budget`], split from the hardware probe so it
+/// can be tested. `available` is bytes of free RAM; 0 means "unknown".
+fn cap_for_budget(
+    available: u64,
+    requested: usize,
+    frames: usize,
+    repeats: usize,
+    feature_dim: usize,
+) -> usize {
+    if available == 0 || frames == 0 {
+        return requested; // Unknown memory: trust the user rather than guess.
+    }
+    // A third leaves room for the training tensors — a batch plus its
+    // activations — and for everything else the app is doing.
+    let budget = available / 3;
+    let per_patch = ((feature_dim + 1) * Samples::patch_pixels() * 4) as u64;
+    let cost_per_unit = per_patch * (repeats.max(1) * frames) as u64;
+    if cost_per_unit == 0 {
+        return requested;
+    }
+    // Never zero: a machine too small for one patch cannot train at all, and
+    // returning zero would produce a silently empty dataset rather than a slow
+    // one.
+    ((budget / cost_per_unit).max(1) as usize).min(requested)
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+
+    fn per_patch(d: usize) -> u64 {
+        ((d + 1) * Samples::patch_pixels() * 4) as u64
+    }
+
+    #[test]
+    fn a_roomy_machine_gets_what_it_asked_for() {
+        assert_eq!(cap_for_budget(64 << 30, 8, 20, 3, 410), 8);
+    }
+
+    #[test]
+    fn a_small_machine_is_capped_below_the_request() {
+        // 4 GB free -> ~1.33 GB budget. One patch per frame at d=410 over 20
+        // frames and 3 repeats already costs ~226 MB.
+        let cap = cap_for_budget(4 << 30, 8, 20, 3, 410);
+        assert!(cap < 8, "expected a cap below the request, got {cap}");
+        assert!(cap >= 1);
+        let table = per_patch(410) * (3 * 20) as u64 * cap as u64;
+        assert!(table <= (4u64 << 30) / 3, "capped table still exceeds budget");
+    }
+
+    #[test]
+    fn the_cap_never_reaches_zero() {
+        assert_eq!(cap_for_budget(1 << 20, 8, 500, 3, 410), 1);
+    }
+
+    #[test]
+    fn unknown_memory_defers_to_the_user() {
+        assert_eq!(cap_for_budget(0, 24, 20, 3, 410), 24);
+    }
+
+    #[test]
+    fn a_narrow_feature_stack_affords_more_patches() {
+        // The local basis alone is ~15x narrower than DINOv2; the budget should
+        // reflect that instead of punishing every configuration alike.
+        let wide = cap_for_budget(8 << 30, 64, 20, 3, 410);
+        let narrow = cap_for_budget(8 << 30, 64, 20, 3, 27);
+        assert!(narrow > wide, "narrow={narrow} should exceed wide={wide}");
+    }
+}
+
 fn build_split(
     app: &AppHandle,
     db: &DbState,
@@ -234,9 +330,30 @@ fn build_split(
     let n_val = ((shuffled.len() as f32 * val_fraction).round() as usize).clamp(1, shuffled.len() - 1);
     let (val_ids, train_ids) = shuffled.split_at(n_val);
 
+    // Feature width is knowable before a single frame is built: the local basis
+    // is a fixed function of the input channels, and the encoder's width comes
+    // from the catalog. Computing it here means the memory budget is exact
+    // rather than a guess that could still let the machine tip over.
+    let colour_channels = 3; // assume colour: the wider, safer case
+    let local_dim = filters::FilterBankConfig::default().output_channels(colour_channels);
+    let encoder_dim = options
+        .encoder_id
+        .as_deref()
+        .and_then(registry::find)
+        .map(|s| s.embed_dim)
+        .unwrap_or(0);
+    let est_dim = local_dim + encoder_dim + crate::commands::ml::scribble::SCRIBBLE_CHANNELS;
+    let repeats = options.augment_repeats.unwrap_or(3).max(1);
+    let requested_patches = patch_budget(
+        options.patches_per_frame.unwrap_or(8),
+        train_ids.len(),
+        repeats,
+        est_dim,
+    );
+
     let ds = DatasetConfig {
         working_size: options.working_size.unwrap_or(384),
-        patches_per_frame: options.patches_per_frame.unwrap_or(8),
+        patches_per_frame: requested_patches,
         repeats: options.augment_repeats.unwrap_or(3).max(1),
         seed,
         ..Default::default()
@@ -459,10 +576,14 @@ pub fn ml_train_model(
     // Clear before building the split: a stop requested against a previous run
     // must not cancel this one before it has trained a single epoch.
     state.cancel.store(false, Ordering::Relaxed);
-    let split = build_split(&app, &db, &state, &options)?;
+    let mut split = build_split(&app, &db, &state, &options)?;
+    // Move each frame's patches into the pooled table and drop it immediately.
+    // Borrowing kept `per_frame` alive alongside a full copy, so peak memory was
+    // twice the dataset — on a laptop that is the difference between training
+    // and swapping to a halt. A single fit has no use for the per-frame split.
     let mut all = Samples::new(split.feature_dim);
-    for s in &split.per_frame {
-        all.extend(s);
+    for s in std::mem::take(&mut split.per_frame) {
+        all.extend(&s);
     }
 
     let (head, metrics) = train::train_head_with(
