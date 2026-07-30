@@ -13,9 +13,18 @@ pub struct Region {
     /// x, y, width, height in image pixels.
     pub bbox: [f64; 4],
     pub area: u32,
-    /// Outer contour rings, image-pixel coordinates.
+    /// Contour rings, image-pixel coordinates. One ring per outer contour, with
+    /// any enclosed holes bridged into it (see [`bridge_hole`]).
     pub polygons: Vec<Vec<[f64; 2]>>,
 }
+
+/// Minimum enclosed area (px²) for a hole to be cut out of its region.
+///
+/// A contour traced around a single stray background pixel encloses 4 px²; a 2x2
+/// hole encloses 9. A predicted mask is speckled with one-pixel dropouts that are
+/// noise rather than anatomy, and each one kept would add a bridge corridor to
+/// the ring for no gain.
+const MIN_HOLE_AREA: f64 = 8.0;
 
 /// Split a label's value mask into per-object regions.
 ///
@@ -79,22 +88,31 @@ fn region_from_binary(bin: &[u8], w: u32, h: u32) -> Option<Region> {
     }
 
     let img = GrayImage::from_raw(w, h, bin.to_vec())?;
+    let contours = find_contours::<u32>(&img);
     let mut polygons = Vec::new();
-    for c in find_contours::<u32>(&img) {
-        if c.border_type == BorderType::Outer && c.points.len() >= 3 {
-            let ring: Vec<[f64; 2]> =
-                c.points.iter().map(|p| [p.x as f64, p.y as f64]).collect();
-            // Keep the raw ring when simplification collapses it. Douglas-Peucker
-            // at this tolerance flattens a small component — a 2x2 blob and
-            // anything near it — to fewer than three points, and dropping the
-            // result made whole regions disappear rather than merely lose
-            // detail. A region that exists should always produce a polygon.
-            let simplified = douglas_peucker(&ring, 1.5);
-            let out = if simplified.len() >= 3 { simplified } else { ring };
-            if out.len() >= 3 {
-                polygons.push(out);
-            }
+    for (i, c) in contours.iter().enumerate() {
+        if c.border_type != BorderType::Outer {
+            continue;
         }
+        let Some(mut ring) = simplify_ring(contour_ring(c)) else {
+            continue;
+        };
+        // Cut out the background this contour encloses. A predicted mask produces
+        // ring-shaped structures and interior gaps far more often than a hand
+        // traced one does, and without this a donut came back as a solid disc.
+        for hole in contours
+            .iter()
+            .filter(|hc| hc.border_type == BorderType::Hole && hc.parent == Some(i))
+        {
+            let Some(hring) = simplify_ring(contour_ring(hole)) else {
+                continue;
+            };
+            if ring_area(&hring) < MIN_HOLE_AREA {
+                continue;
+            }
+            ring = bridge_hole(&ring, &hring);
+        }
+        polygons.push(ring);
     }
 
     Some(Region {
@@ -108,6 +126,70 @@ fn region_from_binary(bin: &[u8], w: u32, h: u32) -> Option<Region> {
         area,
         polygons,
     })
+}
+
+/// A traced contour as image-pixel points.
+fn contour_ring(c: &imageproc::contours::Contour<u32>) -> Vec<[f64; 2]> {
+    c.points.iter().map(|p| [p.x as f64, p.y as f64]).collect()
+}
+
+/// Simplify a contour ring, or `None` when it cannot form a polygon at all.
+///
+/// Keeps the raw ring when simplification collapses it. Douglas-Peucker at this
+/// tolerance flattens a small component — a 2x2 blob and anything near it — to
+/// fewer than three points, and dropping the result made whole regions disappear
+/// rather than merely lose detail. A region that exists should always produce a
+/// polygon.
+fn simplify_ring(ring: Vec<[f64; 2]>) -> Option<Vec<[f64; 2]>> {
+    let simplified = douglas_peucker(&ring, 1.5);
+    let out = if simplified.len() >= 3 { simplified } else { ring };
+    (out.len() >= 3).then_some(out)
+}
+
+/// Enclosed area of a closed ring (shoelace, unsigned so winding is irrelevant).
+fn ring_area(ring: &[[f64; 2]]) -> f64 {
+    if ring.len() < 3 {
+        return 0.0;
+    }
+    let mut acc = 0.0;
+    for i in 0..ring.len() {
+        let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+        acc += a[0] * b[1] - b[0] * a[1];
+    }
+    (acc / 2.0).abs()
+}
+
+/// Splice `hole` into `outer` as a single closed ring, joined by a zero-width
+/// corridor between their closest pair of vertices.
+///
+/// Every consumer of these polygons fills by even-odd parity: the editor's SVG
+/// layer through `fill-rule="evenodd"`, this crate's rasterizer through scanline
+/// crossing counts, and pycocotools and the YOLO tooling likewise. Under that
+/// rule the spliced loop cancels and reads as a hole, and the corridor is crossed
+/// twice by any scanline that meets it, so it contributes nothing. That keeps a
+/// holed region a single flat list of points — all `VectorShape.nodes` can hold —
+/// instead of needing sub-paths threaded through storage, rendering,
+/// rasterization and export.
+fn bridge_hole(outer: &[[f64; 2]], hole: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    let (mut bi, mut bj, mut best) = (0usize, 0usize, f64::MAX);
+    for (i, o) in outer.iter().enumerate() {
+        for (j, p) in hole.iter().enumerate() {
+            let d = (o[0] - p[0]).powi(2) + (o[1] - p[1]).powi(2);
+            if d < best {
+                best = d;
+                bi = i;
+                bj = j;
+            }
+        }
+    }
+    let mut out = Vec::with_capacity(outer.len() + hole.len() + 2);
+    out.extend_from_slice(&outer[..=bi]);
+    out.extend(hole[bj..].iter().copied());
+    out.extend(hole[..bj].iter().copied());
+    out.push(hole[bj]); // close the hole loop
+    out.push(outer[bi]); // back down the corridor
+    out.extend(outer[bi + 1..].iter().copied());
+    out
 }
 
 /// Trace the outer contour(s) of the 8-connected, same-value component that
@@ -627,6 +709,112 @@ mod tests {
                     - xs.iter().cloned().fold(f64::MAX, f64::min)
             })
             .fold(0.0, f64::max)
+    }
+
+    /// Even-odd point-in-polygon, mirroring the scanline parity that
+    /// `commands::vector::fill_polygon` and the editor's SVG layer both use — so
+    /// these assertions test what the renderers will actually draw.
+    fn inside_evenodd(ring: &[[f64; 2]], x: f64, y: f64) -> bool {
+        let n = ring.len();
+        let mut inside = false;
+        for i in 0..n {
+            let (x1, y1) = (ring[i][0], ring[i][1]);
+            let (x2, y2) = (ring[(i + 1) % n][0], ring[(i + 1) % n][1]);
+            if (y1 <= y && y2 > y) || (y2 <= y && y1 > y) {
+                let t = (y - y1) / (y2 - y1);
+                if x1 + t * (x2 - x1) > x {
+                    inside = !inside;
+                }
+            }
+        }
+        inside
+    }
+
+    /// A filled disc of radius `r` centred on `(cx, cy)`, minus an optional
+    /// concentric bite of radius `hole`.
+    fn annulus(w: u32, h: u32, cx: f64, cy: f64, r: f64, hole: f64) -> Vec<u8> {
+        let mut m = vec![0u8; (w * h) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                let d = ((x as f64 - cx).powi(2) + (y as f64 - cy).powi(2)).sqrt();
+                if d <= r && d > hole {
+                    m[(y * w + x) as usize] = 1;
+                }
+            }
+        }
+        m
+    }
+
+    #[test]
+    fn a_donut_keeps_its_hole() {
+        let (w, h) = (48u32, 48u32);
+        let (c, r, hole) = (24.0, 16.0, 7.0);
+        let regions = regions_from_mask(&annulus(w, h, c, c, r, hole), w, h, false);
+        assert_eq!(regions.len(), 1, "the annulus is one connected component");
+        assert_eq!(regions[0].polygons.len(), 1, "outer and hole bridged into one ring");
+        let ring = &regions[0].polygons[0];
+
+        assert!(!inside_evenodd(ring, c, c), "the centre must read as background");
+        // Midway through the annulus wall, on each side of the centre.
+        let mid = (r + hole) / 2.0;
+        assert!(inside_evenodd(ring, c + mid, c), "the wall must read as foreground");
+        assert!(inside_evenodd(ring, c - mid, c), "the wall must read as foreground");
+        assert!(!inside_evenodd(ring, c, 1.0), "outside stays outside");
+    }
+
+    #[test]
+    fn two_holes_are_both_cut_out() {
+        let (w, h) = (60u32, 40u32);
+        let mut m = vec![1u8; (w * h) as usize];
+        // Clear the border so the block is not flush against the image edge.
+        for x in 0..w {
+            m[x as usize] = 0;
+            m[((h - 1) * w + x) as usize] = 0;
+        }
+        for y in 0..h {
+            m[(y * w) as usize] = 0;
+            m[(y * w + w - 1) as usize] = 0;
+        }
+        let punch = |m: &mut Vec<u8>, cx: u32, cy: u32| {
+            for y in cy - 3..=cy + 3 {
+                for x in cx - 3..=cx + 3 {
+                    m[(y * w + x) as usize] = 0;
+                }
+            }
+        };
+        punch(&mut m, 15, 20);
+        punch(&mut m, 45, 20);
+
+        let regions = regions_from_mask(&m, w, h, false);
+        assert_eq!(regions.len(), 1);
+        let ring = &regions[0].polygons[0];
+        assert!(!inside_evenodd(ring, 15.0, 20.0), "first hole");
+        assert!(!inside_evenodd(ring, 45.0, 20.0), "second hole");
+        assert!(inside_evenodd(ring, 30.0, 20.0), "the bar between them is solid");
+    }
+
+    #[test]
+    fn a_one_pixel_dropout_is_not_cut_out() {
+        // A stray missing pixel is prediction noise; cutting it out would add a
+        // bridge corridor to the ring for no visible gain.
+        let (w, h) = (32u32, 32u32);
+        let mut m = annulus(w, h, 16.0, 16.0, 12.0, 0.0);
+        m[(16 * w + 16) as usize] = 0;
+        let regions = regions_from_mask(&m, w, h, false);
+        assert_eq!(regions[0].polygons.len(), 1);
+        assert!(
+            inside_evenodd(&regions[0].polygons[0], 16.0, 16.0),
+            "a single-pixel dropout must stay filled"
+        );
+    }
+
+    #[test]
+    fn a_solid_blob_is_unchanged_by_hole_handling() {
+        let (w, h) = (32u32, 32u32);
+        let regions = regions_from_mask(&annulus(w, h, 16.0, 16.0, 10.0, 0.0), w, h, false);
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].polygons.len(), 1);
+        assert!(inside_evenodd(&regions[0].polygons[0], 16.0, 16.0));
     }
 
     #[test]

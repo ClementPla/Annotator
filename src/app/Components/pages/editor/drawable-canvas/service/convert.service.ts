@@ -143,7 +143,11 @@ export class ConvertService {
     let pad: number;
     if (filled) {
       ctx.fillStyle = '#ffffff';
-      ctx.fill(path);
+      // 'evenodd', not the Canvas default 'nonzero': a traced region carries its
+      // holes as loops spliced into the same ring (see `bridge_hole` in the Rust
+      // geometry module), and nonzero winding would fill them back in. Matches
+      // the vector layer's `fill-rule="evenodd"`, so what burns is what is drawn.
+      ctx.fill(path, 'evenodd');
       pad = 1;
     } else {
       ctx.strokeStyle = '#ffffff';
