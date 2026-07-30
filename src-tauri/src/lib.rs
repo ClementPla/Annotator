@@ -84,6 +84,28 @@ pub fn run() {
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_dialog::init());
 
+    // A release build is `windows_subsystem = "windows"`, so it has no console
+    // and every `println!` in the app goes nowhere. That made the installed
+    // build undiagnosable — the accelerator it chose, whether the feature cache
+    // was reused, why an encoder fell back — all of it visible under
+    // `tauri dev` and invisible to anyone running the shipped app.
+    //
+    // Log to a file as well as stdout so a user can send the record of a run.
+    // Rotates rather than growing without bound; the ML module is chatty.
+    let app = app.plugin(
+        tauri_plugin_log::Builder::new()
+            .level(log::LevelFilter::Info)
+            .max_file_size(5_000_000)
+            .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::LogDir { file_name: None },
+            ))
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::Stdout,
+            ))
+            .build(),
+    );
+
     // Auto-update from GitHub releases (desktop only; the updater/process
     // plugins don't apply on mobile).
     #[cfg(desktop)]

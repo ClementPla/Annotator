@@ -58,7 +58,7 @@ fn attach_accelerator(
                 Ok(true) => match ep.register(&mut b) {
                     Ok(()) => return (b, $label),
                     Err(e) => {
-                        println!("[ml] {} present but failed to register: {e}", $label);
+                        log::warn!("[ml] {} present but failed to register: {e}", $label);
                     }
                 },
                 _ => {}
@@ -141,14 +141,14 @@ impl EncoderSession {
         };
         *ACTIVE_ACCELERATOR.lock() = accel;
         if accel == "CPU" {
-            println!(
+            log::info!(
                 "[ml] encoder session — running on CPU. For NVIDIA acceleration \
                  ort needs cuDNN 9 (cudnn64_9.dll) on PATH alongside the CUDA \
                  runtime; without it the CUDA provider reports as available but \
                  fails to load."
             );
         } else {
-            println!("[ml] encoder session — accelerator: {accel}");
+            log::info!("[ml] encoder session — accelerator: {accel}");
         }
 
         let session = builder
@@ -216,7 +216,7 @@ impl EncoderSession {
             Ok(out) => Ok(out),
             Err(e) if !self.cpu_only => {
                 let accel = detect_accelerator();
-                println!(
+                log::info!(
                     "[ml] encoder failed on {accel} ({e}); reopening on CPU. \
                      This graph's dynamic shapes are not supported by that \
                      provider — for NVIDIA acceleration install cuDNN 9 so the \
@@ -461,7 +461,7 @@ mod tests {
 
         let (d, gh, gw) = probe_graph(std::path::Path::new(&path), spec)
             .unwrap_or_else(|e| panic!("{id} failed to load: {e}"));
-        println!("[probe] {id} -> [{d}, {gh}, {gw}]");
+        log::info!("[probe] {id} -> [{d}, {gh}, {gw}]");
         assert_eq!((gh, gw), (expect, expect), "{id}: unexpected grid");
     }
 }

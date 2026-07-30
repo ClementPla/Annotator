@@ -134,7 +134,7 @@ fn load_inner(dir: &Path, key: &Key) -> Option<Array3<f32>> {
 /// be written is a slower app, not a broken one.
 pub fn store(dir: &Path, key: &Key, value: &Array3<f32>) {
     if let Err(e) = fs::create_dir_all(dir) {
-        println!("[ml] feature cache unavailable ({e})");
+        log::warn!("[ml] feature cache unavailable ({e})");
         return;
     }
     let (d, h, w) = (value.shape()[0], value.shape()[1], value.shape()[2]);

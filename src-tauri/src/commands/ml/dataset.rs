@@ -180,7 +180,7 @@ fn vector_masks(
         // run: skip it the way an unreadable mask would be skipped.
         let Ok(shapes) = serde_json::from_str::<Vec<crate::commands::vector::VectorShape>>(&json)
         else {
-            println!("[ml] frame {frame_id}: unreadable vector shapes for label {label_id}, skipped");
+            log::warn!("[ml] frame {frame_id}: unreadable vector shapes for label {label_id}, skipped");
             continue;
         };
         if shapes.is_empty() {

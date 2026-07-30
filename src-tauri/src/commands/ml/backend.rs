@@ -116,9 +116,9 @@ pub fn cuda_works() -> bool {
         .is_ok();
         std::panic::set_hook(prev);
         if ok {
-            println!("[ml] CUDA backend available — head will train on the GPU");
+            log::info!("[ml] CUDA backend available — head will train on the GPU");
         } else {
-            println!(
+            log::info!(
                 "[ml] CUDA backend unavailable (no device, driver, or NVRTC) — \
                  falling back to CPU"
             );

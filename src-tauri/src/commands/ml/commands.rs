@@ -231,7 +231,7 @@ fn patch_budget(requested: usize, frames: usize, repeats: usize, feature_dim: us
     let available = sys.available_memory();
     let cap = cap_for_budget(available, requested, frames, repeats, feature_dim);
     if cap < requested {
-        println!(
+        log::info!(
             "[ml] patches/frame {requested} -> {cap}: only {} MB free",
             available / 1_048_576
         );
@@ -428,7 +428,7 @@ fn build_split(
         }
         done += 1;
         spent_ms += ms;
-        println!("[ml] features val frame {fid} — {ms:.0} ms ({done}/{total})");
+        log::info!("[ml] features val frame {fid} — {ms:.0} ms ({done}/{total})");
         emit_avg(app, "features", done, total, ms, spent_ms / done as f32);
     }
 
@@ -444,7 +444,7 @@ fn build_split(
         }
         done += 1;
         spent_ms += ms;
-        println!("[ml] features train frame {fid} — {ms:.0} ms ({done}/{total})");
+        log::info!("[ml] features train frame {fid} — {ms:.0} ms ({done}/{total})");
         emit_avg(app, "features", done, total, ms, spent_ms / done as f32);
     }
 
@@ -453,7 +453,7 @@ fn build_split(
     // opening the ONNX session, which a fresh process always pays — is invisible.
     let (hits, misses) = super::cache::stats();
     if hits + misses > 0 {
-        println!("[ml] feature cache — {hits} reused, {misses} computed");
+        log::info!("[ml] feature cache — {hits} reused, {misses} computed");
     }
 
     if per_frame.is_empty() {
@@ -650,7 +650,7 @@ pub fn ml_train_model(
     // already paid for the fit, and a model they can use this session is worth
     // more than an error that discards it because the file was read-only.
     if let Err(e) = store_model(&db, &model, cfg.hidden, cfg.depth) {
-        println!("[ml] could not save the model to the project: {e}");
+        log::warn!("[ml] could not save the model to the project: {e}");
     }
     *state.model.lock() = Some(model);
 
@@ -683,7 +683,7 @@ fn store_model(
     let bytes = weights.len();
     db.with_conn(|conn| queries::save_ml_model(conn, &json, &weights))
         .map_err(|e| e.to_string())?;
-    println!("[ml] model saved to the project ({} KB)", bytes / 1024);
+    log::info!("[ml] model saved to the project ({} KB)", bytes / 1024);
     Ok(())
 }
 
@@ -699,14 +699,14 @@ pub fn ml_load_saved_model(db: State<DbState>, state: State<MlState>) -> Option<
     let meta: persist::ModelMeta = match serde_json::from_str(&json) {
         Ok(m) => m,
         Err(e) => {
-            println!("[ml] stored model metadata is unreadable ({e}); ignoring it");
+            log::warn!("[ml] stored model metadata is unreadable ({e}); ignoring it");
             return None;
         }
     };
     let head = match persist::decode_head(weights, &meta) {
         Ok(h) => h,
         Err(e) => {
-            println!("[ml] stored model could not be loaded ({e}); ignoring it");
+            log::warn!("[ml] stored model could not be loaded ({e}); ignoring it");
             return None;
         }
     };
@@ -720,7 +720,7 @@ pub fn ml_load_saved_model(db: State<DbState>, state: State<MlState>) -> Option<
         metrics: meta.metrics(),
         device: head.device().to_string(),
     };
-    println!(
+    log::info!(
         "[ml] restored a saved model — {} classes, trained on {} images",
         meta.classes, meta.train_frames
     );
@@ -758,7 +758,7 @@ pub fn ml_forget_model(db: State<DbState>, state: State<MlState>) -> Result<bool
 #[tauri::command]
 pub fn ml_stop_training(state: State<MlState>) {
     state.cancel.store(true, Ordering::Relaxed);
-    println!("[ml] stop requested — finishing the current epoch");
+    log::info!("[ml] stop requested — finishing the current epoch");
 }
 
 /// Everything Didascalie keeps in local app data, broken down.
@@ -795,7 +795,7 @@ pub fn ml_storage_usage(app: AppHandle) -> Result<StorageUsage, String> {
 pub fn ml_clear_feature_cache(app: AppHandle) -> Result<usize, String> {
     let dir = super::cache::cache_dir(&app)?;
     let n = super::cache::clear(&dir);
-    println!("[ml] cleared {n} cached feature tensors");
+    log::info!("[ml] cleared {n} cached feature tensors");
     Ok(n)
 }
 

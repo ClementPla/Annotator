@@ -485,7 +485,7 @@ fn fit<B: AutodiffBackend>(
     // leave. Foreground-biased *sampling* raises the positive rate but does not
     // remove the imbalance inside each patch; weighting the loss does.
     let weights = class_weights(&train.y, n_classes);
-    println!(
+    log::info!(
         "[ml] class balance {:?} -> weights {:?}",
         class_counts(&train.y, n_classes),
         weights.iter().map(|w| (w * 100.0).round() / 100.0).collect::<Vec<_>>()
@@ -504,7 +504,7 @@ fn fit<B: AutodiffBackend>(
     // indistinguishable from "training got slow" unless the number is visible.
     let table_mb =
         (train.n * train.d * Samples::patch_pixels() * std::mem::size_of::<f32>()) as f64 / 1e6;
-    println!(
+    log::info!(
         "[ml] fit start — device={} samples={} features={} classes={} hidden={}x{} \
          epochs={} batch={} steps={} table={:.0} MB",
         device_label,
@@ -526,7 +526,7 @@ fn fit<B: AutodiffBackend>(
         // is already the granularity progress is reported at, so the user never
         // waits longer than the interval they can see ticking.
         if stop() {
-            println!(
+            log::info!(
                 "[ml] fit stopped by request after {} of {} epochs — keeping the \
                  weights trained so far",
                 epoch, cfg.epochs
@@ -571,7 +571,7 @@ fn fit<B: AutodiffBackend>(
         let avg_ms = elapsed_ms / (epoch + 1) as f32;
         let loss = epoch_loss / batches_per_epoch.max(1) as f32;
 
-        println!(
+        log::info!(
             "[ml] epoch {}/{} — loss {:.4} — {:.0} ms (avg {:.0} ms)",
             epoch + 1,
             cfg.epochs,
@@ -598,7 +598,7 @@ fn fit<B: AutodiffBackend>(
             features: train.d,
         });
     }
-    println!(
+    log::info!(
         "[ml] fit done — {:.1} s",
         fit_start.elapsed().as_secs_f32()
     );
@@ -706,7 +706,7 @@ pub fn learning_curve_with(
             sub.seed = cfg.seed
                 .wrapping_add((budget as u64) << 32)
                 .wrapping_add(repeat as u64);
-            println!(
+            log::info!(
                 "[ml] curve point {}/{} — budget {} frames, draw {}",
                 point + 1,
                 total_points,
