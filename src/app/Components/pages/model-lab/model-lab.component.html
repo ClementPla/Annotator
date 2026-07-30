@@ -147,6 +147,28 @@
         <input type="checkbox" [(ngModel)]="cacheFeatures" />
         Cache features
       </label>
+    </div>
+
+    @if (labels().length) {
+      <p class="muted hint">
+        Labels to predict. Every extra class competes in the softmax, so a label
+        you are not working on costs accuracy on the ones you are.
+      </p>
+      <div class="opts">
+        @for (l of labels(); track l.id) {
+          <label class="opt-check">
+            <input
+              type="checkbox"
+              [checked]="selectedLabels().has(l.id)"
+              (change)="toggleLabel(l.id)"
+            />
+            {{ l.name }}
+          </label>
+        }
+      </div>
+    }
+
+    <div class="opts">
       <label>
         Epochs
         <input type="number" [(ngModel)]="epochs" min="1" max="500" />

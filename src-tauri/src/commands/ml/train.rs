@@ -301,6 +301,43 @@ pub fn predict_map(
     }
 }
 
+/// Supervised pixel count per class.
+fn class_counts(y: &[i32], n_classes: usize) -> Vec<usize> {
+    let mut counts = vec![0usize; n_classes];
+    for &c in y {
+        if c >= 0 && (c as usize) < n_classes {
+            counts[c as usize] += 1;
+        }
+    }
+    counts
+}
+
+/// Inverse-frequency class weights, as `total / (n_classes * count)`.
+///
+/// The "balanced" convention: a class holding its proportional share gets 1.0,
+/// rarer classes more. Capped, because a class present in a handful of pixels
+/// would otherwise earn a weight large enough to make the loss lurch and drown
+/// out everything else. A class with no pixels at all gets 1.0 — it never
+/// appears in a target, so the value is inert, and 0 would risk a NaN.
+fn class_weights(y: &[i32], n_classes: usize) -> Vec<f32> {
+    const MAX_WEIGHT: f32 = 50.0;
+    let counts = class_counts(y, n_classes);
+    let total: usize = counts.iter().sum();
+    if total == 0 || n_classes == 0 {
+        return vec![1.0; n_classes];
+    }
+    counts
+        .iter()
+        .map(|&c| {
+            if c == 0 {
+                1.0
+            } else {
+                (total as f32 / (n_classes as f32 * c as f32)).min(MAX_WEIGHT)
+            }
+        })
+        .collect()
+}
+
 /// Accuracy plus per-class Dice against a reference labelling.
 pub fn evaluate(pred: &[i32], truth: &[i32], n_classes: usize) -> EvalMetrics {
     if pred.is_empty() || pred.len() != truth.len() {
@@ -442,7 +479,20 @@ fn fit<B: AutodiffBackend>(
     let mut model =
         SegHead::<B>::with_depth(train.d, cfg.hidden, cfg.depth, n_classes, &device);
     let mut optim = AdamConfig::new().init();
-    let loss_fn = CrossEntropyLossConfig::new().init(&device);
+    // Weight classes by inverse frequency. Without this the loss is dominated by
+    // background — an optic disc is ~1% of a frame, so "predict background
+    // everywhere" scores ~99% accuracy and is a stable minimum the head will not
+    // leave. Foreground-biased *sampling* raises the positive rate but does not
+    // remove the imbalance inside each patch; weighting the loss does.
+    let weights = class_weights(&train.y, n_classes);
+    println!(
+        "[ml] class balance {:?} -> weights {:?}",
+        class_counts(&train.y, n_classes),
+        weights.iter().map(|w| (w * 100.0).round() / 100.0).collect::<Vec<_>>()
+    );
+    let loss_fn = CrossEntropyLossConfig::new()
+        .with_weights(Some(weights))
+        .init(&device);
     let mut rng = Rng::new(cfg.seed);
 
     let batch = cfg.batch.min(train.n).max(1);
@@ -716,6 +766,35 @@ mod tests {
             s.push_patch(&feats, &vec![cls; px]);
         }
         s
+    }
+
+    #[test]
+    fn rare_classes_outweigh_common_ones() {
+        // 95% background, 5% foreground — the shape that produced blank masks.
+        let mut y = vec![0i32; 95];
+        y.extend(std::iter::repeat(1).take(5));
+        let w = class_weights(&y, 2);
+        assert!(w[1] > w[0], "rare class must outweigh common: {w:?}");
+        // Balanced convention: a proportional class sits at 1.0.
+        assert!((w[0] - 100.0 / (2.0 * 95.0)).abs() < 1e-4, "{w:?}");
+    }
+
+    #[test]
+    fn a_balanced_split_leaves_weights_at_one() {
+        let y: Vec<i32> = (0..100).map(|i| (i % 2) as i32).collect();
+        for w in class_weights(&y, 2) {
+            assert!((w - 1.0).abs() < 1e-5, "balanced data should not reweight");
+        }
+    }
+
+    #[test]
+    fn weights_stay_finite_for_absent_and_tiny_classes() {
+        let mut y = vec![0i32; 10_000];
+        y.push(1); // one pixel of class 1; class 2 absent entirely
+        let w = class_weights(&y, 3);
+        assert!(w.iter().all(|v| v.is_finite() && *v > 0.0), "{w:?}");
+        assert!(w[1] <= 50.0, "weight must be capped, got {}", w[1]);
+        assert_eq!(w[2], 1.0, "absent class gets an inert weight");
     }
 
     #[test]

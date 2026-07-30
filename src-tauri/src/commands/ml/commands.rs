@@ -96,6 +96,14 @@ pub struct CurveOptions {
     pub patches_per_frame: Option<usize>,
     /// Persist encoder features to local app data between runs.
     pub cache_features: Option<bool>,
+    /// Labels to train on. Omit for every label in the project.
+    ///
+    /// Each label the head predicts is another output class competing in the
+    /// softmax, and a label the annotator never drew contributes only dilution:
+    /// it can never be the argmax anywhere, but it still takes probability mass
+    /// away from the ones that can. Narrowing to the labels actually being
+    /// worked on is the cheapest way to sharpen a small head.
+    pub label_ids: Option<Vec<i64>>,
     pub augment_repeats: Option<usize>,
     pub budgets: Option<Vec<usize>>,
     pub curve_repeats: Option<usize>,
@@ -306,9 +314,18 @@ fn build_split(
     options: &CurveOptions,
 ) -> Result<Split, String> {
     let frames = dataset::annotated_frame_ids(db)?;
-    let order = dataset::label_order(&db)?;
+    let mut order = dataset::label_order(&db)?;
     if order.is_empty() {
         return Err("this project defines no segmentation labels".into());
+    }
+    if let Some(wanted) = options.label_ids.as_ref().filter(|w| !w.is_empty()) {
+        // Preserve project order rather than the order the request listed them
+        // in: class index is position + 1, and a head is only meaningful against
+        // the mapping it was fitted with.
+        order.retain(|id| wanted.contains(id));
+        if order.is_empty() {
+            return Err("none of the selected labels exist in this project".into());
+        }
     }
     if frames.len() < 2 {
         return Err(format!(

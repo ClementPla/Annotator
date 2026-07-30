@@ -323,6 +323,7 @@ export interface CurveOptions {
   workingSize?: number;
   patchesPerFrame?: number;
   cacheFeatures?: boolean;
+  labelIds?: number[];
   augmentRepeats?: number;
   budgets?: number[];
   curveRepeats?: number;

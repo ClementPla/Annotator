@@ -26,6 +26,7 @@ import {
   EncoderStatus,
   MlProgress,
   TrainSummary,
+  LabelId,
   StorageUsage,
   TrainTick,
 } from '../../../lib/api';
@@ -79,6 +80,9 @@ export class ModelLabComponent implements OnInit, OnDestroy {
    * derived image data to disk, which should be the user's choice. */
   cacheFeatures = localStorage.getItem('dida.ml.cacheFeatures') === '1';
   readonly storage = signal<StorageUsage | null>(null);
+  /** Labels the head will predict. Empty = every label in the project. */
+  readonly labels = signal<LabelId[]>([]);
+  readonly selectedLabels = signal<Set<number>>(new Set());
   readonly model = signal<TrainSummary | null>(null);
   /** Rolling loss history for the current fit, for a sparkline. */
   readonly lossHistory = signal<number[]>([]);
@@ -141,6 +145,13 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       this.encoders.set(encoders);
       this.summary.set(summary);
       this.model.set(await api.mlModelStatus());
+      const labels = await api.listLabels();
+      this.labels.set(labels);
+      // Default to everything: a first run should train on what is there rather
+      // than silently on nothing.
+      if (!this.selectedLabels().size) {
+        this.selectedLabels.set(new Set(labels.map((l) => l.id)));
+      }
       await this.refreshStorage();
     } catch (e) {
       this.error.set(String(e));
@@ -193,6 +204,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       workingSize: this.workingSize,
       patchesPerFrame: this.patchesPerFrame,
       cacheFeatures: this.persistCacheChoice(),
+      labelIds: [...this.selectedLabels()],
       epochs: this.epochs,
       curveRepeats: this.curveRepeats,
     };
@@ -240,6 +252,12 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   private persistCacheChoice(): boolean {
     localStorage.setItem('dida.ml.cacheFeatures', this.cacheFeatures ? '1' : '0');
     return this.cacheFeatures;
+  }
+
+  toggleLabel(id: number): void {
+    const next = new Set(this.selectedLabels());
+    if (!next.delete(id)) next.add(id);
+    this.selectedLabels.set(next);
   }
 
   async refreshStorage(): Promise<void> {
