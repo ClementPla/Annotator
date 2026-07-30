@@ -596,6 +596,9 @@ pub fn ml_train_model(
     // Borrowing kept `per_frame` alive alongside a full copy, so peak memory was
     // twice the dataset — on a laptop that is the difference between training
     // and swapping to a halt. A single fit has no use for the per-frame split.
+    // Read the count *before* draining: taking the vector empties it, and the
+    // summary below is built afterwards.
+    let train_frames = split.per_frame.len();
     let mut all = Samples::new(split.feature_dim);
     for s in std::mem::take(&mut split.per_frame) {
         all.extend(&s);
@@ -611,7 +614,7 @@ pub fn ml_train_model(
     )?;
 
     let summary = TrainSummary {
-        train_frames: split.per_frame.len(),
+        train_frames,
         val_frames: split.val_frames,
         feature_dim: split.feature_dim,
         classes: split.classes,
@@ -628,7 +631,7 @@ pub fn ml_train_model(
         encoder_id: options.encoder_id.clone(),
         working_size: options.working_size.unwrap_or(384),
         metrics,
-        train_frames: split.per_frame.len(),
+        train_frames,
     });
 
     Ok(summary)
