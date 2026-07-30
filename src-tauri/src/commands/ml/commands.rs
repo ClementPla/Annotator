@@ -409,6 +409,7 @@ fn build_split(
         scribble_dropout: 0.0,
         ..ds.clone()
     };
+    super::cache::reset_stats();
     let mut val = Samples::new(0);
     let mut feature_dim = 0usize;
     for &fid in val_ids {
@@ -443,6 +444,14 @@ fn build_split(
         spent_ms += ms;
         println!("[ml] features train frame {fid} — {ms:.0} ms ({done}/{total})");
         emit_avg(app, "features", done, total, ms, spent_ms / done as f32);
+    }
+
+    // Say plainly whether the encoder cache was reused. Without this line a slow
+    // run looks like a cold cache even when every frame hit, and the real cost —
+    // opening the ONNX session, which a fresh process always pays — is invisible.
+    let (hits, misses) = super::cache::stats();
+    if hits + misses > 0 {
+        println!("[ml] feature cache — {hits} reused, {misses} computed");
     }
 
     if per_frame.is_empty() {

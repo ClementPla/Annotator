@@ -25,8 +25,27 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ndarray::Array3;
+
+/// Hit/miss tally for the current run.
+///
+/// Purely diagnostic, but it earns its keep: "the cache is not being reused"
+/// is otherwise indistinguishable from "the cache is reused and the run is slow
+/// for another reason", and the difference decides where to look.
+static HITS: AtomicUsize = AtomicUsize::new(0);
+static MISSES: AtomicUsize = AtomicUsize::new(0);
+
+pub fn reset_stats() {
+    HITS.store(0, Ordering::Relaxed);
+    MISSES.store(0, Ordering::Relaxed);
+}
+
+/// `(hits, misses)` since the last [`reset_stats`].
+pub fn stats() -> (usize, usize) {
+    (HITS.load(Ordering::Relaxed), MISSES.load(Ordering::Relaxed))
+}
 
 /// Magic + version, so a format change cannot be misread as data.
 const MAGIC: &[u8; 8] = b"DIDAFEA1";
@@ -79,6 +98,16 @@ impl Key {
 /// error: a corrupt cache entry should cost a recomputation, never a failed
 /// training run.
 pub fn load(dir: &Path, key: &Key) -> Option<Array3<f32>> {
+    let hit = load_inner(dir, key);
+    if hit.is_some() {
+        HITS.fetch_add(1, Ordering::Relaxed);
+    } else {
+        MISSES.fetch_add(1, Ordering::Relaxed);
+    }
+    hit
+}
+
+fn load_inner(dir: &Path, key: &Key) -> Option<Array3<f32>> {
     let bytes = fs::read(dir.join(key.file_name())).ok()?;
     if bytes.len() < 20 || &bytes[..8] != MAGIC {
         return None;
