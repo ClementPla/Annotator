@@ -76,9 +76,17 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   /** Set once stop is requested, so the button reflects the pending state.
    * The fit finishes its current epoch, so the click is not instant. */
   readonly stopping = signal(false);
-  /** Persist encoder features to app data between runs. Opt-in: it writes
-   * derived image data to disk, which should be the user's choice. */
-  cacheFeatures = localStorage.getItem('dida.ml.cacheFeatures') === '1';
+  /**
+   * Persist encoder features to app data between runs.
+   *
+   * On unless turned off. It was opt-in at first, on the reasoning that writing
+   * derived image data to disk should be a deliberate choice — but an unticked
+   * box gives no signal, so the visible result was simply that every session
+   * recomputed features it appeared to have already cached. The storage readout
+   * and Clear button below are the honest form of that control: they say what is
+   * on disk and remove it, rather than quietly declining to write.
+   */
+  cacheFeatures = (localStorage.getItem('dida.ml.cacheFeatures') ?? '1') === '1';
   readonly storage = signal<StorageUsage | null>(null);
   /** Labels the head will predict. Empty = every label in the project. */
   readonly labels = signal<LabelId[]>([]);

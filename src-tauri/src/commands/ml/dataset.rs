@@ -73,10 +73,14 @@ pub struct DatasetConfig {
     pub scribble_dropout: f32,
     /// Whether newly computed encoder features may be written to the cache.
     ///
-    /// Only *writing* is opt-in — that is the act that puts derived image data
-    /// on disk. Reading entries that already exist is always allowed: it costs
-    /// nothing and reveals nothing new, and gating both behind one flag meant a
-    /// fresh session recomputed features it had already paid for.
+    /// Only *writing* is ever gated — that is the act that puts derived image
+    /// data on disk. Reading entries that already exist is always allowed: it
+    /// costs nothing and reveals nothing new, and gating both behind one flag
+    /// meant a fresh session recomputed features it had already paid for.
+    ///
+    /// The UI now defaults this on (users cannot tell an unticked box from a
+    /// broken cache), but it stays `false` here: a `DatasetConfig` built
+    /// directly, as tests do, should not write to the user's disk unasked.
     pub cache_writes: bool,
     pub seed: u64,
 }

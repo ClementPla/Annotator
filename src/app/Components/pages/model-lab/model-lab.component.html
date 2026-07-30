@@ -183,7 +183,11 @@
           <input type="checkbox" [(ngModel)]="cacheFeatures" />
           <span>
             <strong>Save features to disk</strong>
-            <span class="f-hint">Makes later runs on the same images much faster.</span>
+            <span class="f-hint"
+              >Later runs on the same images reuse them instead of recomputing.
+              Turning this off does not delete what is already saved — use Clear
+              below.</span
+            >
           </span>
         </label>
       </p-card>

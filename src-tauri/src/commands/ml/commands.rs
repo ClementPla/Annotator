@@ -95,7 +95,8 @@ pub struct CurveOptions {
     pub encoder_id: Option<String>,
     pub working_size: Option<u32>,
     pub patches_per_frame: Option<usize>,
-    /// Persist encoder features to local app data between runs.
+    /// Persist encoder features to local app data between runs. Defaults to on;
+    /// the storage readout and Clear button are what bound it.
     pub cache_features: Option<bool>,
     /// Labels to train on. Omit for every label in the project.
     ///
@@ -372,7 +373,7 @@ fn build_split(
     let ds = DatasetConfig {
         working_size: options.working_size.unwrap_or(384),
         patches_per_frame: requested_patches,
-        cache_writes: options.cache_features.unwrap_or(false),
+        cache_writes: options.cache_features.unwrap_or(true),
         repeats: options.augment_repeats.unwrap_or(3).max(1),
         seed,
         ..Default::default()
