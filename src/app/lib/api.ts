@@ -503,12 +503,19 @@ export const api = {
    * Trace every component of a mask into simplified polygons. `minArea` drops
    * specks, which predicted masks carry and hand-drawn ones do not.
    */
-  vectorizeMask: (mask: Uint8Array, width: number, height: number, minArea = 12) =>
+  vectorizeMask: (
+    mask: Uint8Array,
+    width: number,
+    height: number,
+    minArea = 64,
+    maxShapes = 64,
+  ) =>
     invoke<number[][][]>('vectorize_mask', {
       mask: mask.slice().buffer,
       width,
       height,
       minArea,
+      maxShapes,
     }),
 
   vectorizeComponent: (

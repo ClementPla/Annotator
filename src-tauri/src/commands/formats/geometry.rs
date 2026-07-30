@@ -84,9 +84,15 @@ fn region_from_binary(bin: &[u8], w: u32, h: u32) -> Option<Region> {
         if c.border_type == BorderType::Outer && c.points.len() >= 3 {
             let ring: Vec<[f64; 2]> =
                 c.points.iter().map(|p| [p.x as f64, p.y as f64]).collect();
+            // Keep the raw ring when simplification collapses it. Douglas-Peucker
+            // at this tolerance flattens a small component — a 2x2 blob and
+            // anything near it — to fewer than three points, and dropping the
+            // result made whole regions disappear rather than merely lose
+            // detail. A region that exists should always produce a polygon.
             let simplified = douglas_peucker(&ring, 1.5);
-            if simplified.len() >= 3 {
-                polygons.push(simplified);
+            let out = if simplified.len() >= 3 { simplified } else { ring };
+            if out.len() >= 3 {
+                polygons.push(out);
             }
         }
     }

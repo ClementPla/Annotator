@@ -10,6 +10,10 @@ import { StateManagerService } from '../Components/pages/editor/drawable-canvas/
 import { UndoRedoService } from '../Components/pages/editor/drawable-canvas/service/undo-redo.service';
 
 import { api, ScribbleInput, VectorShape, VectorNode } from '../lib/api';
+
+/** Upper bound on traced shapes. A fragmented prediction can otherwise drop
+ *  hundreds of specks into the editor, each needing manual deletion. */
+const MAX_TRACED_SHAPES = 64;
 import { VectorEditorService } from '../Components/pages/editor/drawable-canvas/service/vector-editor.service';
 import { OrchestratorService } from '../Components/pages/editor/drawable-canvas/service/orchestrator.service';
 
@@ -143,6 +147,8 @@ export class PredictionService {
           base64ToUint8(m.maskBase64),
           result.width,
           result.height,
+          64,
+          MAX_TRACED_SHAPES,
         );
         for (const p of polys) shapes.push(this.polygonToShape(p, m.labelId));
       }
@@ -157,11 +163,16 @@ export class PredictionService {
 
       // addShapes commits its own undo entry, so the whole set reverts at once.
       this.vectorEditor.addShapes(shapes);
+      // Say when the cap bit. Silently keeping the largest 64 of 300 blobs
+      // would look like the model missed things it actually found.
+      const capped = shapes.length >= MAX_TRACED_SHAPES;
       this.notifications.notify({
-        severity: 'success',
-        summary: 'Prediction vectorised',
-        detail: `${shapes.length} shape${shapes.length === 1 ? '' : 's'} — Ctrl+Z to revert`,
-        life: 3000,
+        severity: capped ? 'warn' : 'success',
+        summary: capped ? 'Traced the largest regions' : 'Prediction traced',
+        detail: capped
+          ? `Kept the ${shapes.length} largest regions — the prediction is fragmented`
+          : `${shapes.length} shape${shapes.length === 1 ? '' : 's'} — Ctrl+Z to revert`,
+        life: 4000,
       });
     } catch (error) {
       const message = String(error);
