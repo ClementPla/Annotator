@@ -77,7 +77,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   readonly stopping = signal(false);
   /** Persist encoder features to app data between runs. Opt-in: it writes
    * derived image data to disk, which should be the user's choice. */
-  cacheFeatures = false;
+  cacheFeatures = localStorage.getItem('dida.ml.cacheFeatures') === '1';
   readonly storage = signal<StorageUsage | null>(null);
   readonly model = signal<TrainSummary | null>(null);
   /** Rolling loss history for the current fit, for a sparkline. */
@@ -192,7 +192,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       encoderId: this.selectedEncoder(),
       workingSize: this.workingSize,
       patchesPerFrame: this.patchesPerFrame,
-      cacheFeatures: this.cacheFeatures,
+      cacheFeatures: this.persistCacheChoice(),
       epochs: this.epochs,
       curveRepeats: this.curveRepeats,
     };
@@ -229,6 +229,17 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
     if (n < 1024 * 1024 * 1024) return `${(n / 1048576).toFixed(0)} MB`;
     return `${(n / 1073741824).toFixed(2)} GB`;
+  }
+
+  /**
+   * Remember the choice across restarts.
+   *
+   * Without this the box reset every session, so a user who had already paid to
+   * compute features silently stopped adding to the cache the next time.
+   */
+  private persistCacheChoice(): boolean {
+    localStorage.setItem('dida.ml.cacheFeatures', this.cacheFeatures ? '1' : '0');
+    return this.cacheFeatures;
   }
 
   async refreshStorage(): Promise<void> {

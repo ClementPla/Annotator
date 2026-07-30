@@ -107,14 +107,28 @@ opt-level = 3
 
 
 [profile.release]
-codegen-units = 1 # Allows LLVM to perform better optimization.
-lto = true # Enables link-time-optimizations.
+# 1 unit + full LTO was costing minutes of link time, and LTO scales
+# superlinearly with code size — which grew sharply when the CUDA backend added
+# ~50 crates and the training loop began monomorphising for two backends.
+#
+# Thin LTO keeps cross-crate inlining but partitions the work, so it parallelises
+# and finishes in a fraction of the time for a few percent of the optimisation.
+# For an app whose hot loops are inside burn and ort — already compiled at
+# opt-level 3 as dependencies — that is a trade worth taking. Use
+# `--profile release-full` below for a shipping build if the difference matters.
+codegen-units = 16
+lto = "thin"
 opt-level = 2 # Prioritizes speed over binary size. Use `z` if you prefer smaller binary or `s` for in between.
 panic = "abort" # Higher performance by disabling panic handlers.
 strip = true # Ensures debug symbols are removed.
 incremental = true
 
-[build]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+# A shipping build, when the last few percent matter more than the wait.
+#   cargo tauri build -- --profile release-full
+[profile.release-full]
+inherits = "release"
+codegen-units = 1
+lto = true
+
 
 [patch.crates-io]

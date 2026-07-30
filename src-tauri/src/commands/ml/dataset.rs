@@ -71,6 +71,13 @@ pub struct DatasetConfig {
     /// them for a share of repeats forces the head to work unaided and makes
     /// scribbles a genuine refinement rather than a requirement.
     pub scribble_dropout: f32,
+    /// Whether newly computed encoder features may be written to the cache.
+    ///
+    /// Only *writing* is opt-in — that is the act that puts derived image data
+    /// on disk. Reading entries that already exist is always allowed: it costs
+    /// nothing and reveals nothing new, and gating both behind one flag meant a
+    /// fresh session recomputed features it had already paid for.
+    pub cache_writes: bool,
     pub seed: u64,
 }
 
@@ -84,6 +91,7 @@ impl Default for DatasetConfig {
             scribble_strokes: 3,
             stroke_len: 40,
             scribble_dropout: 0.5,
+            cache_writes: false,
             seed: 0,
         }
     }
@@ -485,8 +493,10 @@ pub fn build_frame_samples(
                 Some(t) => t,
                 None => {
                     let t = enc.embed(&image)?.data;
-                    if let (Some(dir), Some(k)) = (feature_cache, &key) {
-                        cache::store(dir, k, &t);
+                    if cfg.cache_writes {
+                        if let (Some(dir), Some(k)) = (feature_cache, &key) {
+                            cache::store(dir, k, &t);
+                        }
                     }
                     t
                 }

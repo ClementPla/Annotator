@@ -354,6 +354,7 @@ fn build_split(
     let ds = DatasetConfig {
         working_size: options.working_size.unwrap_or(384),
         patches_per_frame: requested_patches,
+        cache_writes: options.cache_features.unwrap_or(false),
         repeats: options.augment_repeats.unwrap_or(3).max(1),
         seed,
         ..Default::default()
@@ -361,11 +362,8 @@ fn build_split(
 
     // Opt-in: caching features writes derived image data to disk, so it stays
     // the user's choice rather than a silent default.
-    let feature_cache = if options.cache_features.unwrap_or(false) {
-        super::cache::cache_dir(app).ok()
-    } else {
-        None
-    };
+    // Always offered for *reading*; writing is gated below by `cache_writes`.
+    let feature_cache = super::cache::cache_dir(app).ok();
 
     ensure_encoder(app, state, &options.encoder_id)?;
     let mut guard = state.encoder.lock();
