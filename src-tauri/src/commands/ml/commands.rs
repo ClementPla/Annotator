@@ -19,11 +19,12 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::dl::model_manager::ensure_model_cached;
-use crate::storage::DbState;
+use crate::storage::{queries, DbState};
 
 use super::dataset::{self, DatasetConfig};
 use super::filters;
 use super::encoder::EncoderSession;
+use super::persist;
 use super::predict::{self, MlState, PredictedFrame, ScribbleInput, TrainedModel};
 use super::registry;
 use super::scribble::Rng;
@@ -632,7 +633,8 @@ pub fn ml_train_model(
         device: head.device().to_string(),
     };
 
-    *state.model.lock() = Some(TrainedModel {
+    let cfg = train_config(&options);
+    let model = TrainedModel {
         head,
         feature_dim: split.feature_dim,
         classes: split.classes,
@@ -641,9 +643,106 @@ pub fn ml_train_model(
         working_size: options.working_size.unwrap_or(384),
         metrics,
         train_frames,
-    });
+    };
+
+    // Persist before publishing, but never fail the run over it: the user has
+    // already paid for the fit, and a model they can use this session is worth
+    // more than an error that discards it because the file was read-only.
+    if let Err(e) = store_model(&db, &model, cfg.hidden, cfg.depth) {
+        println!("[ml] could not save the model to the project: {e}");
+    }
+    *state.model.lock() = Some(model);
 
     Ok(summary)
+}
+
+/// Write a fitted head into the open project.
+fn store_model(
+    db: &DbState,
+    model: &TrainedModel,
+    hidden: usize,
+    depth: usize,
+) -> Result<(), String> {
+    let meta = persist::ModelMeta {
+        feature_dim: model.feature_dim,
+        classes: model.classes,
+        label_order: model.label_order.clone(),
+        encoder_id: model.encoder_id.clone(),
+        working_size: model.working_size,
+        hidden,
+        depth,
+        accuracy: model.metrics.accuracy,
+        mean_dice: model.metrics.mean_dice,
+        per_class_dice: model.metrics.per_class_dice.clone(),
+        train_frames: model.train_frames,
+        trained_on: model.head.device().to_string(),
+    };
+    let json = serde_json::to_string(&meta).map_err(|e| e.to_string())?;
+    let weights = persist::encode_head(&model.head)?;
+    let bytes = weights.len();
+    db.with_conn(|conn| queries::save_ml_model(conn, &json, &weights))
+        .map_err(|e| e.to_string())?;
+    println!("[ml] model saved to the project ({} KB)", bytes / 1024);
+    Ok(())
+}
+
+/// Restore the head stored in the open project, if there is one.
+///
+/// Called when a project opens. A miss is not an error — most projects have no
+/// model — and neither is a model this build cannot read: the user retrains,
+/// which is the same position they were in before.
+#[tauri::command]
+pub fn ml_load_saved_model(db: State<DbState>, state: State<MlState>) -> Option<TrainSummary> {
+    let stored = db.with_conn(|conn| queries::load_ml_model(conn)).ok()??;
+    let (json, weights) = stored;
+    let meta: persist::ModelMeta = match serde_json::from_str(&json) {
+        Ok(m) => m,
+        Err(e) => {
+            println!("[ml] stored model metadata is unreadable ({e}); ignoring it");
+            return None;
+        }
+    };
+    let head = match persist::decode_head(weights, &meta) {
+        Ok(h) => h,
+        Err(e) => {
+            println!("[ml] stored model could not be loaded ({e}); ignoring it");
+            return None;
+        }
+    };
+
+    let summary = TrainSummary {
+        train_frames: meta.train_frames,
+        val_frames: 0,
+        feature_dim: meta.feature_dim,
+        classes: meta.classes,
+        encoder: meta.encoder_id.clone(),
+        metrics: meta.metrics(),
+        device: head.device().to_string(),
+    };
+    println!(
+        "[ml] restored a saved model — {} classes, trained on {} images",
+        meta.classes, meta.train_frames
+    );
+    let metrics = meta.metrics();
+    *state.model.lock() = Some(TrainedModel {
+        head,
+        feature_dim: meta.feature_dim,
+        classes: meta.classes,
+        label_order: meta.label_order,
+        encoder_id: meta.encoder_id,
+        working_size: meta.working_size,
+        metrics,
+        train_frames: meta.train_frames,
+    });
+    Some(summary)
+}
+
+/// Discard the saved model, from both the project and this session.
+#[tauri::command]
+pub fn ml_forget_model(db: State<DbState>, state: State<MlState>) -> Result<bool, String> {
+    *state.model.lock() = None;
+    db.with_conn(|conn| queries::delete_ml_model(conn))
+        .map_err(|e| e.to_string())
 }
 
 /// Ask the running fit to stop at the next epoch boundary.

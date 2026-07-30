@@ -581,6 +581,13 @@ export const api = {
   mlTrainModel: (options: CurveOptions) =>
     invoke<TrainSummary>('ml_train_model', { options }),
   mlModelStatus: () => invoke<TrainSummary | null>('ml_model_status'),
+  /**
+   * Restore the head saved in the open project, if any. Null when the project
+   * has no model, or has one this build cannot read — both mean "retrain".
+   */
+  mlLoadSavedModel: () => invoke<TrainSummary | null>('ml_load_saved_model'),
+  /** Discard the saved model, from both the project file and this session. */
+  mlForgetModel: () => invoke<boolean>('ml_forget_model'),
   /** Ask the running fit to stop at the next epoch; the head it has is kept. */
   mlStopTraining: () => invoke<void>('ml_stop_training'),
   mlStorageUsage: () => invoke<StorageUsage>('ml_storage_usage'),

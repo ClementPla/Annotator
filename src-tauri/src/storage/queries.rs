@@ -229,6 +229,35 @@ pub fn save_annotation(
     Ok(())
 }
 
+/// Store the fitted head, replacing whatever was there.
+///
+/// `meta` is opaque JSON to this layer: the storage module has no business
+/// knowing a head's architecture, and letting the ML module change its own
+/// metadata without a schema migration is the point of keeping it that way.
+pub fn save_ml_model(conn: &Connection, meta: &str, weights: &[u8]) -> Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO ml_models (id, meta, weights, modified_at)
+         VALUES (1, ?1, ?2, datetime('now'))",
+        params![meta, weights],
+    )?;
+    Ok(())
+}
+
+/// The stored head as `(meta json, weights)`, or None when none was ever saved.
+pub fn load_ml_model(conn: &Connection) -> Result<Option<(String, Vec<u8>)>> {
+    let mut stmt = conn.prepare("SELECT meta, weights FROM ml_models WHERE id = 1")?;
+    let mut rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
+}
+
+/// Forget the stored head. Returns whether there was one.
+pub fn delete_ml_model(conn: &Connection) -> Result<bool> {
+    Ok(conn.execute("DELETE FROM ml_models WHERE id = 1", [])? > 0)
+}
+
 pub fn get_frame_dimensions(conn: &Connection, frame_id: i64) -> Result<(u32, u32)> {
     let (width, height): (u32, u32) = conn.query_row(
         "SELECT width, height FROM frames WHERE id = ?1",
@@ -291,6 +320,34 @@ mod tests {
             )
             .unwrap();
         assert_eq!(n, 5);
+    }
+
+    #[test]
+    fn the_saved_model_round_trips_and_keeps_only_the_latest() {
+        let conn = Connection::open_in_memory().unwrap();
+        configure_connection(&conn).unwrap();
+        run_migrations(&conn).unwrap();
+
+        assert!(load_ml_model(&conn).unwrap().is_none(), "a fresh project has no model");
+        assert!(!delete_ml_model(&conn).unwrap(), "nothing to delete yet");
+
+        // Weights are binary and must survive as bytes, zeros included.
+        let weights: Vec<u8> = (0..=255u8).chain([0, 0, 0]).collect();
+        save_ml_model(&conn, r#"{"classes":3}"#, &weights).unwrap();
+        let (meta, got) = load_ml_model(&conn).unwrap().expect("model must load");
+        assert_eq!(meta, r#"{"classes":3}"#);
+        assert_eq!(got, weights, "weights must survive verbatim");
+
+        // Retraining replaces rather than accumulates.
+        save_ml_model(&conn, r#"{"classes":5}"#, &[1, 2, 3]).unwrap();
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM ml_models", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 1, "a second fit must overwrite the first");
+        assert_eq!(load_ml_model(&conn).unwrap().unwrap().0, r#"{"classes":5}"#);
+
+        assert!(delete_ml_model(&conn).unwrap());
+        assert!(load_ml_model(&conn).unwrap().is_none());
     }
 
     #[test]

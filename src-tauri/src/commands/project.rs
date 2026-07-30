@@ -24,25 +24,41 @@ pub fn create_project(
 }
 
 #[tauri::command]
-pub fn open_project(db: State<DbState>, path: String) -> Result<ProjectConfig> {
+pub fn open_project(
+    db: State<DbState>,
+    ml: State<crate::commands::ml::predict::MlState>,
+    path: String,
+) -> Result<ProjectConfig> {
     if db.is_open() {
         dbg!("Closing existing project before opening a new one.");
         db.close();
+        *ml.model.lock() = None;
     }
-    
+
     let conn = queries::open_database(Path::new(&path))?;
     let config = queries::get_project_config(&conn)?;
-    
+
     // Ensure labels table is in sync with config
     queries::sync_labels_from_config(&conn, &config)?;
-    
+
     db.set(conn);
+    // Restore this project's trained head, if it has one, so predicting works
+    // straight away rather than only after a visit to the model page. Failure is
+    // silent by design — most projects have no model, and one this build cannot
+    // read leaves the user exactly where they were: able to retrain.
+    crate::commands::ml::commands::ml_load_saved_model(db, ml);
     Ok(config)
 }
 
 #[tauri::command]
-pub fn close_project(db: State<DbState>) -> Result<()> {
+pub fn close_project(
+    db: State<DbState>,
+    ml: State<crate::commands::ml::predict::MlState>,
+) -> Result<()> {
     db.close();
+    // A head only means anything against the labels it was fitted to, so it must
+    // not outlive its project into the next one.
+    *ml.model.lock() = None;
     Ok(())
 }
 

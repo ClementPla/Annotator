@@ -909,3 +909,4 @@ mod tests {
         assert!(learning_curve(&[], &val, 2, &[1], 1, &tiny()).is_err());
     }
 }
+

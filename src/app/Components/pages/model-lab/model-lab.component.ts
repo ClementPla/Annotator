@@ -292,6 +292,16 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Discard the trained model from the project and this session. */
+  async forget(): Promise<void> {
+    try {
+      await api.mlForgetModel();
+      this.model.set(null);
+    } catch (e) {
+      this.error.set(String(e));
+    }
+  }
+
   // TODO(remove): the learning-curve sweep is a development diagnostic, not an
   // end-user feature — it retrains at increasing dataset sizes to characterise
   // how quality scales and leaves no usable model behind. Its button has been

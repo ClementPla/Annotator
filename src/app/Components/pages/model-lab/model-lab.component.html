@@ -223,9 +223,18 @@
               </div>
             </div>
             <p class="muted">
-              Apply it to a frame from the editor toolbar. Training again
-              replaces it.
+              Apply it to a frame from the editor toolbar. It is saved in this
+              project and reopens with it. Training again replaces it.
             </p>
+            <p-button
+              label="Delete model"
+              icon="pi pi-trash"
+              severity="danger"
+              size="small"
+              [text]="true"
+              [disabled]="running()"
+              (onClick)="forget()"
+            />
           </div>
         }
 

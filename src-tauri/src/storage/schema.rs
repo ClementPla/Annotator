@@ -119,6 +119,22 @@ CREATE INDEX IF NOT EXISTS idx_registrations_ref_frame
     ON registrations(reference_frame_id);
 CREATE INDEX IF NOT EXISTS idx_keypoint_pairs_registration
     ON keypoint_pairs(registration_id);
+
+-- A fitted segmentation head, so training survives closing the app.
+--
+-- One row: `id` is pinned to 1 and writes upsert over it. Keeping a history
+-- would mean a UI to choose between models, and the useful question after
+-- retraining is "use the new one", not "which of the seven".
+--
+-- Weights live here rather than in app data because class `i + 1` means
+-- `label_order[i]` — ids that only exist in this project — so the model and the
+-- labels that give it meaning stay together when the project is copied.
+CREATE TABLE IF NOT EXISTS ml_models (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    meta JSON NOT NULL,
+    weights BLOB NOT NULL,
+    modified_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 "#;
 
 /// v1 -> v2: vector annotations (bezier paths / polygons / polylines).

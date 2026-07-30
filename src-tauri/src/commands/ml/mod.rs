@@ -38,6 +38,7 @@ pub mod commands;
 pub mod dataset;
 pub mod encoder;
 pub mod filters;
+pub mod persist;
 pub mod predict;
 pub mod registry;
 pub mod scribble;
