@@ -556,6 +556,26 @@ export const api = {
       y,
     }),
 
+  /**
+   * Skeletonize every component of a mask into open centerline polylines.
+   * `minArea` drops specks as in `vectorizeMask`; `maxShapes` caps *components*,
+   * not polylines, since one branched structure yields several.
+   */
+  skeletonizeMask: (
+    mask: Uint8Array,
+    width: number,
+    height: number,
+    minArea = 64,
+    maxShapes = 64,
+  ) =>
+    invoke<number[][][]>('skeletonize_mask', {
+      mask: mask.slice().buffer,
+      width,
+      height,
+      minArea,
+      maxShapes,
+    }),
+
   saveTaskDefinitions: (definitions: TaskDefinitions) =>
     invoke('save_task_definitions', {
       definitions: definitions,

@@ -103,7 +103,11 @@ export class PredictionService {
    * precision the mask does not have and would pull the outline off the
    * boundary the model actually predicted. The user can smooth what they want.
    */
-  private polygonToShape(poly: number[][], labelId: number): VectorShape {
+  private polygonToShape(
+    poly: number[][],
+    labelId: number,
+    closed: boolean,
+  ): VectorShape {
     const nodes: VectorNode[] = poly.map(([x, y]) => ({
       x,
       y,
@@ -116,8 +120,10 @@ export class PredictionService {
     return {
       id: crypto.randomUUID(),
       labelId,
-      closed: true,
-      filled: true,
+      closed,
+      // An open centerline has no interior to fill; filling one would paint the
+      // chord between its endpoints.
+      filled: closed,
       nodes,
     };
   }
@@ -128,8 +134,17 @@ export class PredictionService {
    * The model still predicts a raster mask — this vectorises its output. That
    * keeps the dense training signal the head needs while giving back something
    * the node editor can actually adjust.
+   *
+   * `regions` traces each blob's outline into a closed, filled shape.
+   * `centerlines` thins each blob to its 1px skeleton and returns open paths —
+   * the right output when the structure is a curve rather than an area (a
+   * vessel, a nerve, a fibre, a crack), where an outline says nothing useful and
+   * the thing you actually want to measure is the path down the middle.
    */
-  async predictCurrentFrameAsVectors(useScribbles = true): Promise<void> {
+  private async predictAsShapes(
+    useScribbles: boolean,
+    mode: 'regions' | 'centerlines',
+  ): Promise<void> {
     const frame = this.sequenceService.currentFrame();
     if (!frame) return;
 
@@ -143,20 +158,34 @@ export class PredictionService {
       const shapes: VectorShape[] = [];
       for (const m of result.masks) {
         if (!labels.some((l) => l.id === m.labelId)) continue;
-        const polys = await api.vectorizeMask(
-          base64ToUint8(m.maskBase64),
-          result.width,
-          result.height,
-          64,
-          MAX_TRACED_SHAPES,
-        );
-        for (const p of polys) shapes.push(this.polygonToShape(p, m.labelId));
+        const mask = base64ToUint8(m.maskBase64);
+        const traced =
+          mode === 'regions'
+            ? await api.vectorizeMask(
+                mask,
+                result.width,
+                result.height,
+                64,
+                MAX_TRACED_SHAPES,
+              )
+            : await api.skeletonizeMask(
+                mask,
+                result.width,
+                result.height,
+                64,
+                MAX_TRACED_SHAPES,
+              );
+        for (const p of traced) {
+          shapes.push(this.polygonToShape(p, m.labelId, mode === 'regions'));
+        }
       }
 
       if (!shapes.length) {
         this.notifications.warn(
           'Nothing applied',
-          'The prediction produced no traceable regions.',
+          mode === 'regions'
+            ? 'The prediction produced no traceable regions.'
+            : 'The prediction produced no traceable centerlines.',
         );
         return;
       }
@@ -164,14 +193,18 @@ export class PredictionService {
       // addShapes commits its own undo entry, so the whole set reverts at once.
       this.vectorEditor.addShapes(shapes);
       // Say when the cap bit. Silently keeping the largest 64 of 300 blobs
-      // would look like the model missed things it actually found.
-      const capped = shapes.length >= MAX_TRACED_SHAPES;
+      // would look like the model missed things it actually found. Only
+      // meaningful for regions: skeletonizeMask caps *components*, and one
+      // branched structure yields several polylines, so the shape count here
+      // says nothing about whether the cap was reached.
+      const capped = mode === 'regions' && shapes.length >= MAX_TRACED_SHAPES;
+      const noun = mode === 'regions' ? 'shape' : 'centerline';
       this.notifications.notify({
         severity: capped ? 'warn' : 'success',
         summary: capped ? 'Traced the largest regions' : 'Prediction traced',
         detail: capped
           ? `Kept the ${shapes.length} largest regions — the prediction is fragmented`
-          : `${shapes.length} shape${shapes.length === 1 ? '' : 's'} — Ctrl+Z to revert`,
+          : `${shapes.length} ${noun}${shapes.length === 1 ? '' : 's'} — Ctrl+Z to revert`,
         life: 4000,
       });
     } catch (error) {
@@ -181,6 +214,16 @@ export class PredictionService {
     } finally {
       this.running.set(false);
     }
+  }
+
+  /** Predict, then trace each region's outline into an editable closed path. */
+  async predictCurrentFrameAsVectors(useScribbles = true): Promise<void> {
+    return this.predictAsShapes(useScribbles, 'regions');
+  }
+
+  /** Predict, then reduce each region to its centerline as an open path. */
+  async predictCurrentFrameAsSkeletons(useScribbles = true): Promise<void> {
+    return this.predictAsShapes(useScribbles, 'centerlines');
   }
 
   async predictCurrentFrame(useScribbles = true): Promise<void> {

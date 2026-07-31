@@ -124,6 +124,20 @@
             <div class="hidden lg:block">As paths</div>
           </span>
         </p-button>
+
+        <p-button
+          severity="secondary"
+          [outlined]="true"
+          pTooltip="Predict, then reduce each region to its centerline — an open path down the middle. For vessels, fibres and other curve-like structures, where an outline is two parallel boundaries and the middle is what you want."
+          tooltipPosition="bottom"
+          [loading]="prediction.running()"
+          (onClick)="predictAsSkeletons(true)"
+        >
+          <span class="flex gap-2 items-center">
+            <i class="pi pi-share-alt"></i>
+            <div class="hidden lg:block">As skeletons</div>
+          </span>
+        </p-button>
       </div>
 
       @if (editorService.isToolWithBrushSize()) {

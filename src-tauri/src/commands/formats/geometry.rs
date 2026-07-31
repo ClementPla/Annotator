@@ -247,16 +247,29 @@ fn flood_same_value_component(values: &[u8], w: u32, h: u32, sx: u32, sy: u32) -
 
 // ── Skeletonization (raster component → centerline paths) ───────────────────
 
-/// Minimum length (px) of an endpoint branch (spur) kept in the traced skeleton.
-/// Trims the short hairs thinning leaves along a thick/rough shape's edges; the
-/// degree-2 node each pruned spur leaves behind is then contracted so the trunk
-/// stays continuous. Kept below a typical real branch length.
+/// Absolute floor (px) for the spur test below. It only decides the outcome for
+/// shapes so thin that the radius term is ~0 — a 1px hand-drawn stroke, where
+/// the hairs thinning leaves are a couple of pixels long.
 const MIN_SPUR_LEN: f64 = 5.0;
+/// How far a branch must run, as a multiple of the maximal inscribed-disc radius
+/// at its base, before it counts as real.
+///
+/// This is the pruning criterion that matters. A spur's length scales with the
+/// *local thickness* of the region — the same boundary roughness that leaves 3px
+/// hairs on a 6px stroke leaves 30px hairs on a 60px blob — so an absolute
+/// threshold cannot work across the shapes this tool is pointed at. Judging a
+/// branch against the disc it hangs off is scale-invariant: a branch that stays
+/// inside its base's disc has not left the parent shape and carries no geometry
+/// the trunk doesn't already have. 1.5 clears the two diagonal arms thinning
+/// leaves at a blunt end (each ≈ one radius) while keeping any side branch
+/// long enough to be resolvable at all.
+const SPUR_RADIUS_FACTOR: f64 = 1.5;
 /// Douglas–Peucker tolerance for skeleton polylines (finer than contour tracing
 /// so curved centerlines stay smooth).
 const SKELETON_EPSILON: f64 = 1.0;
-/// Minimum length (px) of a returned centerline path. Prunes the tiny artefact
-/// branches thinning leaves at curve extrema; the longest path is always kept.
+/// Absolute floor (px) for the returned-path test, which otherwise scales with
+/// the local radius the same way spur pruning does. The longest path is always
+/// kept, so a single unbranched fibre can never filter down to nothing.
 const MIN_OUTPUT_LEN: f64 = 8.0;
 
 /// Skeletonize the same-value component under `(sx, sy)` and return its centerline
@@ -274,10 +287,60 @@ pub fn component_skeleton_paths(
     let Some(bin) = flood_same_value_component(values, w, h, sx, sy) else {
         return Vec::new();
     };
+    skeleton_of_binary(&bin, w as usize, h as usize)
+}
 
+/// Skeletonize **every** component of `mask` into centerline polylines.
+///
+/// The whole-mask counterpart of [`component_skeleton_paths`], for turning a
+/// predicted mask into editable centerlines in one pass — the skeleton analogue
+/// of [`regions_from_mask`]. Components are skeletonized independently so a
+/// junction is only ever a real branch within one structure, never two objects
+/// that happen to touch diagonally.
+///
+/// `min_area` drops specks below a pixel count, and `max_shapes` caps how many
+/// components are traced (largest first). Both behave as in `vectorize_mask`;
+/// note the cap counts *components*, not returned polylines, since one branched
+/// structure legitimately yields several.
+pub fn mask_skeleton_paths(
+    values: &[u8],
+    w: u32,
+    h: u32,
+    min_area: u32,
+    max_shapes: usize,
+) -> Vec<Vec<[f64; 2]>> {
+    let (wu, hu) = (w as usize, h as usize);
+    if values.len() < wu * hu || w == 0 || h == 0 {
+        return Vec::new();
+    }
+    let presence: Vec<u8> = values.iter().map(|&v| if v != 0 { 255 } else { 0 }).collect();
+    let Some(img) = GrayImage::from_raw(w, h, presence) else {
+        return Vec::new();
+    };
+    let cc = connected_components(&img, Connectivity::Eight, Luma([0u8]));
+    let max_label = cc.pixels().map(|p| p[0]).max().unwrap_or(0);
+
+    let mut comps: Vec<(u32, Vec<u8>)> = Vec::new();
+    for label in 1..=max_label {
+        let bin: Vec<u8> = cc.pixels().map(|p| u8::from(p[0] == label)).collect();
+        let area = bin.iter().filter(|&&v| v != 0).count() as u32;
+        if area >= min_area {
+            comps.push((area, bin));
+        }
+    }
+    comps.sort_by(|a, b| b.0.cmp(&a.0));
+    comps
+        .into_iter()
+        .take(if max_shapes == 0 { usize::MAX } else { max_shapes })
+        .flat_map(|(_, bin)| skeleton_of_binary(&bin, wu, hu))
+        .collect()
+}
+
+/// Thin one binary component to its centerline polylines. `bin` is nonzero on
+/// the component and zero elsewhere, in image-space row-major order.
+fn skeleton_of_binary(bin: &[u8], wu: usize, hu: usize) -> Vec<Vec<[f64; 2]>> {
     // Work on a 1px-padded grid (1 = fg) so thinning/tracing never touch the
     // image border; coords are shifted back by 1 when emitting points.
-    let (wu, hu) = (w as usize, h as usize);
     let (pw, ph) = (wu + 2, hu + 2);
     let mut grid = vec![0u8; pw * ph];
     for y in 0..hu {
@@ -288,9 +351,14 @@ pub fn component_skeleton_paths(
         }
     }
 
+    // Measured on the *region*, before thinning: every downstream threshold is a
+    // multiple of the local half-width, which is what makes them hold whether the
+    // user drew a hairline or filled an organ.
+    let dt = distance_to_background(&grid, pw, ph);
+
     zhang_suen_thin(&mut grid, pw, ph);
 
-    let simplified: Vec<Vec<[f64; 2]>> = trace_skeleton(&grid, pw, ph)
+    let simplified: Vec<Vec<[f64; 2]>> = trace_skeleton(&grid, pw, ph, &dt)
         .into_iter()
         .map(|poly| douglas_peucker(&poly, SKELETON_EPSILON))
         .filter(|poly| poly.len() >= 2)
@@ -299,15 +367,69 @@ pub fn component_skeleton_paths(
     // Drop leftover clutter (the tiny artefact branches raster thinning leaves at
     // a thick curved band's high-curvature extrema) while always keeping the
     // longest path, so an unbranched fibre comes back as a single clean line.
-    let max_len = simplified
-        .iter()
-        .map(|p| polyline_length_pts(p))
-        .fold(0.0, f64::max);
-    let keep_min = MIN_OUTPUT_LEN.min(max_len);
+    let lengths: Vec<f64> = simplified.iter().map(|p| polyline_length_pts(p)).collect();
+    let max_len = lengths.iter().copied().fold(0.0, f64::max);
     simplified
         .into_iter()
-        .filter(|p| polyline_length_pts(p) >= keep_min)
+        .zip(lengths)
+        .filter(|(poly, len)| {
+            *len >= max_len || *len >= keep_threshold(radius_along(poly, &dt, pw))
+        })
+        .map(|(poly, _)| poly)
         .collect()
+}
+
+/// The length a branch must reach, given the inscribed-disc radius it sits in.
+fn keep_threshold(radius: f64) -> f64 {
+    MIN_OUTPUT_LEN.max(SPUR_RADIUS_FACTOR * radius)
+}
+
+/// The largest inscribed-disc radius the polyline passes through, in pixels.
+/// Points are image-space; `dt` is on the 1px-padded grid.
+fn radius_along(poly: &[[f64; 2]], dt: &[f32], pw: usize) -> f64 {
+    poly.iter()
+        .map(|p| dt[(p[1] as usize + 1) * pw + (p[0] as usize + 1)] as f64)
+        .fold(0.0, f64::max)
+}
+
+/// Distance (px) from each foreground pixel to the nearest background pixel;
+/// background reads 0. Two chamfer passes with (1, √2) steps — an approximation
+/// to the Euclidean transform, good to a few percent, which is ample for a
+/// threshold. Callers pad, so the border is background and the 8-ring of every
+/// visited pixel is in bounds.
+fn distance_to_background(img: &[u8], w: usize, h: usize) -> Vec<f32> {
+    const FAR: f32 = 1e9;
+    const D1: f32 = 1.0;
+    const D2: f32 = std::f32::consts::SQRT_2;
+
+    let mut dt: Vec<f32> = img.iter().map(|&v| if v != 0 { FAR } else { 0.0 }).collect();
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let i = y * w + x;
+            if dt[i] == 0.0 {
+                continue;
+            }
+            let m = (dt[i - w] + D1)
+                .min(dt[i - 1] + D1)
+                .min(dt[i - w - 1] + D2)
+                .min(dt[i - w + 1] + D2);
+            dt[i] = dt[i].min(m);
+        }
+    }
+    for y in (1..h - 1).rev() {
+        for x in (1..w - 1).rev() {
+            let i = y * w + x;
+            if dt[i] == 0.0 {
+                continue;
+            }
+            let m = (dt[i + w] + D1)
+                .min(dt[i + 1] + D1)
+                .min(dt[i + w + 1] + D2)
+                .min(dt[i + w - 1] + D2);
+            dt[i] = dt[i].min(m);
+        }
+    }
+    dt
 }
 
 /// Euclidean length of a polyline given as image-space points.
@@ -455,7 +577,7 @@ struct SkelEdge {
 /// shatter at every little bump: short spurs are pruned and the degree-2 nodes
 /// they leave behind are contracted, so the trunk stays one path and only real
 /// ≥3-way intersections split it.
-fn trace_skeleton(img: &[u8], w: usize, h: usize) -> Vec<Vec<[f64; 2]>> {
+fn trace_skeleton(img: &[u8], w: usize, h: usize, dt: &[f32]) -> Vec<Vec<[f64; 2]>> {
     let pt = |idx: usize| [(idx % w) as f64 - 1.0, (idx / w) as f64 - 1.0];
     let key = |a: usize, b: usize| if a < b { (a, b) } else { (b, a) };
 
@@ -533,7 +655,7 @@ fn trace_skeleton(img: &[u8], w: usize, h: usize) -> Vec<Vec<[f64; 2]>> {
         }
     }
 
-    simplify_graph(&mut edges, w);
+    simplify_graph(&mut edges, w, dt);
 
     for e in &edges {
         if e.alive && e.pts.len() >= 2 {
@@ -558,29 +680,86 @@ fn degree_map(edges: &[SkelEdge]) -> std::collections::HashMap<usize, usize> {
 /// branch drops a junction to degree 2, which contraction then splices into its
 /// neighbour, which can expose the next artefact — so a curved band's messy
 /// extrema collapse into the through-path instead of fragmenting.
-fn simplify_graph(edges: &mut Vec<SkelEdge>, w: usize) {
+fn simplify_graph(edges: &mut Vec<SkelEdge>, w: usize, dt: &[f32]) {
     loop {
-        let pruned = prune_pass(edges, w);
+        let pruned = prune_pass(edges, w, dt);
+        let popped = collapse_bubbles(edges, w, dt);
         let contracted = contract_pass(edges);
-        if !pruned && !contracted {
+        if !pruned && !popped && !contracted {
             break;
         }
     }
     edges.retain(|e| e.alive);
 }
 
-/// One pass: kill leaf spurs — short branches ending at a free endpoint. (Short
-/// links *between* two junctions are left intact so real multi-way junctions,
-/// which an 8-connected skeleton often spreads over 2 pixels, aren't collapsed.)
-fn prune_pass(edges: &mut [SkelEdge], w: usize) -> bool {
+/// One pass: kill leaf spurs — branches ending at a free endpoint that are short
+/// relative to the inscribed disc at the junction they hang off. (Short links
+/// *between* two junctions are left intact so real multi-way junctions, which an
+/// 8-connected skeleton often spreads over 2 pixels, aren't collapsed.)
+///
+/// The base must be a real junction (degree ≥ 3). A branch whose *other* end is
+/// also free is not a spur — it is the trunk, possibly the last thing left after
+/// its siblings were pruned, and deleting it would return nothing at all.
+fn prune_pass(edges: &mut [SkelEdge], w: usize, dt: &[f32]) -> bool {
     let deg = degree_map(edges);
     let mut changed = false;
     for e in edges.iter_mut().filter(|e| e.alive) {
         let (da, db) = (deg.get(&e.a).copied().unwrap_or(0), deg.get(&e.b).copied().unwrap_or(0));
-        let is_spur = (da == 1 || db == 1) && polyline_len(&e.pts, w) < MIN_SPUR_LEN;
-        if is_spur {
+        let base = if da == 1 && db >= 3 {
+            e.b
+        } else if db == 1 && da >= 3 {
+            e.a
+        } else {
+            continue;
+        };
+        let limit = MIN_SPUR_LEN.max(SPUR_RADIUS_FACTOR * dt[base] as f64);
+        if polyline_len(&e.pts, w) < limit {
             e.alive = false;
             changed = true;
+        }
+    }
+    changed
+}
+
+/// One pass: pop thinning bubbles — two separate branches joining the *same* pair
+/// of nodes, which is what thinning wraps around a small hole in the region. A
+/// predicted mask is full of them, and neither spur pruning (both ends are
+/// junctions) nor contraction (both nodes are degree 3) can touch one, so the
+/// centerline came back split into parallel arcs.
+///
+/// The longest arc survives and the rest are dropped, but only when they are
+/// short against the disc at the join — so a hole small relative to the band that
+/// contains it pops, while a genuine ring, whose arcs dwarf its own thickness,
+/// keeps its loop. Both nodes then fall to degree 2 and contraction splices the
+/// trunk back into one path.
+fn collapse_bubbles(edges: &mut [SkelEdge], w: usize, dt: &[f32]) -> bool {
+    let mut by_pair: std::collections::HashMap<(usize, usize), Vec<usize>> =
+        std::collections::HashMap::new();
+    for (i, e) in edges.iter().enumerate() {
+        if e.alive && e.a != e.b {
+            let pair = if e.a < e.b { (e.a, e.b) } else { (e.b, e.a) };
+            by_pair.entry(pair).or_default().push(i);
+        }
+    }
+
+    let mut changed = false;
+    for ((a, b), group) in by_pair {
+        if group.len() < 2 {
+            continue;
+        }
+        let limit = MIN_SPUR_LEN.max(SPUR_RADIUS_FACTOR * (dt[a].max(dt[b])) as f64);
+        let keep = group
+            .iter()
+            .copied()
+            .max_by(|&i, &j| {
+                polyline_len(&edges[i].pts, w).total_cmp(&polyline_len(&edges[j].pts, w))
+            })
+            .expect("group is non-empty");
+        for i in group {
+            if i != keep && polyline_len(&edges[i].pts, w) < limit {
+                edges[i].alive = false;
+                changed = true;
+            }
         }
     }
     changed
@@ -904,6 +1083,76 @@ mod tests {
         assert_eq!(paths.len(), 1, "a wavy fibre must trace as one path");
     }
 
+    /// A ~22px-thick bar over `x in 5..=58` on a 64x48 grid. With `bump`, its top
+    /// edge sticks up by 2px every fifth column — ordinary boundary roughness for
+    /// a painted or predicted region. (1px is below the threshold where thinning
+    /// seeds a branch at all; it gets eaten first.)
+    fn thick_bar(bump: bool) -> (u32, u32, Vec<u8>) {
+        let (w, h) = (64u32, 48u32);
+        let mut values = vec![0u8; (w * h) as usize];
+        for x in 5..=58u32 {
+            let top = if bump && x % 5 == 0 { 10 } else { 12 };
+            for y in top..=33 {
+                values[(y * w + x) as usize] = 1;
+            }
+        }
+        (w, h, values)
+    }
+
+    #[test]
+    fn a_rough_thick_bar_is_still_one_line() {
+        // The reported failure. Each bump seeds a branch running from the boundary
+        // in to the medial axis — about half the thickness, ~11px — so the fixed
+        // 5px spur threshold kept every one of them and this came back as *ten*
+        // fragments. Judged against the disc at its base, each is noise.
+        let (w, h, values) = thick_bar(true);
+        let paths = component_skeleton_paths(&values, w, h, 30, 22);
+        assert_eq!(paths.len(), 1, "a rough thick bar must not shatter");
+        assert!(max_x_span(&paths) >= 30.0, "span was {}", max_x_span(&paths));
+    }
+
+    #[test]
+    fn roughness_does_not_change_the_result() {
+        // The smooth and rough bars differ only in 1px boundary noise, so they
+        // must skeletonize the same way. This is the scale-invariance the fixed
+        // threshold could not give.
+        let (w, h, smooth) = thick_bar(false);
+        let (_, _, rough) = thick_bar(true);
+        assert_eq!(
+            component_skeleton_paths(&smooth, w, h, 30, 20).len(),
+            component_skeleton_paths(&rough, w, h, 30, 20).len(),
+        );
+    }
+
+    #[test]
+    fn a_small_hole_does_not_split_the_centerline() {
+        // Thinning wraps the skeleton around a hole, leaving two parallel arcs
+        // between the same pair of junctions. Spur pruning cannot see them (both
+        // ends are junctions) and contraction cannot either (both are degree 3),
+        // so before `collapse_bubbles` a single dropout in a predicted mask split
+        // the centerline in two.
+        let (w, h, mut values) = thick_bar(false);
+        for y in 19..=21u32 {
+            for x in 30..=32u32 {
+                values[(y * w + x) as usize] = 0;
+            }
+        }
+        let paths = component_skeleton_paths(&values, w, h, 10, 20);
+        assert_eq!(paths.len(), 1, "a small hole must not split the centerline");
+    }
+
+    #[test]
+    fn a_ring_keeps_its_loop() {
+        // The other side of the bubble rule: an annulus is *made* of a loop, and
+        // its arcs dwarf its own thickness, so it must come back whole.
+        let (w, h) = (48u32, 48u32);
+        let values = annulus(w, h, 24.0, 24.0, 18.0, 13.0);
+        let paths = component_skeleton_paths(&values, w, h, 24, 9);
+        assert_eq!(paths.len(), 1, "a ring is one closed centerline");
+        let len = polyline_length_pts(&paths[0]);
+        assert!(len >= 60.0, "the loop was cut short: length {len}");
+    }
+
     #[test]
     fn skeleton_of_plus_has_four_arms() {
         // A plus: 1px vertical + horizontal bars crossing at the centre. Arms are
@@ -921,3 +1170,4 @@ mod tests {
         assert!(paths.len() >= 4, "expected >= 4 arms, got {}", paths.len());
     }
 }
+

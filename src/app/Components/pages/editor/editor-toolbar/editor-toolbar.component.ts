@@ -76,6 +76,17 @@ export class EditorToolbarComponent {
     void this.prediction.predictCurrentFrameAsVectors(useScribbles);
   }
 
+  /**
+   * Run the head and reduce its output to centerlines instead of outlines.
+   *
+   * Same prediction, different reading of it: for a curve-like structure the
+   * outline is two nearly parallel boundaries, and the path down the middle is
+   * the thing worth editing and measuring.
+   */
+  predictAsSkeletons(useScribbles: boolean): void {
+    void this.prediction.predictCurrentFrameAsSkeletons(useScribbles);
+  }
+
   /** Slider position [0, brushSteps] mapped logarithmically from lineWidth. */
   get brushSizeSlider(): number {
     const v = Math.min(this.brushMax, Math.max(this.brushMin, this.editorService.lineWidth));

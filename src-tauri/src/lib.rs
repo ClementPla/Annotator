@@ -179,6 +179,7 @@ pub fn run() {
             commands::vectorize::vectorize_component,
             commands::vectorize::vectorize_mask,
             commands::skeletonize::skeletonize_component,
+            commands::skeletonize::skeletonize_mask,
             commands::annotation::list_labels,
             commands::annotation::get_labels,
             // Classification commands
