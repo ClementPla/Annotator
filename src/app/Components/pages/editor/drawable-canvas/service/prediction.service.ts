@@ -58,6 +58,26 @@ export class PredictionService {
   }
 
   /**
+   * Enter the running state.
+   *
+   * Paired with [`endRun`] so the two entry points cannot drift: they did, and
+   * only one of them cleared `stage`, which left the toolbar button reading
+   * "classifying" — the last phase the backend reported — long after the run
+   * had finished. Anything that outlives a single prediction belongs here.
+   */
+  private beginRun(): void {
+    this.running.set(true);
+    this.stage.set(null);
+    this.lastError.set(null);
+  }
+
+  /** Leave the running state, clearing anything scoped to one prediction. */
+  private endRun(): void {
+    this.running.set(false);
+    this.stage.set(null);
+  }
+
+  /**
    * Turn what the user has already drawn into scribble conditioning.
    *
    * The head's conditioning is binary, so the mapping is: pixels of the
@@ -151,8 +171,7 @@ export class PredictionService {
     // cleared while work is still in flight.
     if (!frame || this.running()) return;
 
-    this.running.set(true);
-    this.lastError.set(null);
+    this.beginRun();
     try {
       const scribbles = useScribbles ? this.deriveScribbles() : undefined;
       const result = await api.mlPredictFrame(frame.id, scribbles);
@@ -215,7 +234,7 @@ export class PredictionService {
       this.lastError.set(message);
       this.notifications.error('Prediction failed', message);
     } finally {
-      this.running.set(false);
+      this.endRun();
     }
   }
 
@@ -233,8 +252,7 @@ export class PredictionService {
     const frame = this.sequenceService.currentFrame();
     if (!frame || this.running()) return;
 
-    this.running.set(true);
-    this.lastError.set(null);
+    this.beginRun();
     try {
       const scribbles = useScribbles ? this.deriveScribbles() : undefined;
       const result = await api.mlPredictFrame(frame.id, scribbles);
@@ -286,8 +304,7 @@ export class PredictionService {
       this.lastError.set(message);
       this.notifications.error('Prediction failed', message);
     } finally {
-      this.running.set(false);
-      this.stage.set(null);
+      this.endRun();
     }
   }
 }
