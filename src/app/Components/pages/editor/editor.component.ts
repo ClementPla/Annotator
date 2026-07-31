@@ -235,7 +235,8 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
         this.labelService.switchVisibilityAllSegLabels();
         this.editorService.requestCanvasRedraw();
       },
-      nextLabel: () => this.cycleToNextLabel(),
+      nextLabel: () => this.labelService.cycleActive(1),
+      previousLabel: () => this.labelService.cycleActive(-1),
       toggleEdges: () => {
         this.editorService.edgesOnly = !this.editorService.edgesOnly;
         this.editorService.requestCanvasRedraw();
@@ -474,21 +475,6 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   // Label Helpers
   // ==========================================
 
-  private cycleToNextLabel() {
-    const labels = this.labelService.listSegmentationLabels;
-    if (labels.length === 0) return;
-    const nextIndex = (this.labelService.getActiveIndex() + 1) % labels.length;
-    const next = labels[nextIndex];
-    // Mirror a tree click so the selection highlight and instance state stay
-    // consistent whichever way the active label was changed.
-    this.labelService.activeLabel = next;
-    this.labelService.activeSegInstance = {
-      label: next,
-      instance: -1,
-      shade: next.color,
-      id: next.id,
-    };
-  }
 
   private togglePostProcessing() {
     if (this.editorService.isDrawingTool()) {

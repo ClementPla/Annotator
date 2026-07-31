@@ -44,6 +44,7 @@ export class KeyboardShortcutService implements OnDestroy {
     // View
     { keys: ['tab'], action: 'toggleAllVisibility', description: 'Toggle all labels visibility', category: 'view' },
     { keys: ['ctrl+tab'], action: 'nextLabel', description: 'Cycle to next label', category: 'view' },
+    { keys: ['ctrl+shift+tab'], action: 'previousLabel', description: 'Cycle to previous label', category: 'view' },
     { keys: ['ctrl+e'], action: 'toggleEdges', description: 'Toggle edge display', category: 'view' },
     { keys: ['q'], action: 'toggleImageProcessing', description: 'Toggle image processing', category: 'view' },
     { keys: ['d'], action: 'togglePostProcessing', description: 'Toggle post-processing', category: 'view' },

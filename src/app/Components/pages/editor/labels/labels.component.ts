@@ -185,13 +185,7 @@ export class LabelsComponent implements OnInit, OnDestroy {
   public changeActiveLabel(event: TreeNode[] | TreeNode | null): void {
     if (Array.isArray(event) || !event) return;
 
-    this.labelsService.activeLabel = event.data as SegLabel;
-    this.labelsService.activeSegInstance = {
-      label: this.labelsService.activeLabel,
-      instance: -1,
-      shade: this.labelsService.activeLabel.color,
-      id: this.labelsService.activeLabel.id
-    };
+    this.labelsService.activate(event.data as SegLabel);
   }
 
   // ==========================================

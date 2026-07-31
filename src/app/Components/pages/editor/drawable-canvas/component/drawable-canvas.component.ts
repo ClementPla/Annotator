@@ -31,6 +31,8 @@ import { CanvasInputDirective } from '../directives/canvas-input.directive';
 import { Button } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
 import { SelectModule } from 'primeng/select';
+import { ContextMenu, ContextMenuModule } from 'primeng/contextmenu';
+import { MenuItem } from 'primeng/api';
 
 import { Point2D, Viewbox } from '../interface';
 import { FeatureFlagsService } from '../../../../../experimental/feature-flags.service';
@@ -41,7 +43,7 @@ import { TiledImageService } from '../service/tiled-image.service';
 
 @Component({
   selector: 'app-drawable-canvas',
-  imports: [CommonModule, FormsModule, Button, TooltipModule, SelectModule, SVGElementsComponent, VectorLayerComponent, CanvasInputDirective],
+  imports: [CommonModule, FormsModule, Button, TooltipModule, SelectModule, ContextMenuModule, SVGElementsComponent, VectorLayerComponent, CanvasInputDirective],
   templateUrl: './drawable-canvas.component.html',
   styleUrl: './drawable-canvas.component.scss',
   standalone: true,
@@ -55,6 +57,37 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   // padding). Drives whether the brush cursor / cursor-none applies, so the
   // margin around a zoomed-out image keeps a regular, clickable cursor.
   public isCursorInsideImage = false;
+
+  @ViewChild('labelMenu') labelMenu?: ContextMenu;
+  /**
+   * Labels offered by the right-click picker.
+   *
+   * Rebuilt when the menu opens rather than read from a getter: PrimeNG menus
+   * are OnPush and react to the array's identity, so a fresh array on every
+   * change-detection pass rebuilds the overlay under the cursor and swallows
+   * the click. Labels only change when the project does, so building on open
+   * is both stable and always current.
+   */
+  public labelMenuItems: MenuItem[] = [];
+
+  /**
+   * Open the label picker at the pointer.
+   *
+   * Ctrl+Tab / Ctrl+Shift+Tab step through labels, which is quick for a few;
+   * this is the direct route once a project has more than a handful.
+   */
+  public openLabelPicker(event: MouseEvent): void {
+    const active = this.labelService.activeLabel;
+    this.labelMenuItems = this.labelService.listSegmentationLabels.map(
+      (label) => ({
+        label: label.label,
+        icon: label === active ? 'pi pi-check' : 'pi pi-fw',
+        style: { 'border-left': `4px solid ${label.color}` },
+        command: () => this.labelService.activate(label),
+      }),
+    );
+    this.labelMenu?.show(event);
+  }
 
   // Viewport CSS dimensions (drive both canvas style and internal resolution)
   public viewportWidth = 0;

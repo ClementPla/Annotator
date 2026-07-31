@@ -68,9 +68,12 @@
         'cursor-crosshair': !editorService.canPan() && !editorService.isToolWithBrushSize()
       }"
       (canvasMove)="onMouseMove($any($event))"
+      (contextMenu)="openLabelPicker($any($event))"
       (mouseleave)="isCursorInsideImage = false"
       (wheel)="wheel($event)"
     ></canvas>
+
+    <p-contextMenu #labelMenu [model]="labelMenuItems" appendTo="body" />
 
     <!-- Overlay layer for experimental features (e.g. superpixel boundaries) -->
     <canvas

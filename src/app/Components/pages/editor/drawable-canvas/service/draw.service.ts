@@ -10,6 +10,7 @@ import { StateManagerService } from './state-manager.service';
 import { CanvasManagerService } from './canvas-manager.service';
 import { UndoRedoService } from './undo-redo.service';
 import { PostProcessService } from './post-process.service';
+import { VectorEditorService } from './vector-editor.service';
 
 import { Tools } from '../../../../../Core/tools';
 import { BboxLabel } from '../../../../../Core/interface';
@@ -48,7 +49,8 @@ export class DrawService implements OnDestroy {
     private canvasManagerService: CanvasManagerService,
     private undoRedoService: UndoRedoService,
     private postProcessService: PostProcessService,
-    private ioService: IOService
+    private ioService: IOService,
+    private vectorEditor: VectorEditorService
   ) {
     this.initializeSubscriptions();
   }
@@ -246,13 +248,31 @@ export class DrawService implements OnDestroy {
     this.editorService.canvasClear
       .pipe(takeUntil(this.destroy$))
       .subscribe((value) => {
-        if (value >= 0) {
-          this.canvasManagerService.clearMaskAtIndex(value);
-          this.stateService.recomputeCanvasSum = true;
-          this.ioService.markLabelDirty(value);
-          this.redrawRequest.next(true);
-        }
+        if (value >= 0) this.clearLabel(value);
       });
+  }
+
+  /**
+   * Erase everything annotated under one label: its raster mask *and* its
+   * vector paths.
+   *
+   * A label's annotation is both halves, so clearing only the mask left the
+   * paths on screen and looked like the button had not worked. Both go into one
+   * undo group, which also makes the raster clear undoable for the first time —
+   * it previously took no snapshot at all, so a mis-click was unrecoverable.
+   */
+  private clearLabel(index: number): void {
+    const labelId = this.labelService.listSegmentationLabels[index]?.id;
+
+    this.undoRedoService.beginGroup();
+    this.undoRedoService.snapshotLayers([index]);
+    this.canvasManagerService.clearMaskAtIndex(index);
+    if (labelId != null) this.vectorEditor.deleteShapesForLabel(labelId);
+    this.undoRedoService.endGroup();
+
+    this.stateService.recomputeCanvasSum = true;
+    this.ioService.markLabelDirty(index);
+    this.redrawRequest.next(true);
   }
 
   // ==========================================

@@ -53,6 +53,13 @@
           (click)="markSelectedAsReviewed(true)"
         ></p-button>
         <p-button
+          label="Mark as not reviewed"
+          icon="pi pi-times-circle"
+          severity="secondary"
+          [outlined]="true"
+          (click)="markSelectedAsReviewed(false)"
+        ></p-button>
+        <p-button
           label="Clear selection"
           icon="pi pi-times"
           severity="secondary"
@@ -279,6 +286,7 @@
           [frameIds]="item.frameIds"
           (thumbnailSelected)="handleSelect($event)"
           (thumbnailClicked)="openItem(item)"
+          (reviewedToggled)="onItemReviewedToggle($event)"
         ></app-gallery-element>
         }
       </div>

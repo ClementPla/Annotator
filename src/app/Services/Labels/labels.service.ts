@@ -126,6 +126,43 @@ export class LabelsService {
     this._treeNode = constructLabelTreeNode(this.listSegmentationLabels);
   }
 
+  /**
+   * Make `label` the active one, together with its instance state.
+   *
+   * The single entry point for changing the active label. The label tree, the
+   * keyboard cycle, the instance picker and vector selection all route through
+   * here, so `activeLabel` and `activeSegInstance` cannot drift apart — they
+   * were set as a pair in four separate places, and any new caller that forgot
+   * the second half left the instance picker pointing at the previous label.
+   *
+   * `instance` defaults to -1, meaning the label as a whole rather than one of
+   * its instances.
+   */
+  activate(label: SegLabel, instance = -1, shade = label.color): void {
+    this.activeLabel = label;
+    this.activeSegInstance = { label, instance, shade, id: label.id };
+  }
+
+  /** Activate the label carrying `id`, if the project still has one. */
+  activateById(id: number): void {
+    const label = this.listSegmentationLabels.find((l) => l.id === id);
+    if (label) this.activate(label);
+  }
+
+  /** Move the active label `step` places through the list, wrapping. */
+  cycleActive(step: number): void {
+    const labels = this.listSegmentationLabels;
+    const n = labels.length;
+    if (n === 0) return;
+    const from = this.getActiveIndex();
+    if (from < 0) {
+      // Nothing active yet — enter the list from whichever end `step` implies.
+      this.activate(labels[step > 0 ? 0 : n - 1]);
+      return;
+    }
+    this.activate(labels[(((from + step) % n) + n) % n]);
+  }
+
   getActiveIndex(): number {
     if (this.activeLabel) {
       return this.listSegmentationLabels.findIndex(
@@ -159,12 +196,11 @@ export class LabelsService {
       return;
     }
     if (!this.activeSegInstance) {
-      this.activeSegInstance = {
-        label: this.activeLabel,
-        instance: 1,
-        shade: this.activeLabel.shades?.[1] ?? this.activeLabel.color,
-        id: this.activeLabel.id,
-      };
+      this.activate(
+        this.activeLabel,
+        1,
+        this.activeLabel.shades?.[1] ?? this.activeLabel.color,
+      );
     } else {
       let current_instance = this.activeSegInstance.instance;
       // Instance ids are the pixel value, so they must stay >= 1 (0 = empty).
@@ -173,14 +209,11 @@ export class LabelsService {
         current_instance = 0;
       }
       current_instance++;
-      const new_shade = this.activeLabel.shades![current_instance];
-
-      this.activeSegInstance = {
-        label: this.activeLabel,
-        instance: current_instance,
-        shade: new_shade,
-        id: this.activeLabel.id,
-      };
+      this.activate(
+        this.activeLabel,
+        current_instance,
+        this.activeLabel.shades![current_instance],
+      );
     }
   }
 

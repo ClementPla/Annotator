@@ -218,6 +218,19 @@ export class VectorEditorService {
     // NB: clipboard is intentionally preserved across frames (cross-frame paste).
   }
 
+  /**
+   * Drop every shape belonging to `labelId`, as one undoable action.
+   *
+   * The counterpart to clearing a label's raster mask: a label's annotation is
+   * both, so clearing one and leaving the other behind is never what was meant.
+   */
+  deleteShapesForLabel(labelId: number): void {
+    const ids = this._shapes()
+      .filter((s) => s.labelId === labelId)
+      .map((s) => s.id);
+    this.deleteShapesByIds(ids);
+  }
+
   shapesByLabel(): Map<number, VectorShape[]> {
     const byLabel = new Map<number, VectorShape[]>();
     for (const shape of this._shapes()) {
@@ -771,9 +784,22 @@ export class VectorEditorService {
     return this._selectedIds().includes(id);
   }
 
+  /**
+   * Reduce the selection to one shape (or nothing), and follow it with the
+   * active label.
+   *
+   * Selecting a path is how you say "I want to work on this", and the tools
+   * that follow — painting, the instance picker, a new path — all act on the
+   * active label. Leaving it pointing elsewhere meant selecting a path and
+   * editing silently produced work under the wrong label. Every single-shape
+   * selection routes through here, so click, marquee-collapse, vectorize and
+   * paste all behave the same way.
+   */
   private selectOnly(id: string | null): void {
     this._selectedIds.set(id ? [id] : []);
     this._selectedNode.set(null);
+    const shape = id ? this._shapes().find((s) => s.id === id) : null;
+    if (shape) this.labels.activateById(shape.labelId);
   }
 
   private addToSelection(id: string): void {

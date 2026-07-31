@@ -161,6 +161,35 @@
         </span>
       }
 
+      <!-- Reviewed toggle. The list layout uses a labelled switch; a card has no
+           room for one, so it gets an icon that reads as its own state. -->
+      @if (showReviewedToggle) {
+        <button
+          type="button"
+          class="absolute border-2 flex h-6 items-center justify-center right-2 rounded-full transition-colors w-6"
+          [class.bg-green-500]="isReviewed"
+          [class.border-green-500]="isReviewed"
+          [class.bg-white]="!isReviewed"
+          [class.border-gray-300]="!isReviewed"
+          [class.top-2]="!hasMultipleFrames"
+          [class.top-10]="hasMultipleFrames"
+          [attr.aria-pressed]="isReviewed"
+          [attr.aria-label]="
+            (isReviewed ? 'Mark ' : 'Mark ') +
+            displayTitle +
+            (isReviewed ? ' as not reviewed' : ' as reviewed')
+          "
+          [pTooltip]="isReviewed ? 'Mark as not reviewed' : 'Mark as reviewed'"
+          (click)="$event.stopPropagation(); onReviewedToggle(!isReviewed)"
+        >
+          <i
+            class="pi pi-verified text-sm"
+            [class.text-white]="isReviewed"
+            [class.text-gray-400]="!isReviewed"
+          ></i>
+        </button>
+      }
+
       <!-- Selection Checkbox -->
       <div
         class="absolute border-2 bottom-2 flex h-6 items-center justify-center right-2 rounded transition-colors w-6"

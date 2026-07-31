@@ -55,6 +55,10 @@ interface GalleryItem {
   thumbnailFrameId: number;
   /** Fraction of frames reviewed, 0..1. Used for progress sorting. */
   progress: number;
+  /** Frames carrying an annotation. Kept so un-reviewing can recompute the
+   *  status without a reload: a sequence that stops being reviewed falls back
+   *  to 'annotated', not to 'empty'. */
+  annotatedCount: number;
   /** True if the sequence contains at least one keypoint pair. */
   hasKeypoints: boolean;
 }
@@ -253,6 +257,7 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
           ),
           progress:
             seq.frameCount > 0 ? seq.reviewedCount / seq.frameCount : 0,
+          annotatedCount: seq.annotatedCount,
           frameIds: frameIdsBySequence[seq.id] ?? [],
           hasKeypoints: seq.hasKeypoints,
         }));
@@ -547,8 +552,15 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
         return;
       }
 
-      item.status = event.reviewed ? 'reviewed' : 'empty';
+      // Route through computeStatus rather than assigning a literal: un-reviewing
+      // a sequence that still carries annotations makes it 'annotated', and the
+      // old `: 'empty'` showed it as untouched until the next reload.
       item.progress = event.reviewed ? 1 : 0;
+      item.status = this.computeStatus(
+        event.reviewed ? item.frameCount : 0,
+        item.annotatedCount,
+        item.frameCount,
+      );
       this.applyFilters();
     } catch (error) {
       console.error('Failed to mark sequence as reviewed:', error);

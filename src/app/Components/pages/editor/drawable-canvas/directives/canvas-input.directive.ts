@@ -17,6 +17,8 @@ export class CanvasInputDirective {
     cursor: Point2D;   // viewport space (CSS px)
   }>();
   @Output() canvasUp = new EventEmitter<MouseEvent>();
+  /** Right-click on the canvas, for the label picker. */
+  @Output() contextMenu = new EventEmitter<MouseEvent>();
 
   // Two-finger pinch state
   private pinchActive = false;
@@ -35,8 +37,18 @@ export class CanvasInputDirective {
   // Mouse
   // ==========================================
 
+  /** Right-click opens the label picker, so only the left button draws. */
+  @HostListener('contextmenu', ['$event'])
+  onContextMenu(event: MouseEvent) {
+    event.preventDefault();
+    this.contextMenu.emit(event);
+  }
+
   @HostListener('mousedown', ['$event'])
   onMouseDown(event: MouseEvent) {
+    // Without this a right- or middle-click started a stroke, which then had no
+    // matching mouseup and left the canvas painting until the next left click.
+    if (event.button !== 0) return;
     this.pointerDown(event);
   }
 

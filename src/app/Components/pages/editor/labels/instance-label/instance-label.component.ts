@@ -117,13 +117,7 @@ export class InstanceLabelComponent implements OnInit, OnDestroy {
   }
 
   changeActive(value: number): void {
-    this.labelService.activeLabel = this.label;
-    this.labelService.activeSegInstance = {
-      label: this.label,
-      instance: value,
-      shade: this.shadeFor(value),
-      id: this.label.id,
-    };
+    this.labelService.activate(this.label, value, this.shadeFor(value));
   }
 
   /**
