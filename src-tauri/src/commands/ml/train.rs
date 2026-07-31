@@ -104,10 +104,21 @@ pub struct TrainConfig {
 }
 
 impl Default for TrainConfig {
+    /// Sized for the datasets this lab actually sees.
+    ///
+    /// `hidden = 128, depth = 3` was ~484,000 parameters, fitted in practice to
+    /// a few hundred patches from a handful of reviewed frames — orders of
+    /// magnitude more capacity than the supervision can constrain. It also cost
+    /// the most where it mattered least: the dilated blocks are `hidden`-to-
+    /// `hidden`, so their work scales with `hidden²` and dominated the step.
+    ///
+    /// 64x2 is roughly an eighth of the parameters and a sixth of the block
+    /// FLOPs. On a small annotated set that should train faster *and* generalise
+    /// better; raise either knob when there is genuinely more data to justify it.
     fn default() -> Self {
         Self {
-            hidden: 128,
-            depth: 3,
+            hidden: 64,
+            depth: 2,
             epochs: 40,
             lr: 1e-3,
             // Patches, not pixels: each carries PATCH^2 supervised pixels.

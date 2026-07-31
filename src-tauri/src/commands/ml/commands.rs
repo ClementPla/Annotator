@@ -485,8 +485,11 @@ fn build_split(
 
 fn train_config(options: &CurveOptions) -> TrainConfig {
     TrainConfig {
-        hidden: options.hidden.unwrap_or(128),
-        depth: options.depth.unwrap_or(3),
+        // Fall back to TrainConfig's own defaults rather than repeating them —
+        // these two drifted from it once already, so the head the lab built was
+        // not the head the defaults described.
+        hidden: options.hidden.unwrap_or(TrainConfig::default().hidden),
+        depth: options.depth.unwrap_or(TrainConfig::default().depth),
         epochs: options.epochs.unwrap_or(40),
         seed: options.seed.unwrap_or(0),
         ..Default::default()
