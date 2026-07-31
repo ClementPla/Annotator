@@ -97,6 +97,10 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .max_file_size(5_000_000)
             .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+            // `clear_targets` first: the builder already defaults to Stdout and
+            // LogDir, and `.target()` appends, so naming them again wrote every
+            // line twice.
+            .clear_targets()
             .target(tauri_plugin_log::Target::new(
                 tauri_plugin_log::TargetKind::LogDir { file_name: None },
             ))
