@@ -1,3 +1,16 @@
+/* A gallery item is a click target, not prose. Without this, click-dragging or
+   shift-clicking across items to build a batch selection also drags a text
+   selection through their titles and badges, painting them in the browser's
+   selection blue — which reads as a rendering fault rather than as selected
+   text. One rule on the host covers both the card and the list-row layout.
+
+   The -webkit- prefix is not legacy padding here: the macOS build runs on
+   WKWebView, not Chromium. */
+:host {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .gallery-element {
   margin: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
