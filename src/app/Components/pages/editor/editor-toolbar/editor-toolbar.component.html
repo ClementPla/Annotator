@@ -81,63 +81,25 @@
 
       <div class="flex gap-2 items-center vector-tool-group">
         <span class="opacity-60 vector-tool-group__label">Model</span>
-        <p-button
+        <p-splitButton
+          [label]="predictLabel"
+          [icon]="prediction.running() ? 'pi pi-spin pi-spinner' : 'pi pi-bolt'"
           severity="secondary"
           [outlined]="true"
-          pTooltip="Predict this frame with the trained head, conditioned on what you have already drawn. Ctrl+Z reverts."
+          [model]="outputMenu"
+          (onClick)="predict()"
+          pTooltip="Predict this frame with the trained head. The arrow picks what you get back: painted pixels, editable region outlines, or centerlines. Ctrl+Z reverts."
           tooltipPosition="bottom"
-          [loading]="prediction.running()"
-          (onClick)="predict(true)"
-        >
-          <span class="flex gap-2 items-center">
-            <i class="pi pi-bolt"></i>
-            <div class="hidden lg:block">
-              {{ prediction.stage() ?? 'Predict' }}
-            </div>
-          </span>
-        </p-button>
+        />
 
-        <p-button
-          severity="secondary"
-          [outlined]="true"
-          pTooltip="Predict without using your strokes as hints — the honest read of what the model does unaided"
+        <label
+          class="flex gap-2 items-center"
+          pTooltip="Use what you have already drawn as hints. Turn it off to see what the model does unaided."
           tooltipPosition="bottom"
-          [loading]="prediction.running()"
-          (onClick)="predict(false)"
         >
-          <span class="flex gap-2 items-center">
-            <i class="pi pi-sparkles"></i>
-            <div class="hidden lg:block">Unaided</div>
-          </span>
-        </p-button>
-
-        <p-button
-          severity="secondary"
-          [outlined]="true"
-          pTooltip="Predict, then trace the result into editable paths rather than painting pixels. Nodes are corners you can adjust."
-          tooltipPosition="bottom"
-          [loading]="prediction.running()"
-          (onClick)="predictAsVectors(true)"
-        >
-          <span class="flex gap-2 items-center">
-            <i class="pi pi-pencil"></i>
-            <div class="hidden lg:block">As paths</div>
-          </span>
-        </p-button>
-
-        <p-button
-          severity="secondary"
-          [outlined]="true"
-          pTooltip="Predict, then reduce each region to its centerline — an open path down the middle. For vessels, fibres and other curve-like structures, where an outline is two parallel boundaries and the middle is what you want."
-          tooltipPosition="bottom"
-          [loading]="prediction.running()"
-          (onClick)="predictAsSkeletons(true)"
-        >
-          <span class="flex gap-2 items-center">
-            <i class="pi pi-share-alt"></i>
-            <div class="hidden lg:block">As skeletons</div>
-          </span>
-        </p-button>
+          <p-toggleswitch [(ngModel)]="useScribbles" />
+          <span class="hidden lg:block opacity-70">Use strokes</span>
+        </label>
       </div>
 
       @if (editorService.isToolWithBrushSize()) {

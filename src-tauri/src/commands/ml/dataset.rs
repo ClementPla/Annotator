@@ -281,20 +281,19 @@ pub fn jitter(image: &Array3<f32>, rng: &mut Rng) -> Array3<f32> {
     image.mapv(|v| (v.clamp(0.0, 1.0).powf(gamma) * gain + bias).clamp(0.0, 1.0))
 }
 
-/// Draw `n_patches` patches into a sample table.
+/// Draw `n_patches` patches into a sample table. Patches rather than pixels,
+/// because the head is convolutional and needs neighbours.
 ///
-/// Patches, because the head is convolutional and needs neighbours.
+/// # Class balance applies to sampling only
 ///
-/// # Why this rebalances, having previously refused to
+/// Crop origins are biased towards foreground. For a structure covering ~1% of
+/// a frame, uniform crops put a positive pixel in front of the loss so rarely
+/// that the head converges to all-background and stays there.
 ///
-/// The original rule was that origins stay uniform so the curve reflects the
-/// class prior the annotator actually produced. That is the right instinct for
-/// *reporting* and the wrong one for *sampling*: with an optic disc at ~1% of a
-/// frame, uniform crops put a positive pixel in front of the loss so rarely
-/// that the head converges to all-background and stays there. Balance is
-/// therefore applied to which crops are *drawn*, never to the loss weighting or
-/// the metrics — held-out Dice is still computed on unbalanced frames, so the
-/// numbers stay honest while the gradient stops being starved.
+/// The bias is confined to *which crops are drawn*. Loss weighting and metrics
+/// are untouched, so held-out Dice is still measured on unbalanced frames and
+/// remains comparable to what the model will meet at inference. Do not extend
+/// the balancing into either of those.
 ///
 /// A frame smaller than one patch is skipped rather than padded — padding would
 /// feed the head invented context it will never see at inference.
@@ -313,7 +312,7 @@ pub fn sample_patches(
     let n_patches = n_patches.max(1);
 
     // Where the annotator actually drew. Uniform sampling alone is hopeless for
-    // small structures: an optic disc covers ~1% of a fundus frame, so most
+    // small structures: a target covering ~1% of a frame means most
     // random crops contain no positive pixel at all and the head converges to
     // "always background" — a correct answer to that data, and a useless model.
     // Biasing a share of crops to centre on a labelled pixel is what puts the
@@ -820,7 +819,7 @@ mod tests {
     fn foreground_bias_finds_a_small_structure_that_uniform_sampling_misses() {
         let (w, h) = (200usize, 200usize);
         let feats = Array3::<f32>::zeros((2, h, w));
-        // A 6x6 blob — 0.09% of the frame, comparable to an optic disc.
+        // A 6x6 blob — 0.09% of the frame, the small-structure regime.
         let mut labels = vec![0i32; w * h];
         for y in 100..106 {
             for x in 100..106 {

@@ -351,7 +351,7 @@ fn decode_tokens(shape: &[usize], data: Vec<f32>) -> Result<Array3<f32>, String>
 ///
 /// This is called to upsample an encoder's token grid to working resolution —
 /// `[384, 32, 32]` to `[384, 384, 384]`, 56 million outputs. The channel loop
-/// used to be *innermost*, which for a C-ordered `[c, h, w]` array strides by
+/// must stay *outermost*: for a C-ordered `[c, h, w]` array a channel-inner loop strides by
 /// `h * w` floats (590 KB at this size) on every step: a cache miss on each of
 /// the four gathers, for every output. Measured at 6.2 s per frame — larger than
 /// the ViT forward it follows, and it kept being misread as encoder cost.

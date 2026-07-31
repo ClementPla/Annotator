@@ -19,7 +19,7 @@ import {
   makeIdentityAdjustments,
   makeIdentityState,
 } from './image-processing.model';
-import { ImageAdjustmentRenderer } from './image-adjustement.renderer';
+import { ImageAdjustmentRenderer } from './image-adjustment.renderer';
 
 @Injectable({ providedIn: 'root' })
 export class ImageAdjustmentService implements OnDestroy {

@@ -8,13 +8,26 @@ import { FormsModule } from '@angular/forms';
 import { EditorService } from '../services/editor.service';
 import { ConvertService } from '../drawable-canvas/service/convert.service';
 import { VectorEditorService } from '../drawable-canvas/service/vector-editor.service';
-import { PredictionService } from '../../../../Services/prediction.service';
+import { PredictionService } from '../drawable-canvas/service/prediction.service';
 import { SliderModule } from 'primeng/slider';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { BlockUIModule } from 'primeng/blockui';
 import { PanelModule } from 'primeng/panel';
 import { GenericsModule } from '../../../../generics/generics.module';
 import { TooltipModule } from 'primeng/tooltip';
+import { SplitButtonModule } from 'primeng/splitbutton';
+import { MenuItem } from 'primeng/api';
+
+/** What a prediction leaves behind. */
+type PredictOutput = 'pixels' | 'paths' | 'centerlines';
+
+const OUTPUT_KEY = 'dida.predict.output';
+
+const OUTPUTS: { id: PredictOutput; label: string; icon: string }[] = [
+  { id: 'pixels', label: 'Painted pixels', icon: 'pi pi-bolt' },
+  { id: 'paths', label: 'Editable paths', icon: 'pi pi-pencil' },
+  { id: 'centerlines', label: 'Centerlines', icon: 'pi pi-share-alt' },
+];
 
 @Component({
     selector: 'app-editor-toolbar',
@@ -30,6 +43,7 @@ import { TooltipModule } from 'primeng/tooltip';
         ToggleSwitchModule,
         GenericsModule,
         TooltipModule,
+        SplitButtonModule,
     ],
     templateUrl: './editor-toolbar.component.html',
     styleUrl: './editor-toolbar.component.scss'
@@ -58,33 +72,52 @@ export class EditorToolbarComponent {
   }
 
   /**
-   * Run the trained head on this frame.
+   * What a prediction produces. Persisted so the toolbar reopens as left.
    *
-   * @param useScribbles feed the current annotation in as conditioning.
+   * The model predicts a raster mask in every case; this only decides how that
+   * mask is read back — pixels, region outlines, or centerlines.
    */
-  predict(useScribbles: boolean): void {
-    void this.prediction.predictCurrentFrame(useScribbles);
+  outputMode: PredictOutput =
+    (localStorage.getItem(OUTPUT_KEY) as PredictOutput | null) ?? 'pixels';
+
+  /** Feed what the user has already drawn in as conditioning. */
+  useScribbles = true;
+
+  /** Output choices for the split button's dropdown; picking one also runs it. */
+  get outputMenu(): MenuItem[] {
+    return OUTPUTS.map((o) => ({
+      label: o.label,
+      icon: o.icon,
+      disabled: o.id === this.outputMode,
+      command: () => {
+        this.outputMode = o.id;
+        localStorage.setItem(OUTPUT_KEY, o.id);
+        this.predict();
+      },
+    }));
   }
 
-  /**
-   * Run the head and trace its output into editable paths instead of pixels.
-   *
-   * The model predicts a raster mask either way; this vectorises the result, so
-   * it is a choice about what you get back rather than about how it was fitted.
-   */
-  predictAsVectors(useScribbles: boolean): void {
-    void this.prediction.predictCurrentFrameAsVectors(useScribbles);
+  get outputLabel(): string {
+    return OUTPUTS.find((o) => o.id === this.outputMode)?.label ?? 'Predict';
   }
 
-  /**
-   * Run the head and reduce its output to centerlines instead of outlines.
-   *
-   * Same prediction, different reading of it: for a curve-like structure the
-   * outline is two nearly parallel boundaries, and the path down the middle is
-   * the thing worth editing and measuring.
-   */
-  predictAsSkeletons(useScribbles: boolean): void {
-    void this.prediction.predictCurrentFrameAsSkeletons(useScribbles);
+  /** Shows the live phase while a prediction runs, the target output otherwise. */
+  get predictLabel(): string {
+    return this.prediction.stage() ?? this.outputLabel;
+  }
+
+  /** Run the trained head on this frame, in the selected output mode. */
+  predict(): void {
+    switch (this.outputMode) {
+      case 'paths':
+        void this.prediction.predictCurrentFrameAsVectors(this.useScribbles);
+        break;
+      case 'centerlines':
+        void this.prediction.predictCurrentFrameAsSkeletons(this.useScribbles);
+        break;
+      default:
+        void this.prediction.predictCurrentFrame(this.useScribbles);
+    }
   }
 
   /** Slider position [0, brushSteps] mapped logarithmically from lineWidth. */

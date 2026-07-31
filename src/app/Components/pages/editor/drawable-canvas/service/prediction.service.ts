@@ -1,21 +1,21 @@
 import { Injectable, NgZone, signal } from '@angular/core';
 import { listen } from '@tauri-apps/api/event';
 
-import { LabelsService } from './Labels/labels.service';
-import { SequenceService } from './sequence.service';
-import { IOService } from './io.service';
-import { NotificationService } from './notification.service';
-import { CanvasManagerService } from '../Components/pages/editor/drawable-canvas/service/canvas-manager.service';
-import { StateManagerService } from '../Components/pages/editor/drawable-canvas/service/state-manager.service';
-import { UndoRedoService } from '../Components/pages/editor/drawable-canvas/service/undo-redo.service';
+import { LabelsService } from '../../../../../Services/Labels/labels.service';
+import { SequenceService } from '../../../../../Services/sequence.service';
+import { IOService } from '../../../../../Services/io.service';
+import { NotificationService } from '../../../../../Services/notification.service';
+import { CanvasManagerService } from './canvas-manager.service';
+import { StateManagerService } from './state-manager.service';
+import { UndoRedoService } from './undo-redo.service';
 
-import { api, ScribbleInput, VectorShape, VectorNode } from '../lib/api';
+import { api, ScribbleInput, VectorShape, VectorNode } from '../../../../../lib/api';
 
 /** Upper bound on traced shapes. A fragmented prediction can otherwise drop
  *  hundreds of specks into the editor, each needing manual deletion. */
 const MAX_TRACED_SHAPES = 64;
-import { VectorEditorService } from '../Components/pages/editor/drawable-canvas/service/vector-editor.service';
-import { OrchestratorService } from '../Components/pages/editor/drawable-canvas/service/orchestrator.service';
+import { VectorEditorService } from './vector-editor.service';
+import { OrchestratorService } from './orchestrator.service';
 
 /**
  * Applies the trained segmentation head to the frame currently open in the
@@ -93,7 +93,7 @@ export class PredictionService {
    * Predict the open frame and load the result into the label layers.
    *
    * @param useScribbles condition on the current annotation. Turning this off
-   * shows what the model does unaided, which is the honest read of its quality.
+   * shows what the model does unaided.
    */
   /**
    * Turn a traced polygon into an editable path.
@@ -146,7 +146,10 @@ export class PredictionService {
     mode: 'regions' | 'centerlines',
   ): Promise<void> {
     const frame = this.sequenceService.currentFrame();
-    if (!frame) return;
+    // Re-entry guard: a prediction takes seconds, and a second click would run
+    // a concurrent one that overwrites the first's result and leaves `running`
+    // cleared while work is still in flight.
+    if (!frame || this.running()) return;
 
     this.running.set(true);
     this.lastError.set(null);
@@ -228,7 +231,7 @@ export class PredictionService {
 
   async predictCurrentFrame(useScribbles = true): Promise<void> {
     const frame = this.sequenceService.currentFrame();
-    if (!frame) return;
+    if (!frame || this.running()) return;
 
     this.running.set(true);
     this.lastError.set(null);

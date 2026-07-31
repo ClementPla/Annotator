@@ -29,7 +29,6 @@ export class InferenceClientService {
     
     try {
       const reply = await api.inferenceConnect(host, port);
-      console.log('[inference] ping reply:', reply);   
       this._status.set({
         kind: 'connected',
         registered: reply.registered,

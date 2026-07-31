@@ -1,17 +1,15 @@
 //! Tauri surface for the segmentation-head lab.
 //!
-//! Long-running work (feature extraction, the budget sweep, prediction) is
-//! declared `#[tauri::command(async)]`. The bodies stay synchronous — which
-//! keeps `State<DbState>` usable without fighting `Send` across awaits — but
-//! the attribute is what moves them onto a worker thread.
+//! Long-running work (feature extraction, training, prediction) must be
+//! `#[tauri::command(async)]`. A plain `#[tauri::command]` runs on the **main
+//! thread**, where a multi-minute job freezes the window and starves the event
+//! loop that delivers progress — the bar sits at zero until the job finishes,
+//! which is indistinguishable from a hang.
 //!
-//! This matters more than it looks: a plain `#[tauri::command]` runs on the
-//! **main thread**, so a multi-minute sweep freezes the window and starves the
-//! very event loop that is meant to deliver progress. The bar would sit at zero
-//! until the whole job finished, which is indistinguishable from a hang.
-//!
+//! The bodies stay synchronous, which keeps `State<DbState>` usable without
+//! fighting `Send` across awaits; the attribute alone moves them off-thread.
 //! Progress is streamed as `ml-progress` / `ml-train-progress` events rather
-//! than returned, so a sweep over dozens of frames shows movement throughout.
+//! than returned.
 
 use std::sync::atomic::Ordering;
 
@@ -381,13 +379,11 @@ fn build_split(
 
     // Validation frames are augmentation-free, and carry **no scribbles**.
     //
-    // The latter fixes a leak that inflated every number this lab has
-    // reported: simulated strokes are drawn from a frame's own ground truth, so
-    // conditioning a validation frame on them shows the model strokes derived
-    // from the answer it is about to be scored against. The head can then score
-    // well by following the strokes rather than by reading the image. Held-out
-    // frames are now scored unconditioned, which is the honest question --
-    // "what does this model do on an image it has never seen?"
+    // Validation frames must stay unconditioned. Simulated strokes are drawn
+    // from a frame's own ground truth, so conditioning a validation frame on
+    // them hands the model strokes derived from the answer it is about to be
+    // scored against, and it can score well by following the strokes rather
+    // than by reading the image. Do not enable scribbles here.
     let val_cfg = DatasetConfig {
         repeats: 1,
         scribble_strokes: 0,

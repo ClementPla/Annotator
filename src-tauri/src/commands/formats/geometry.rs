@@ -1059,7 +1059,7 @@ mod tests {
         // A wavy thick "fibre": centerline y = 20 + 9*sin(x/9), ~7px thick. Raster
         // thinning leaves messy chunks at the curve extrema; the graph cleanup
         // must still return a single unbranched centerline (not a pile of
-        // fragments, which is what the naive tracer produced).
+        // fragments).
         let (w, h) = (60u32, 40u32);
         let mut values = vec![0u8; (w * h) as usize];
         for xi in 4..=55 {

@@ -64,7 +64,6 @@ export class BatchAnnotationService {
         }
       }
     }
-    console.log(payload);
 
     // Save to database
     try {

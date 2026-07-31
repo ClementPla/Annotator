@@ -1,23 +1,22 @@
-//! The trainable head, its optimisation loop, and the learning-curve sweep.
+//! The trainable head and its optimisation loop.
 //!
 //! # Shape of the model
 //!
-//! The head is a small dilated CNN over feature patches: `[d, 48, 48]` in, one
-//! logit per class per pixel out. It replaced a per-pixel MLP, which could not
-//! consult a neighbouring pixel at any capacity — so shape, context and
-//! topology were unreachable, and scribble channels had nothing able to
-//! propagate them.
+//! A small dilated CNN over feature patches: `[d, 48, 48]` in, one logit per
+//! class per pixel out. Patches rather than whole frames keep training
+//! affordable — a dense feature volume is hundreds of megabytes, a batch of
+//! patches a few.
 //!
-//! Patches rather than whole frames keep training affordable: a dense feature
-//! volume is hundreds of megabytes, while a batch of patches is a few.
+//! # Evaluation is by frame
 //!
-//! # Why this stays honest
+//! Every reported metric is computed on held-out **frames**, never on held-out
+//! pixels or patches of a frame that was trained on. Pixels within an image are
+//! strongly correlated, so scoring that way inflates the numbers badly. Keep any
+//! new metric on the same footing.
 //!
-//! Patches are drawn without class rebalancing, so the loss sees the prior the
-//! annotator actually produced. Every reported metric is computed on held-out
-//! *frames*, never held-out pixels or patches of a trained-on frame: pixels
-//! within an image are strongly correlated, and scoring that way would inflate
-//! the curve badly.
+//! Note that `dataset::sample_patches` *does* bias crop origins towards
+//! foreground; that bias is confined to which patches are drawn and never
+//! reaches the loss weighting or these metrics.
 
 use burn::module::{AutodiffModule, Module};
 use burn::nn::loss::CrossEntropyLossConfig;
@@ -136,18 +135,12 @@ impl Default for TrainConfig {
 /// thing a segmentation head must not do.
 const DILATIONS: [usize; 3] = [1, 2, 4];
 
-/// Convolutional segmentation head.
+/// Convolutional segmentation head: 1x1 projection down to `hidden`, the
+/// dilated 3x3 stack, then 1x1 to class logits.
 ///
-/// The predecessor was an MLP over single pixels, which could not consider a
-/// neighbour at any capacity: shape, context and topology were unreachable by
-/// construction, and scribble-distance channels degenerated into "paint near
-/// the strokes" because nothing could propagate them. A receptive field is what
-/// fixes both, so the head is convolutional and trains on patches.
-///
-/// Structure: 1x1 to project the wide feature stack down to `hidden`, then the
-/// dilated 3x3 stack, then 1x1 to class logits. The leading 1x1 matters for
-/// cost — with an encoder attached `d_in` can be ~475, and running 3x3 kernels
-/// at that width would dominate the whole budget.
+/// The leading 1x1 is what makes the cost bearable: with an encoder attached
+/// `d_in` reaches ~475, and 3x3 kernels at that width would dominate the whole
+/// training budget.
 #[derive(Module, Debug)]
 pub struct SegHead<B: Backend> {
     project: Conv2d<B>,
@@ -491,7 +484,7 @@ fn fit<B: AutodiffBackend>(
         SegHead::<B>::with_depth(train.d, cfg.hidden, cfg.depth, n_classes, &device);
     let mut optim = AdamConfig::new().init();
     // Weight classes by inverse frequency. Without this the loss is dominated by
-    // background — an optic disc is ~1% of a frame, so "predict background
+    // background — a small structure is ~1% of a frame, so "predict background
     // everywhere" scores ~99% accuracy and is a stable minimum the head will not
     // leave. Foreground-biased *sampling* raises the positive rate but does not
     // remove the imbalance inside each patch; weighting the loss does.

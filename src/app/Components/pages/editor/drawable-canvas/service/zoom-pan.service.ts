@@ -56,11 +56,6 @@ export class ZoomPanService {
     this.viewportHeight = height;
   }
 
-  /** @deprecated Kept for callers still passing a canvas. */
-  public setContext(canvasRef: HTMLCanvasElement) {
-    this.setViewportRef(canvasRef);
-  }
-
   // ==========================================
   // Coordinate conversions
   // ==========================================
@@ -105,11 +100,6 @@ export class ZoomPanService {
       x: p.x * this.scale + this.offset.x,
       y: p.y * this.scale + this.offset.y,
     };
-  }
-
-  /** @deprecated alias of getViewportCoordinates. */
-  public getCanvasCoordinates(event: MouseEvent | WheelEvent | Point2D): Point2D {
-    return this.getViewportCoordinates(event);
   }
 
   // ==========================================

@@ -341,11 +341,6 @@ export class OrchestratorService {
     this.zoomPan.applyViewTransform(ctx, dpr);
   }
 
-  /** @deprecated Use setViewportRef. */
-  public setCanvasContext(canvas: HTMLCanvasElement) {
-    this.zoomPan.setViewportRef(canvas);
-  }
-
   public resetView(resetZoom: boolean, resetPan: boolean) {
     this.zoomPan.resetZoomAndPan(resetZoom, resetPan);
   }

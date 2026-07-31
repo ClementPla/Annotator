@@ -29,11 +29,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ndarray::Array3;
 
-/// Hit/miss tally for the current run.
-///
-/// Purely diagnostic, but it earns its keep: "the cache is not being reused"
-/// is otherwise indistinguishable from "the cache is reused and the run is slow
-/// for another reason", and the difference decides where to look.
+/// Hit/miss tally for the current run, reported once when training ends.
 static HITS: AtomicUsize = AtomicUsize::new(0);
 static MISSES: AtomicUsize = AtomicUsize::new(0);
 

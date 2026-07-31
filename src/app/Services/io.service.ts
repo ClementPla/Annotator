@@ -12,6 +12,24 @@ import { VectorEditorService } from '../Components/pages/editor/drawable-canvas/
 import { api } from '../lib/api';
 import { NotificationService } from './notification.service';
 
+/**
+ * Loading and saving of a frame's annotations.
+ *
+ * # Known layering wart
+ *
+ * This lives under `Services/` because ten call sites treat it as app-global
+ * (app startup, project close, propagation), yet it injects three services that
+ * belong to the editor's canvas — `CanvasManagerService`, `StateManagerService`
+ * and `VectorEditorService` — because the thing it saves *is* the in-memory
+ * canvas state. So a global service depends on one page's internals, and
+ * neither can move without the other.
+ *
+ * `PredictionService` had the same shape and was simply moved into
+ * `drawable-canvas/service/`, since the editor toolbar was its only consumer.
+ * That is not available here. Untangling this one means inverting the
+ * dependency — the editor registering its canvas with an interface this service
+ * owns — which is worth doing but is not a rename.
+ */
 @Injectable({
   providedIn: 'root',
 })
