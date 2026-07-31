@@ -461,7 +461,9 @@ fn build_split(
     // opening the ONNX session, which a fresh process always pays — is invisible.
     let (hits, misses) = super::cache::stats();
     if hits + misses > 0 {
-        log::info!("[ml] feature cache — {hits} reused, {misses} computed");
+        // Counts working images as well as encoder tokens — both are cached, and
+        // it is the image half that decides whether a frame pays for a decode.
+        log::info!("[ml] cache — {hits} entries reused, {misses} computed");
     }
 
     if per_frame.is_empty() {

@@ -50,6 +50,27 @@ pub fn stats() -> (usize, usize) {
 /// Magic + version, so a format change cannot be misread as data.
 const MAGIC: &[u8; 8] = b"DIDAFEA1";
 
+/// Namespace for a cached decoded-and-resized working image, as opposed to an
+/// encoder's token grid. Not a valid encoder id, so the two cannot collide.
+pub const IMAGE_KIND: &str = "image";
+
+/// Hash raw stored bytes.
+///
+/// The point of hashing the *stored* bytes rather than decoded pixels is that
+/// this is the only content identity available **before** paying for a decode.
+/// Keying on the decoded image, as the token cache does, means a hit can never
+/// save the decode that produced the key — which is why a fully warm cache
+/// still cost ~15 s per frame.
+pub fn hash_bytes(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    h ^= bytes.len() as u64;
+    h.wrapping_mul(0x0100_0000_01b3)
+}
+
 /// Identifies one cached tensor.
 pub struct Key {
     pub encoder_id: String,
@@ -77,6 +98,18 @@ impl Key {
             encoder_id: encoder_id.to_string(),
             working_size,
             content: h,
+        }
+    }
+
+    /// A key for content already reduced to a hash.
+    ///
+    /// `kind` namespaces the entry — an encoder id for a token grid, or
+    /// [`IMAGE_KIND`] for a decoded working image — so the two cannot collide.
+    pub fn raw(kind: &str, working_size: u32, content: u64) -> Self {
+        Self {
+            encoder_id: kind.to_string(),
+            working_size,
+            content,
         }
     }
 
@@ -252,6 +285,27 @@ mod tests {
         let mut edited = v.clone();
         edited[[0, 0, 0]] += 1.0;
         assert_ne!(base.file_name(), Key::new("a", 512, &edited).file_name());
+    }
+
+    #[test]
+    fn a_working_image_entry_cannot_collide_with_an_encoder_entry() {
+        // Same frame bytes and working size, different namespace: the decoded
+        // image and the token grid must not overwrite one another.
+        let content = hash_bytes(b"some stored png bytes");
+        let img = Key::raw(IMAGE_KIND, 384, content);
+        let tokens = Key::raw("dinov3-vits16", 384, content);
+        assert_ne!(img.file_name(), tokens.file_name());
+        // Working size still separates entries within a namespace.
+        assert_ne!(img.file_name(), Key::raw(IMAGE_KIND, 512, content).file_name());
+    }
+
+    #[test]
+    fn hashing_bytes_separates_content_and_length() {
+        assert_ne!(hash_bytes(b"abc"), hash_bytes(b"abd"));
+        assert_ne!(hash_bytes(b"abc"), hash_bytes(b"abcabc"));
+        // A prefix must not collide with the whole — length is folded in.
+        assert_ne!(hash_bytes(b""), hash_bytes(b"\0"));
+        assert_eq!(hash_bytes(b"stable"), hash_bytes(b"stable"), "must be deterministic");
     }
 
     #[test]

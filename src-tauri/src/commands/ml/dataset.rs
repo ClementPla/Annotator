@@ -473,6 +473,46 @@ pub fn load_working_image(
     Ok((resize_bilinear(&image, h, w), w, h))
 }
 
+/// The working image, from cache when possible.
+///
+/// Decoding a full-resolution acquisition and resampling it is pure overhead on
+/// every run after the first — the result is a deterministic function of the
+/// stored bytes and the working size. Keying on a hash of those *bytes* is what
+/// makes the lookup possible without decoding first; the token cache keys on the
+/// decoded pixels and so could never skip this step, which is why a cache
+/// reporting 100% hits still spent ~15 s a frame.
+///
+/// Stored at full `f32` precision rather than quantised back to `u8`. Requantising
+/// would make a cached run disagree with an uncached one in the low bits of every
+/// filter response, and a cache that changes results is worse than a slow one.
+fn working_image(
+    db: &DbState,
+    frame_id: i64,
+    cfg: &DatasetConfig,
+    feature_cache: Option<&std::path::Path>,
+) -> Result<(Array3<f32>, usize, usize), String> {
+    let Some(dir) = feature_cache else {
+        return load_working_image(db, frame_id, cfg.working_size);
+    };
+    let (_meta, bytes) = crate::commands::frame::read_frame_bytes(db, frame_id)
+        .map_err(|e| format!("frame {frame_id}: {e}"))?;
+    let key = cache::Key::raw(cache::IMAGE_KIND, cfg.working_size, cache::hash_bytes(&bytes));
+    if let Some(img) = cache::load(dir, &key) {
+        if img.ndim() == 3 && img.shape()[0] == 3 {
+            let (h, w) = (img.shape()[1], img.shape()[2]);
+            return Ok((img, w, h));
+        }
+    }
+    let decoded = decode_image(&bytes)?;
+    let (src_w, src_h) = (decoded.shape()[2], decoded.shape()[1]);
+    let (w, h) = working_dims(src_w, src_h, cfg.working_size);
+    let resized = resize_bilinear(&decoded, h, w);
+    if cfg.cache_writes {
+        cache::store(dir, &key, &resized);
+    }
+    Ok((resized, w, h))
+}
+
 /// Build the sample table for one annotated frame.
 pub fn build_frame_samples(
     db: &DbState,
@@ -484,8 +524,14 @@ pub fn build_frame_samples(
     feature_cache: Option<&std::path::Path>,
     rng: &mut Rng,
 ) -> Result<Samples, String> {
-    let (image, w, h) = load_working_image(db, frame_id, cfg.working_size)?;
+    // Phase timings. A single per-frame total cannot distinguish "the decode is
+    // slow" from "the filter bank is slow", and guessing between them has
+    // already cost more than measuring would have.
+    let t_image = std::time::Instant::now();
+    let (image, w, h) = working_image(db, frame_id, cfg, feature_cache)?;
+    let ms_image = t_image.elapsed().as_secs_f32() * 1000.0;
 
+    let t_labels = std::time::Instant::now();
     // Rasterise labels at native size, then downscale with nearest.
     let (native_w, native_h) = db
         .with_conn(|conn| queries::get_frame_dimensions(conn, frame_id))
@@ -512,7 +558,9 @@ pub fn build_frame_samples(
     // annotated everywhere else in the app.
     let masks = merge_masks(masks, vector_masks(db, frame_id, native_w, native_h, w, h)?);
     let labels = combine_masks(&masks, order, w * h);
+    let ms_labels = t_labels.elapsed().as_secs_f32() * 1000.0;
 
+    let t_encoder = std::time::Instant::now();
     // Encoder features once per frame (see module note on reuse).
     let encoder_part = match encoder {
         Some(enc) => {
@@ -542,6 +590,8 @@ pub fn build_frame_samples(
         None => None,
     };
 
+    let ms_encoder = t_encoder.elapsed().as_secs_f32() * 1000.0;
+
     let n_classes_present = labels.iter().filter(|&&c| c > 0).count();
     if n_classes_present == 0 {
         // Nothing annotated at working resolution — a tiny structure can vanish
@@ -552,6 +602,7 @@ pub fn build_frame_samples(
     let fb = FilterBankConfig::default();
     let mut out: Option<Samples> = None;
     let binary: Vec<u8> = labels.iter().map(|&c| (c > 0) as u8).collect();
+    let (mut ms_stack, mut ms_sample) = (0.0f32, 0.0f32);
 
     for repeat in 0..cfg.repeats.max(1) {
         let view = if repeat == 0 {
@@ -567,8 +618,11 @@ pub fn build_frame_samples(
         } else {
             scribble::simulate(&binary, w, h, cfg.scribble_strokes, cfg.stroke_len, rng)
         };
+        let t_stack = std::time::Instant::now();
         let feats = assemble_stack(&view, encoder_part.as_ref(), &s, &fb);
+        ms_stack += t_stack.elapsed().as_secs_f32() * 1000.0;
 
+        let t_sample = std::time::Instant::now();
         let acc = out.get_or_insert_with(|| Samples::new(feats.shape()[0]));
         sample_patches(
             &feats,
@@ -578,7 +632,17 @@ pub fn build_frame_samples(
             rng,
             acc,
         );
+        ms_sample += t_sample.elapsed().as_secs_f32() * 1000.0;
     }
+
+    // `stack` and `sample` are summed over repeats, so they carry the x3 that a
+    // default run pays; the others happen once per frame.
+    log::info!(
+        "[ml] frame {frame_id} phases — image {ms_image:.0} ms, labels {ms_labels:.0} ms, \
+         encoder {ms_encoder:.0} ms, stack {ms_stack:.0} ms, sample {ms_sample:.0} ms \
+         ({} repeats)",
+        cfg.repeats.max(1)
+    );
 
     Ok(out.unwrap_or_else(|| Samples::new(0)))
 }
