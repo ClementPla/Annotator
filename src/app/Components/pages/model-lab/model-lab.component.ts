@@ -166,7 +166,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Too few annotated frames to hold any out. */
+  /** Too few reviewed frames to hold any out. */
   readonly canRun = computed(() => {
     const s = this.summary();
     return !!s && s.annotated_frames >= 2 && s.labels > 0 && !this.running();
@@ -176,8 +176,13 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     const s = this.summary();
     if (!s) return 'Loading project…';
     if (s.labels === 0) return 'This project defines no segmentation labels.';
-    if (s.annotated_frames < 2)
-      return `Only ${s.annotated_frames} annotated frame(s). At least 2 are needed so one can be held out.`;
+    if (s.annotated_frames < 2) {
+      // Say *why* there are too few. On a project with plenty of annotation but
+      // nothing reviewed, a bare count reads as though the work went missing.
+      if (s.unreviewed_frames > 0)
+        return `Only ${s.annotated_frames} reviewed frame(s). ${s.unreviewed_frames} more are annotated but not reviewed — mark them reviewed in the editor to train on them. At least 2 are needed so one can be held out.`;
+      return `Only ${s.annotated_frames} reviewed frame(s). At least 2 are needed so one can be held out.`;
+    }
     return null;
   });
 

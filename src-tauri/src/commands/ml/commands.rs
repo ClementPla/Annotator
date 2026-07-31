@@ -68,9 +68,16 @@ pub async fn ml_download_encoder(app: AppHandle, encoder_id: String) -> Result<S
 }
 
 /// What the project currently offers the trainer.
+// Deliberately *not* `rename_all = "camelCase"`: the frontend reads
+// `annotated_frames` in four places, and renaming the wire field would leave
+// them reading `undefined` rather than failing loudly.
 #[derive(Debug, Clone, Serialize)]
 pub struct DatasetSummary {
+    /// Frames training will actually use: annotated **and** reviewed.
     pub annotated_frames: usize,
+    /// Annotated but not reviewed, and therefore excluded. Reported so the page
+    /// can explain a low count instead of looking broken.
+    pub unreviewed_frames: usize,
     pub labels: usize,
     /// Classes the head predicts: every label plus background.
     pub classes: usize,
@@ -82,6 +89,7 @@ pub fn ml_dataset_summary(db: State<DbState>) -> Result<DatasetSummary, String> 
     let labels = dataset::label_order(&db)?;
     Ok(DatasetSummary {
         annotated_frames: frames.len(),
+        unreviewed_frames: dataset::annotated_unreviewed_count(&db)?,
         labels: labels.len(),
         classes: labels.len() + 1,
     })

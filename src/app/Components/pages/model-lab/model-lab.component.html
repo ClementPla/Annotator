@@ -50,13 +50,20 @@
           <div class="stats">
             <div class="stat">
               <span class="v">{{ s.annotated_frames }}</span>
-              <span class="k">annotated frames</span>
+              <span class="k">reviewed frames</span>
             </div>
             <div class="stat">
               <span class="v">{{ s.labels }}</span>
               <span class="k">labels</span>
             </div>
           </div>
+          @if (s.unreviewed_frames > 0) {
+            <p class="muted">
+              {{ s.unreviewed_frames }} annotated frame(s) are not marked as
+              reviewed and are left out. Mark a sequence reviewed in the editor
+              to train on it.
+            </p>
+          }
         } @else {
           <p class="muted">Loading…</p>
         }

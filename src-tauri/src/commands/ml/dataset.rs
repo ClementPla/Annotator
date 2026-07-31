@@ -101,22 +101,54 @@ impl Default for DatasetConfig {
     }
 }
 
-/// Frames that carry at least one annotation.
+/// Frames that carry at least one annotation **and** have been reviewed.
+///
+/// Reviewed, not merely annotated: a frame in progress is a frame whose labels
+/// are wrong somewhere, and a small head fitted on a handful of images has no
+/// redundancy to average that away — one half-drawn structure teaches it that
+/// the structure ends there. Review is the point at which the annotator asserts
+/// the frame is correct, which is exactly the guarantee training needs. It also
+/// matches export, which has always defaulted to reviewed-only.
+///
+/// `reviewed` lives on `frames`; marking a sequence reviewed sets it on every
+/// frame of that sequence, so filtering here is what "use reviewed sequences"
+/// means in practice.
 pub fn annotated_frame_ids(db: &DbState) -> Result<Vec<i64>, String> {
     db.with_conn(|conn| {
-        // Both tables: a frame drawn only with the path tool is annotated, and
-        // listing just `annotations` would exclude it from training entirely.
+        // Both annotation tables: a frame drawn only with the path tool is
+        // annotated, and checking just `annotations` would exclude it entirely.
         let mut stmt = conn.prepare(
-            "SELECT frame_id FROM annotations \
-             UNION \
-             SELECT frame_id FROM vector_annotations \
-             ORDER BY frame_id",
+            "SELECT f.id FROM frames f \
+             WHERE f.reviewed = 1 \
+               AND (EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
+                 OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id)) \
+             ORDER BY f.id",
         )?;
         let rows = stmt.query_map([], |r| r.get::<_, i64>(0))?;
         let ids = rows.collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(ids)
     })
-    .map_err(|e| format!("failed to list annotated frames: {e}"))
+    .map_err(|e| format!("failed to list reviewed annotated frames: {e}"))
+}
+
+/// Frames that are annotated but not yet reviewed, so the UI can say what it is
+/// leaving out.
+///
+/// Without this the model page would report "2 annotated frames" on a project
+/// with forty, and the only way to discover why would be to read the source.
+pub fn annotated_unreviewed_count(db: &DbState) -> Result<usize, String> {
+    db.with_conn(|conn| {
+        let n: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM frames f \
+             WHERE f.reviewed != 1 \
+               AND (EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
+                 OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id))",
+            [],
+            |r| r.get(0),
+        )?;
+        Ok(n as usize)
+    })
+    .map_err(|e| format!("failed to count unreviewed frames: {e}"))
 }
 
 /// Project label ids in display order. Class index is `position + 1`; class 0
@@ -554,6 +586,84 @@ pub fn build_frame_samples(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// In-memory project with frames `(id, reviewed)`; every frame gets one
+    /// raster annotation unless `id` is listed in `vector_only`.
+    fn project_with(frames: &[(i64, bool)], vector_only: &[i64]) -> DbState {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(crate::storage::schema::SCHEMA).unwrap();
+        conn.execute("INSERT INTO sequences (id, name) VALUES (1, 's')", [])
+            .unwrap();
+        for &(id, reviewed) in frames {
+            conn.execute(
+                "INSERT INTO frames (id, sequence_id, frame_index, width, height, reviewed)
+                 VALUES (?1, 1, ?1, 8, 8, ?2)",
+                rusqlite::params![id, reviewed],
+            )
+            .unwrap();
+            // `color` is NOT NULL, and `annotations.label_id` is a foreign key —
+            // a silently skipped label here fails the annotation insert instead.
+            conn.execute(
+                "INSERT OR IGNORE INTO labels (id, name, color) VALUES (?1, ?1, '#ffffff')",
+                [id],
+            )
+            .unwrap();
+            if vector_only.contains(&id) {
+                conn.execute(
+                    "INSERT INTO vector_annotations (frame_id, label_id, shapes)
+                     VALUES (?1, ?1, '[]')",
+                    [id],
+                )
+                .unwrap();
+            } else {
+                conn.execute(
+                    "INSERT INTO annotations (frame_id, label_id, encoding, mask_data)
+                     VALUES (?1, ?1, 'rle8', x'00')",
+                    [id],
+                )
+                .unwrap();
+            }
+        }
+        let db = DbState::new();
+        db.set(conn);
+        db
+    }
+
+    #[test]
+    fn training_uses_reviewed_frames_only() {
+        // 1 and 3 reviewed, 2 annotated but still in progress.
+        let db = project_with(&[(1, true), (2, false), (3, true)], &[]);
+        assert_eq!(annotated_frame_ids(&db).unwrap(), vec![1, 3]);
+        assert_eq!(annotated_unreviewed_count(&db).unwrap(), 1);
+    }
+
+    #[test]
+    fn a_reviewed_frame_drawn_only_with_paths_still_counts() {
+        // Vector-only annotation was invisible to training once before; the
+        // reviewed filter must not quietly reintroduce that.
+        let db = project_with(&[(1, true), (2, true)], &[2]);
+        assert_eq!(annotated_frame_ids(&db).unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn a_reviewed_but_unannotated_frame_is_not_training_data() {
+        // Reviewing an empty frame asserts "nothing here", which is not the
+        // same as supervision — including it would train on a blank mask.
+        let db = project_with(&[(1, true)], &[]);
+        db.with_conn(|c| {
+            c.execute("DELETE FROM annotations", []).unwrap();
+            c.execute(
+                "INSERT INTO frames (id, sequence_id, frame_index, width, height, reviewed)
+                 VALUES (9, 1, 9, 8, 8, 1)",
+                [],
+            )
+            .unwrap();
+            Ok(())
+        })
+        .unwrap();
+        assert!(annotated_frame_ids(&db).unwrap().is_empty());
+        assert_eq!(annotated_unreviewed_count(&db).unwrap(), 0);
+    }
 
     #[test]
     fn combine_respects_label_order_on_overlap() {

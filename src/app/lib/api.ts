@@ -286,7 +286,10 @@ export interface EncoderStatus {
 }
 
 export interface DatasetSummary {
+  /** Frames training will use: annotated **and** reviewed. */
   annotated_frames: number;
+  /** Annotated but not reviewed, and therefore excluded from training. */
+  unreviewed_frames: number;
   labels: number;
   /** Labels plus background. */
   classes: number;
