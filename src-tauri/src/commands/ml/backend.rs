@@ -44,7 +44,20 @@ impl Selection {
     /// GPU is preferred when present: the convolutional head is orders of
     /// magnitude more expensive than the per-pixel MLP it replaced, and on CPU
     /// a realistic sweep runs for minutes per fit.
+    /// Set `DIDA_FORCE_CPU=1` to skip the CUDA probe entirely.
+    ///
+    /// The probe runs a real kernel, and not every way that can fail is
+    /// catchable: `catch_unwind` recovers a panic, but a driver that aborts the
+    /// process or blocks in initialisation takes the app with it, and then the
+    /// symptom is "training never starts" with nothing in the log to say why.
+    /// This turns diagnosing that from a rebuild into an env var — the run
+    /// either completes on CPU, which convicts the probe, or fails the same way,
+    /// which clears it.
     pub fn detect() -> Self {
+        if forced_cpu() {
+            log::info!("[ml] DIDA_FORCE_CPU is set — skipping the CUDA probe");
+            return Selection::Cpu;
+        }
         #[cfg(feature = "gpu")]
         if cuda_works() {
             return Selection::Cuda;
@@ -64,6 +77,13 @@ impl Selection {
             Selection::Cuda => "CUDA (GPU)",
         }
     }
+}
+
+/// Whether the user asked to bypass the GPU entirely.
+fn forced_cpu() -> bool {
+    std::env::var("DIDA_FORCE_CPU")
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false)
 }
 
 // The probe below is only a fallback because the panic can be caught. Under
@@ -96,6 +116,12 @@ pub fn cuda_works() -> bool {
 
     static OK: OnceLock<bool> = OnceLock::new();
     *OK.get_or_init(|| {
+        // Logged *before* the probe, not only after it. A driver that aborts or
+        // hangs instead of panicking leaves no trace of its own, so this line
+        // with no verdict after it is the signal that the probe was fatal —
+        // which is otherwise indistinguishable from training never being asked
+        // for. Set DIDA_FORCE_CPU=1 to confirm.
+        log::info!("[ml] probing for a usable CUDA device…");
         // Silence the default hook for the duration: a failed probe is an
         // expected outcome on a CPU-only machine, and printing a backtrace for
         // it would look like a crash.
