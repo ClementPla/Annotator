@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BboxLabel, SegLabel } from '../../../../../Core/interface';
 import { Rect } from '../interface';
+import { ProjectScoped } from '../../../../../Core/project-scoped';
 
 
 
@@ -8,7 +9,7 @@ import { Rect } from '../interface';
 @Injectable({
   providedIn: 'root'
 })
-export class BboxManagerService {
+export class BboxManagerService implements ProjectScoped {
 
   listBbox: BboxLabel[] = [];
 
@@ -29,4 +30,9 @@ export class BboxManagerService {
 
   }
 
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.clear();
+  }
 }

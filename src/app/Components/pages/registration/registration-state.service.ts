@@ -14,6 +14,7 @@ import {
   Point2D,
 } from './registration.model';
 import { KeypointPair } from '../../../lib/api';
+import { ProjectScoped } from '../../../Core/project-scoped';
 
 // ==========================================
 // Visualization mode
@@ -88,7 +89,7 @@ export function colorForIndex(i: number): string {
 // ==========================================
 
 @Injectable({ providedIn: 'root' })
-export class RegistrationStateService {
+export class RegistrationStateService implements ProjectScoped {
   // ── Frame selection ──────────────────────────────────────────────────────
   private _sequenceId = signal<string | null>(null);
   private _referenceFrameId = signal<string | null>(null);
@@ -437,4 +438,9 @@ export class RegistrationStateService {
     this.refit(this._registration()!);
   }
   
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.reset();
+  }
 }

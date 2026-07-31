@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { Point2D } from '../interface';
 import { EditorService } from '../../services/editor.service';
+import { ProjectScoped } from '../../../../../Core/project-scoped';
 
 @Injectable({ providedIn: 'root' })
-export class StateManagerService {
+export class StateManagerService implements ProjectScoped {
   /** Image native dimensions (px). */
   public width = 0;
   public height = 0;
@@ -95,5 +96,10 @@ export class StateManagerService {
       maxPoint: this.maxPoint,
       recomputeCanvasSum: this.recomputeCanvasSum,
     };
+  }
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.reset();
   }
 }

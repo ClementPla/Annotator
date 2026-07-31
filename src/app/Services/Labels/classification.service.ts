@@ -1,11 +1,12 @@
 // classification.service.ts
 import { Injectable } from '@angular/core';
 import { api } from '../../lib/api';
+import { ProjectScoped } from '../../Core/project-scoped';
 
 @Injectable({
   providedIn: 'root',
 })
-export class ClassificationService {
+export class ClassificationService implements ProjectScoped {
   // In-memory cache per frame
   private multiclassCache = new Map<number, (string | null)[]>();
   private multilabelCache = new Map<number, string[]>();
@@ -64,5 +65,10 @@ export class ClassificationService {
   clear(): void {
     this.multiclassCache.clear();
     this.multilabelCache.clear();
+  }
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.clear();
   }
 }

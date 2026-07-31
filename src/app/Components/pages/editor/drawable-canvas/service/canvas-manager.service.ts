@@ -15,6 +15,7 @@ import {
   downsamplePresence,
   unionPresence,
 } from '../../../../../Core/misc/label-ops';
+import { ProjectScoped } from '../../../../../Core/project-scoped';
 
 /** Longest side (px) past which we skip the native-size composite canvas and
  *  composite the label layer per-viewport instead (WebKit's 2D-canvas area cap
@@ -35,7 +36,7 @@ const BUFFER_MAX_DIM = 4096;
 @Injectable({
   providedIn: 'root',
 })
-export class CanvasManagerService {
+export class CanvasManagerService implements ProjectScoped {
   /** One value mask per segmentation label, row-major, `width*height`. */
   labelMasks: Uint8Array[] = [];
   /** One 256-entry RGBA lookup table per label (value -> display colour). */
@@ -569,5 +570,11 @@ export class CanvasManagerService {
         );
       }
     }
+  }
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.clearAllMasks();
+    this.resetCombinedCanvas();
   }
 }

@@ -11,6 +11,7 @@ import { VectorEditorService } from '../Components/pages/editor/drawable-canvas/
 
 import { api } from '../lib/api';
 import { NotificationService } from './notification.service';
+import { ProjectScoped } from '../Core/project-scoped';
 
 /**
  * Loading and saving of a frame's annotations.
@@ -33,7 +34,7 @@ import { NotificationService } from './notification.service';
 @Injectable({
   providedIn: 'root',
 })
-export class IOService implements OnDestroy {
+export class IOService implements OnDestroy, ProjectScoped {
   public requestedReload = new Subject<boolean>();
   /** Emits after a frame's masks have been loaded into the canvas manager, so
    *  UI derived from mask contents (e.g. the instance picker) can refresh. */
@@ -127,6 +128,17 @@ export class IOService implements OnDestroy {
     this.cancelAutosave();
     this.dirty = false;
     this.dirtyLabels.clear();
+  }
+
+  /**
+   * @see ProjectScoped
+   *
+   * Dropping the queued save is the point: a timer armed against the old
+   * project would otherwise fire after the switch and write its masks into
+   * whichever frame is open by then.
+   */
+  resetForProject(): void {
+    this.discardPendingSave();
   }
 
   /**

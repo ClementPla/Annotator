@@ -3,6 +3,7 @@ import { Subject } from 'rxjs';
 
 import { api } from '../../../../../lib/api';
 import { RGBLUT } from './image-adjustment/image-processing.model';
+import { ProjectScoped } from '../../../../../Core/project-scoped';
 
 /** A native tile ready to draw, positioned at (x, y) in image space. */
 export interface ReadyTile {
@@ -27,7 +28,7 @@ interface Rect {
  * visible region spans few tiles — zoomed out, the overview is enough.
  */
 @Injectable({ providedIn: 'root' })
-export class TiledImageService {
+export class TiledImageService implements ProjectScoped {
   private static readonly TILE = 1024;
   /** Above this many visible tiles we're too zoomed out — skip, use overview. */
   private static readonly MAX_VISIBLE = 24;
@@ -59,6 +60,17 @@ export class TiledImageService {
     this.frameId = frameId;
     this.nativeW = nativeW;
     this.nativeH = nativeH;
+  }
+
+  /**
+   * @see ProjectScoped
+   *
+   * Tiles are cached against a frame id, and ids restart at 1 in every project,
+   * so a surviving tile is not merely stale — it is another project's pixels
+   * under a key the new project will ask for.
+   */
+  resetForProject(): void {
+    this.clear();
   }
 
   clear(): void {

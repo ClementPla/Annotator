@@ -1,6 +1,7 @@
 // pyramid.service.ts
 
 import { Injectable, OnDestroy } from '@angular/core';
+import { ProjectScoped } from '../Core/project-scoped';
 
 // ==========================================
 // Types
@@ -41,12 +42,23 @@ const MAX_LEVELS         = 8;
 // ==========================================
 
 @Injectable({ providedIn: 'root' })
-export class PyramidService implements OnDestroy {
+export class PyramidService implements OnDestroy, ProjectScoped {
   /**
    * Cache: image src → Pyramid.  Lets multiple components access the same
    * image without re-building the pyramid. Cleared on destroy.
    */
   private cache = new Map<string, Promise<Pyramid>>();
+
+  /**
+   * @see ProjectScoped
+   *
+   * Keyed by image source URL. Blob and data URLs are reissued per session, so
+   * an entry from a closed project is dead weight at best and a wrong-image hit
+   * at worst if a URL is ever reused.
+   */
+  resetForProject(): void {
+    this.cache.clear();
+  }
 
   ngOnDestroy(): void {
     this.cache.clear();

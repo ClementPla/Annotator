@@ -7,10 +7,11 @@ import { MulticlassTask, MultilabelTask } from '../../Core/task';
 import {TextLabel} from "../../Core/interface";
 import { api, ProjectConfig } from '../../lib/api';
 import { generate_shades } from '../../Core/misc/colors';
+import { ProjectScoped } from '../../Core/project-scoped';
 @Injectable({
   providedIn: 'root',
 })
-export class LabelsService {
+export class LabelsService implements ProjectScoped {
   listSegmentationLabels: SegLabel[] = [];
 
   listClassificationTasks: MulticlassTask[] = [];
@@ -299,5 +300,10 @@ export class LabelsService {
     }
 
     this.rebuildTreeNodes();
+  }
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.resetAll();
   }
 }

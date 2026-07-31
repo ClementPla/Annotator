@@ -1,9 +1,10 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Sequence, Frame, FrameImage, api } from '../lib/api';
+import { ProjectScoped } from '../Core/project-scoped';
 
 
 @Injectable({ providedIn: 'root' })
-export class SequenceService {
+export class SequenceService implements ProjectScoped {
 
   // Private state
   private readonly _sequences = signal<Sequence[]>([]);
@@ -291,5 +292,10 @@ export class SequenceService {
     this._currentFrameIndex.set(0);
     this._currentFrameImage.set(null);
     this._loading.set(false);
+  }
+
+  /** @see ProjectScoped */
+  resetForProject(): void {
+    this.reset();
   }
 }

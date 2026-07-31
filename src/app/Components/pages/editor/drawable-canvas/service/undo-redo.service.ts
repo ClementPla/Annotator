@@ -7,6 +7,7 @@ import { LabelsService } from '../../../../../Services/Labels/labels.service';
 import { BehaviorSubject } from 'rxjs';
 import { IOService } from '../../../../../Services/io.service';
 import { VectorEditorService } from './vector-editor.service';
+import { ProjectScoped } from '../../../../../Core/project-scoped';
 
 interface LayerUndoRedoState {
   data: Uint8Array;
@@ -28,7 +29,7 @@ type UndoToken =
 @Injectable({
   providedIn: 'root',
 })
-export class UndoRedoService {
+export class UndoRedoService implements ProjectScoped {
   public redrawRequest: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(
     false
   );
@@ -228,6 +229,20 @@ export class UndoRedoService {
     this.layerUndoStacks.clear();
     this.actionOrder = [];
     this.redoOrder = [];
+  }
+
+  /**
+   * @see ProjectScoped
+   *
+   * Stacks are keyed by layer index, and those indices are reused by the next
+   * project's labels — so a surviving entry would let Ctrl+Z paste the previous
+   * project's mask into an unrelated layer. Also drops any half-open group,
+   * which would otherwise swallow the new project's first action.
+   */
+  resetForProject(): void {
+    this.empty();
+    this.grouping = false;
+    this.groupBuffer = [];
   }
 
   /**

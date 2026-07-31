@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { SequenceService } from '../../../Services/sequence.service';
+import { ProjectScoped } from '../../../Core/project-scoped';
 
 type SequenceStatus = 'empty' | 'annotated' | 'reviewed';
 
@@ -9,7 +10,7 @@ export type KeypointFilter = 'all' | 'with' | 'without';
 @Injectable({
   providedIn: 'root',
 })
-export class GalleryService {
+export class GalleryService implements ProjectScoped {
   itemPerPage = 64;
 
   // Persisted filter / view state (survives gallery <-> editor navigation)
@@ -28,8 +29,36 @@ export class GalleryService {
   // Explicit page set by user pagination. null = fall back to active-frame.
   private explicitFirst: number | null = null;
 
-  constructor(private sequenceService: SequenceService) {
-    sequenceService.loadSequences();
+  /**
+   * No project I/O here.
+   *
+   * This used to kick off `loadSequences()` from the constructor. That is now
+   * unsafe as well as redundant: the service is registered as `ProjectScoped`,
+   * so a reset can be what first constructs it — which happens *after* the old
+   * project is closed and *before* the new one is open, firing a query against
+   * no database. The gallery loads its own sequences when it initialises.
+   */
+  constructor(private sequenceService: SequenceService) {}
+
+  /**
+   * @see ProjectScoped
+   *
+   * Filters and paging describe *this project's* sequences — a status filter or
+   * a frame-count range carried into another project hides items for no visible
+   * reason, which is the "gallery is wrong after switching" symptom.
+   *
+   * `imgSize`, `viewLayout`, `sortKey` and `itemPerPage` are deliberately left
+   * alone. They are how the user likes the gallery to look, not facts about the
+   * project, and resetting them would be its own small annoyance.
+   */
+  resetForProject(): void {
+    this.filterTitle = '';
+    this.selectedStatuses = [];
+    this.keypointFilter = 'all';
+    this.frameCountRange = [0, 0];
+    this.frameRangeInitialized = false;
+    this.showAdvancedFilters = false;
+    this.explicitFirst = null;
   }
 
   setFirstPage(first: number): void {

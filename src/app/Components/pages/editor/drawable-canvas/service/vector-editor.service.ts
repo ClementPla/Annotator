@@ -24,6 +24,7 @@ import {
   translateShape,
 } from '../vector/vector.model';
 import { VectorHistory } from '../vector/vector-history';
+import { ProjectScoped } from '../../../../../Core/project-scoped';
 
 /** Screen-pixel pick radius for nodes/handles/paths and the close-path target. */
 const HIT_PX = 9;
@@ -57,7 +58,7 @@ export interface VectorBoundingBox {
  * IOService subscribes to mark the frame dirty (one-directional, no DI cycle).
  */
 @Injectable({ providedIn: 'root' })
-export class VectorEditorService {
+export class VectorEditorService implements ProjectScoped {
   private readonly editor = inject(EditorService);
   private readonly labels = inject(LabelsService);
   private readonly zoomPan = inject(ZoomPanService);
@@ -201,6 +202,20 @@ export class VectorEditorService {
     this._shapes.set([]);
     this.resetInteraction();
     this.history.reset([]);
+  }
+
+  /**
+   * @see ProjectScoped
+   *
+   * Also empties the clipboard, which `clear()` deliberately preserves so a
+   * shape can be copied in one frame and pasted in another. That only holds
+   * *within* a project: a copied shape carries a `labelId`, and ids restart
+   * from 1 in every project, so pasting across a switch would silently attach
+   * the shape to whatever label happened to take that id.
+   */
+  resetForProject(): void {
+    this.clear();
+    this.clipboard = [];
   }
 
   private resetInteraction(): void {

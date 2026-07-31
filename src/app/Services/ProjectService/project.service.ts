@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { api, ProjectConfig, ScanResult } from '../../lib/api';
 import { LabelsService } from '../Labels/labels.service';
+import { ProjectLifecycleService } from './project-lifecycle.service';
 // ==========================================
 // Types
 // ==========================================
@@ -77,7 +78,10 @@ export class ProjectService {
   // Config Updates (before project is created)
   // ==========================================
 
-  constructor(private labelService: LabelsService) {}
+  constructor(
+    private labelService: LabelsService,
+    private lifecycle: ProjectLifecycleService,
+  ) {}
 
   updateConfig(partial: Partial<ProjectConfig>): void {
     this._config.update((current) => ({ ...current, ...partial }));
@@ -149,7 +153,17 @@ export class ProjectService {
     this.addToRecentProjects(config.name, path);
   }
 
+  /**
+   * Open a project, replacing whatever was open.
+   *
+   * The close is not optional. Opening used to overwrite the config and labels
+   * and nothing else, so a second project inherited the first one's sequences,
+   * masks, undo history, gallery filters and per-frame caches — and because ids
+   * restart at 1 in every project, those caches did not look stale, they read as
+   * the new project's own data.
+   */
   async open(path: string): Promise<void> {
+    await this.close();
     const config = await api.openProject(path);
     this._config.set(config);
     await this.labelService.setDefinitions(config); // Now async
@@ -165,7 +179,10 @@ export class ProjectService {
     if (this._isOpen()) {
       await api.closeProject();
     }
-    this.labelService.resetAll();
+    // Every service holding project state, not just labels — see
+    // `Core/project-scoped.ts`. This service is deliberately not in that list:
+    // it drives the lifecycle rather than being subject to it.
+    this.lifecycle.resetAll();
     this.reset();
   }
 
