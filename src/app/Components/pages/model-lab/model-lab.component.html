@@ -172,12 +172,20 @@
           <label class="field">
             <span class="f-label">Image size</span>
             <input type="number" [(ngModel)]="workingSize" min="64" max="1024" step="64" />
-            <span class="f-hint">Larger is more detailed and slower.</span>
+            <span class="f-hint"
+              >The resolution predictions are made at, then scaled back up.
+              Larger is more detailed and slower. Retrain to change it — a model
+              predicts at the size it was trained on.</span
+            >
           </label>
           <label class="field">
             <span class="f-label">Samples per image</span>
             <input type="number" [(ngModel)]="patchesPerFrame" min="4" max="256" step="4" />
-            <span class="f-hint">Raise it if results look coarse.</span>
+            <span class="f-hint"
+              >How much of each image is used for training. Raise it if the model
+              misses things it was shown; it costs time and memory. It does not
+              affect the detail of a prediction — that is Image size.</span
+            >
           </label>
           <label class="field">
             <span class="f-label">Training passes</span>
