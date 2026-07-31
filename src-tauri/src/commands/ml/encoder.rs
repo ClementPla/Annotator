@@ -345,38 +345,133 @@ fn decode_tokens(shape: &[usize], data: Vec<f32>) -> Result<Array3<f32>, String>
 
 /// Bilinear resample of a `[C, H, W]` volume. Used both to fit images to the
 /// encoder input and to lift patch tokens back to working resolution.
+/// Bilinear resample of a `[c, h, w]` volume.
+///
+/// # Why the loop order matters so much here
+///
+/// This is called to upsample an encoder's token grid to working resolution —
+/// `[384, 32, 32]` to `[384, 384, 384]`, 56 million outputs. The channel loop
+/// used to be *innermost*, which for a C-ordered `[c, h, w]` array strides by
+/// `h * w` floats (590 KB at this size) on every step: a cache miss on each of
+/// the four gathers, for every output. Measured at 6.2 s per frame — larger than
+/// the ViT forward it follows, and it kept being misread as encoder cost.
+///
+/// Channel outermost walks contiguous memory, the sample points and weights are
+/// computed once per axis instead of per element, and channels are independent
+/// so they parallelise cleanly.
 pub fn resize_bilinear(src: &Array3<f32>, out_h: usize, out_w: usize) -> Array3<f32> {
+    use rayon::prelude::*;
+
     let (c, h, w) = (src.shape()[0], src.shape()[1], src.shape()[2]);
     let mut out = Array3::<f32>::zeros((c, out_h, out_w));
-    if h == 0 || w == 0 || out_h == 0 || out_w == 0 {
+    if h == 0 || w == 0 || out_h == 0 || out_w == 0 || c == 0 {
         return out;
     }
+
     // Half-pixel centres keep the sampling grid symmetric.
-    let sy = h as f32 / out_h as f32;
-    let sx = w as f32 / out_w as f32;
-    for oy in 0..out_h {
-        let fy = ((oy as f32 + 0.5) * sy - 0.5).clamp(0.0, (h - 1) as f32);
-        let y0 = fy.floor() as usize;
-        let y1 = (y0 + 1).min(h - 1);
-        let wy = fy - y0 as f32;
-        for ox in 0..out_w {
-            let fx = ((ox as f32 + 0.5) * sx - 0.5).clamp(0.0, (w - 1) as f32);
-            let x0 = fx.floor() as usize;
-            let x1 = (x0 + 1).min(w - 1);
-            let wx = fx - x0 as f32;
-            for ch in 0..c {
-                let top = src[[ch, y0, x0]] * (1.0 - wx) + src[[ch, y0, x1]] * wx;
-                let bot = src[[ch, y1, x0]] * (1.0 - wx) + src[[ch, y1, x1]] * wx;
-                out[[ch, oy, ox]] = top * (1.0 - wy) + bot * wy;
+    let taps = |n_out: usize, n_in: usize| -> Vec<(usize, usize, f32)> {
+        let s = n_in as f32 / n_out as f32;
+        (0..n_out)
+            .map(|o| {
+                let f = ((o as f32 + 0.5) * s - 0.5).clamp(0.0, (n_in - 1) as f32);
+                let i0 = f.floor() as usize;
+                (i0, (i0 + 1).min(n_in - 1), f - i0 as f32)
+            })
+            .collect()
+    };
+    let xs = taps(out_w, w);
+    let ys = taps(out_h, h);
+
+    // `as_standard_layout` is a no-op when the input is already contiguous,
+    // which it is for decoded tokens.
+    let src_std = src.as_standard_layout();
+    let src_s = src_std.as_slice().expect("standard layout is contiguous");
+    let out_s = out.as_slice_mut().expect("freshly allocated array is contiguous");
+
+    out_s
+        .par_chunks_mut(out_h * out_w)
+        .enumerate()
+        .for_each(|(ch, plane)| {
+            let base = ch * h * w;
+            for (oy, &(y0, y1, wy)) in ys.iter().enumerate() {
+                let r0 = base + y0 * w;
+                let r1 = base + y1 * w;
+                let row = &mut plane[oy * out_w..(oy + 1) * out_w];
+                for (dst, &(x0, x1, wx)) in row.iter_mut().zip(xs.iter()) {
+                    let top = src_s[r0 + x0] * (1.0 - wx) + src_s[r0 + x1] * wx;
+                    let bot = src_s[r1 + x0] * (1.0 - wx) + src_s[r1 + x1] * wx;
+                    *dst = top * (1.0 - wy) + bot * wy;
+                }
             }
-        }
-    }
+        });
     out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The original implementation, kept as the reference the fast path must
+    /// reproduce exactly. Reordering loops and precomputing weights must change
+    /// only the speed — a resample that shifts by half a pixel would move every
+    /// feature off its label and be near-impossible to spot from accuracy alone.
+    fn resize_bilinear_reference(src: &Array3<f32>, out_h: usize, out_w: usize) -> Array3<f32> {
+        let (c, h, w) = (src.shape()[0], src.shape()[1], src.shape()[2]);
+        let mut out = Array3::<f32>::zeros((c, out_h, out_w));
+        if h == 0 || w == 0 || out_h == 0 || out_w == 0 {
+            return out;
+        }
+        let sy = h as f32 / out_h as f32;
+        let sx = w as f32 / out_w as f32;
+        for oy in 0..out_h {
+            let fy = ((oy as f32 + 0.5) * sy - 0.5).clamp(0.0, (h - 1) as f32);
+            let y0 = fy.floor() as usize;
+            let y1 = (y0 + 1).min(h - 1);
+            let wy = fy - y0 as f32;
+            for ox in 0..out_w {
+                let fx = ((ox as f32 + 0.5) * sx - 0.5).clamp(0.0, (w - 1) as f32);
+                let x0 = fx.floor() as usize;
+                let x1 = (x0 + 1).min(w - 1);
+                let wx = fx - x0 as f32;
+                for ch in 0..c {
+                    let top = src[[ch, y0, x0]] * (1.0 - wx) + src[[ch, y0, x1]] * wx;
+                    let bot = src[[ch, y1, x0]] * (1.0 - wx) + src[[ch, y1, x1]] * wx;
+                    out[[ch, oy, ox]] = top * (1.0 - wy) + bot * wy;
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn the_fast_resample_matches_the_reference_exactly() {
+        // Upsample, downsample, identity, non-square, and single-pixel input —
+        // the clamping edge cases are where a rewrite goes wrong.
+        for &(c, h, w, oh, ow) in &[
+            (5usize, 4usize, 6usize, 17usize, 13usize), // up, non-square
+            (3, 9, 9, 4, 4),                            // down
+            (2, 5, 5, 5, 5),                            // identity
+            (4, 1, 1, 6, 6),                            // degenerate source
+            (1, 3, 7, 21, 3),                           // stretch one axis, shrink other
+        ] {
+            let src = Array3::from_shape_fn((c, h, w), |(k, y, x)| {
+                (k * 31 + y * 7 + x * 3) as f32 * 0.25 - 4.0
+            });
+            let fast = resize_bilinear(&src, oh, ow);
+            let reference = resize_bilinear_reference(&src, oh, ow);
+            assert_eq!(fast.shape(), reference.shape());
+            for (a, b) in fast.iter().zip(reference.iter()) {
+                assert_eq!(a, b, "resample changed for {c}x{h}x{w} -> {oh}x{ow}");
+            }
+        }
+    }
+
+    #[test]
+    fn resampling_a_degenerate_target_is_empty_not_a_panic() {
+        let src = Array3::from_shape_fn((2, 3, 3), |(k, y, x)| (k + y + x) as f32);
+        assert_eq!(resize_bilinear(&src, 0, 5).len(), 0);
+        assert_eq!(resize_bilinear(&src, 5, 0).len(), 0);
+    }
 
     #[test]
     fn decodes_map_layout() {
