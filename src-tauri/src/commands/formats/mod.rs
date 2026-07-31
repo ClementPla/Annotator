@@ -29,6 +29,7 @@ pub enum OptionSpec {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Choice {
     pub value: String,
     pub label: String,
@@ -69,6 +70,7 @@ pub fn default_color(i: usize) -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Capabilities {
     pub masks: bool,
     pub polygons: bool,

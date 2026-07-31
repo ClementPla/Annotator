@@ -32,6 +32,11 @@ use super::train::{EvalMetrics, Head, SegHead};
 /// Stored as JSON beside the weight blob rather than as columns: it is read and
 /// written whole, and a shape that can grow without a migration is worth more
 /// here than queryability.
+///
+/// Deliberately **not** `rename_all = "camelCase"`, unlike the types that cross
+/// the Tauri boundary: these names are the keys in `ml_models.meta` inside every
+/// `.dida`, so renaming them orphans every model already trained. This type does
+/// not reach the frontend — `TrainSummary` does — so there is nothing to unify.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelMeta {
     pub feature_dim: usize,

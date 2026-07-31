@@ -49,7 +49,7 @@
         @if (summary(); as s) {
           <div class="stats">
             <div class="stat">
-              <span class="v">{{ s.annotated_frames }}</span>
+              <span class="v">{{ s.annotatedFrames }}</span>
               <span class="k">reviewed frames</span>
             </div>
             <div class="stat">
@@ -57,9 +57,9 @@
               <span class="k">labels</span>
             </div>
           </div>
-          @if (s.unreviewed_frames > 0) {
+          @if (s.unreviewedFrames > 0) {
             <p class="muted">
-              {{ s.unreviewed_frames }} annotated frame(s) are not marked as
+              {{ s.unreviewedFrames }} annotated frame(s) are not marked as
               reviewed and are left out. Mark a sequence reviewed in the editor
               to train on it.
             </p>
@@ -149,7 +149,7 @@
               @if (enc.cached) {
                 <p-tag value="Ready" severity="success" />
               } @else {
-                <p-tag [value]="enc.approx_mb + ' MB'" severity="warn" />
+                <p-tag [value]="enc.approxMb + ' MB'" severity="warn" />
               }
             </div>
             <span class="enc-desc">{{ enc.description }}</span>

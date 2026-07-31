@@ -250,7 +250,7 @@ export class NavigationService {
       // Load raw background image layer into native system canvas orchestrator.
       // Pass native dims: the image may be a downsampled overview for large frames.
       await this.orchestrator.loadImage(
-        frameImage.image_base64,
+        frameImage.imageBase64,
         frameImage.frame.width,
         frameImage.frame.height,
       );
@@ -291,7 +291,7 @@ export class NavigationService {
     return {
       currentIndex: frameIndex,
       total: totalFrames,
-      frameName: frame.relative_path ?? `Frame ${frame.frame_index}`,
+      frameName: frame.relativePath ?? `Frame ${frame.frameIndex}`,
       sequenceName: sequence.name,
       percentage: totalFrames > 0 ? (100 * (frameIndex + 1)) / totalFrames : 0,
       reviewedCount: progress.reviewed,
@@ -320,7 +320,7 @@ export class NavigationService {
   }
 
   public get currentFrameName(): string | null {
-    return this.sequenceService.currentFrame()?.relative_path ?? null;
+    return this.sequenceService.currentFrame()?.relativePath ?? null;
   }
 
   // ==========================================

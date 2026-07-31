@@ -216,7 +216,7 @@ export class GalleryElementComponent
 
     try {
       const result = await api.getFrameThumbnail(frameId, this.imgSize);
-      this.imagePath = result.image_base64;
+      this.imagePath = result.imageBase64;
     } catch (error) {
       console.error('Error loading thumbnail:', error);
       this.loadError = true;
@@ -224,7 +224,7 @@ export class GalleryElementComponent
       // Fallback: try loading full image
       try {
         const fullImage = await api.getFrameImage(frameId);
-        this.imagePath = fullImage.image_base64;
+        this.imagePath = fullImage.imageBase64;
       } catch (fallbackError) {
         console.error('Fallback image load also failed:', fallbackError);
       }

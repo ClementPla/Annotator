@@ -7,6 +7,7 @@ use crate::utils::error::Result;
 
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct BatchClassificationPayload {
     pub frame_id: i64,
     pub task_name: String,

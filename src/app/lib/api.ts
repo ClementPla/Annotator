@@ -2,24 +2,24 @@ import { invoke } from '@tauri-apps/api/core';
 export interface Sequence {
   id: number;
   name: string;
-  frame_count: number;
-  sort_order: number;
+  frameCount: number;
+  sortOrder: number;
 }
 
 export interface Frame {
   id: number;
-  sequence_id: number;
-  frame_index: number;
-  relative_path: string | null;
+  sequenceId: number;
+  frameIndex: number;
+  relativePath: string | null;
   width: number;
   height: number;
   reviewed: boolean;
-  is_embedded: boolean;
+  isEmbedded: boolean;
 }
 
 export interface FrameImage {
   frame: Frame;
-  image_base64: string; // data URL: "data:image/png;base64,..."
+  imageBase64: string; // data URL: "data:image/png;base64,..."
 }
 
 export interface AnnotationResponse {
@@ -32,26 +32,12 @@ export interface AnnotationResponse {
   height: number;
 }
 
-export interface TaskDefinitions {
-  segmentation_labels: {
-    name: string;
-    color: string;
-    is_instance: boolean;
-  }[];
-  classification_tasks: {
-    name: string;
-    classes: string[];
-    multi_select: boolean;
-  }[];
-  text_description_tasks: {
-    name: string;
-  }[];
-}
 export interface LabelConfig {
   id: number;
   name: string;
   color: string;
-  shades?: string[]; // For instance segmentation
+  /** Per-instance shades, for instance-segmentation labels. */
+  shades?: string[];
 }
 
 export interface MulticlassConfig {
@@ -86,8 +72,10 @@ export interface ProjectConfig {
 }
 
 export interface ScanResult {
-  sequences_created: number;
-  frames_created: number;
+  sequencesCreated: number;
+  framesImported: number;
+  framesEmbedded: number;
+  errors: string[];
 }
 
 export interface ClassificationData {
@@ -103,10 +91,10 @@ export interface TextDescriptionData {
 }
 
 export interface BatchClassificationPayload {
-  frame_id: number; // snake_case to match Rust
-  task_name: string;
-  selected_classes: string[];
-  is_multilabel: boolean;
+  frameId: number; // snake_case to match Rust
+  taskName: string;
+  selectedClasses: string[];
+  isMultilabel: boolean;
 }
 
 export interface LabelId {
@@ -122,22 +110,8 @@ export interface LabelInfo {
   sortOrder: number;
 }
 
-export interface ExportOptions {
-  output_folder: string;
-  individual_mask: boolean;
-  combined_mask: boolean;
-  colormap: boolean;
-  only_reviewed: boolean;
-  instance_segmentation: boolean;
-  classifications: boolean;
-  /** Emit per-frame vector JSON (exact nodes + flattened polygon). */
-  vectors: boolean;
-  /** Bake vector shapes into the exported masks. */
-  rasterize_vectors: boolean;
-}
-
 export interface ExportResult {
-  total_exported: number;
+  totalExported: number;
   errors: string[];
 }
 
@@ -182,12 +156,12 @@ export interface ImportResult {
 export interface GallerySequence {
   id: number;
   name: string;
-  sort_order: number;
-  frame_count: number;
-  reviewed_count: number;
-  annotated_count: number;
-  first_frame_id: number | null;
-  has_keypoints: boolean;
+  sortOrder: number;
+  frameCount: number;
+  reviewedCount: number;
+  annotatedCount: number;
+  firstFrameId: number | null;
+  hasKeypoints: boolean;
 }
 export type KeypointSource = 'user' | 'prefilled';
 export interface KeypointPair {
@@ -253,7 +227,7 @@ export interface VectorShape {
 
 /** All shapes for one (frame, label), as returned by the backend. */
 export interface VectorAnnotationsWire {
-  label_id: number;
+  labelId: number;
   shapes: VectorShape[];
 }
 
@@ -275,21 +249,21 @@ export interface EncoderStatus {
   id: string;
   name: string;
   description: string;
-  repo_id: string;
+  repoId: string;
   filename: string;
   patch: number;
-  embed_dim: number;
-  input_size: number;
-  approx_mb: number;
+  embedDim: number;
+  inputSize: number;
+  approxMb: number;
   domain: string;
   cached: boolean;
 }
 
 export interface DatasetSummary {
   /** Frames training will use: annotated **and** reviewed. */
-  annotated_frames: number;
+  annotatedFrames: number;
   /** Annotated but not reviewed, and therefore excluded from training. */
-  unreviewed_frames: number;
+  unreviewedFrames: number;
   labels: number;
   /** Labels plus background. */
   classes: number;
@@ -302,25 +276,7 @@ export interface EvalMetrics {
   perClassDice: number[];
 }
 
-export interface CurvePoint {
-  /** Annotated frames the head was allowed to see. */
-  nFrames: number;
-  /** Which random subset draw this is, for the same budget. */
-  repeat: number;
-  metrics: EvalMetrics;
-}
-
-export interface CurveReport {
-  points: CurvePoint[];
-  trainFrames: number;
-  valFrames: number;
-  featureDim: number;
-  classes: number;
-  encoder: string | null;
-  budgets: number[];
-}
-
-export interface CurveOptions {
+export interface TrainOptions {
   /** Omit for the local feature basis alone — the encoder ablation. */
   encoderId?: string | null;
   workingSize?: number;
@@ -328,8 +284,6 @@ export interface CurveOptions {
   cacheFeatures?: boolean;
   labelIds?: number[];
   augmentRepeats?: number;
-  budgets?: number[];
-  curveRepeats?: number;
   epochs?: number;
   hidden?: number;
   valFraction?: number;
@@ -445,10 +399,7 @@ export const api = {
   ) =>
     invoke<ArrayBuffer>('get_frame_tile', { frameId, x, y, width, height }),
   getFrameThumbnail: (frameId: number, maxSize: number) =>
-    invoke<{ image_base64: string }>('get_frame_thumbnail', {
-      frameId: frameId,
-      maxSize: maxSize,
-    }),
+    invoke<FrameImage>('get_frame_thumbnail', { frameId, maxSize }),
 
   getProgress: () => invoke<[number, number]>('get_progress'),
 
@@ -576,13 +527,6 @@ export const api = {
       maxShapes,
     }),
 
-  saveTaskDefinitions: (definitions: TaskDefinitions) =>
-    invoke('save_task_definitions', {
-      definitions: definitions,
-    }),
-
-  getTaskDefinitions: () => invoke<TaskDefinitions>('get_task_definitions'),
-
   createProject: (projectName: string, path: string, config: ProjectConfig) =>
     invoke('create_project', {
       projectName: projectName,
@@ -599,16 +543,13 @@ export const api = {
   mlDownloadEncoder: (encoderId: string) =>
     invoke<string>('ml_download_encoder', { encoderId }),
   mlDatasetSummary: () => invoke<DatasetSummary>('ml_dataset_summary'),
-  mlRunLearningCurve: (options: CurveOptions) =>
-    invoke<CurveReport>('ml_run_learning_curve', { options }),
-  mlTrainModel: (options: CurveOptions) =>
+  mlTrainModel: (options: TrainOptions) =>
     invoke<TrainSummary>('ml_train_model', { options }),
   mlModelStatus: () => invoke<TrainSummary | null>('ml_model_status'),
   /**
    * Restore the head saved in the open project, if any. Null when the project
    * has no model, or has one this build cannot read — both mean "retrain".
    */
-  mlLoadSavedModel: () => invoke<TrainSummary | null>('ml_load_saved_model'),
   /** Discard the saved model, from both the project file and this session. */
   mlForgetModel: () => invoke<boolean>('ml_forget_model'),
   /** Ask the running fit to stop at the next epoch; the head it has is kept. */
@@ -669,9 +610,6 @@ export const api = {
     invoke<void>('set_frames_reviewed', { frameIds, reviewed }),
 
   listLabels: () => invoke<LabelId[]>('list_labels'),
-
-  exportAnnotations: (options: ExportOptions) =>
-    invoke<ExportResult>('export_annotations', { options }),
 
   /** Metadata + option schema for every import/export format. */
   listDatasetFormats: () => invoke<DatasetFormat[]>('list_dataset_formats'),

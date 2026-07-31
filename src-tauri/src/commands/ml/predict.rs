@@ -76,6 +76,7 @@ pub struct MlState {
 
 /// Scribbles supplied by the UI, as flat pixel indices at native resolution.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScribbleInput {
     #[serde(default)]
     pub positive: Vec<u32>,

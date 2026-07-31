@@ -16,6 +16,7 @@ use crate::utils::error::{ AppError, Result };
 // ==========================================
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ScanOptions {
   pub folder_path: String,
   pub embed_images: bool,
@@ -26,6 +27,7 @@ pub struct ScanOptions {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ScanResult {
   pub sequences_created: usize,
   pub frames_imported: usize,

@@ -56,6 +56,7 @@ impl Normalization {
 /// ONNX graph itself at load time (see `encoder.rs`), so a wrong hint here
 /// degrades a label in the UI rather than corrupting inference.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EncoderSpec {
     /// Stable identifier used by the frontend and persisted in run metadata.
     pub id: String,

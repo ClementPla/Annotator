@@ -15,6 +15,7 @@ use crate::utils::error::{ AppError, Result };
 // ==========================================
 
 #[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Frame {
   pub id: i64,
   pub sequence_id: i64,
@@ -27,6 +28,7 @@ pub struct Frame {
 }
 
 #[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct FrameImage {
   pub frame: Frame,
   pub image_base64: String,

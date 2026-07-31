@@ -28,10 +28,11 @@ use super::persist;
 use super::predict::{self, MlState, PredictedFrame, ScribbleInput, TrainedModel};
 use super::registry;
 use super::scribble::Rng;
-use super::train::{self, CurvePoint, Samples, TrainConfig};
+use super::train::{self, Samples, TrainConfig};
 
 /// A catalog entry plus whether its weights are already on disk.
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EncoderStatus {
     #[serde(flatten)]
     pub spec: registry::EncoderSpec,
@@ -72,6 +73,7 @@ pub async fn ml_download_encoder(app: AppHandle, encoder_id: String) -> Result<S
 // `annotated_frames` in four places, and renaming the wire field would leave
 // them reading `undefined` rather than failing loudly.
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DatasetSummary {
     /// Frames training will actually use: annotated **and** reviewed.
     pub annotated_frames: usize,
@@ -97,7 +99,7 @@ pub fn ml_dataset_summary(db: State<DbState>) -> Result<DatasetSummary, String> 
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CurveOptions {
+pub struct TrainOptions {
     /// Omit to train on the local feature basis alone — the ablation that says
     /// whether the encoder is earning its download.
     pub encoder_id: Option<String>,
@@ -115,25 +117,11 @@ pub struct CurveOptions {
     /// worked on is the cheapest way to sharpen a small head.
     pub label_ids: Option<Vec<i64>>,
     pub augment_repeats: Option<usize>,
-    pub budgets: Option<Vec<usize>>,
-    pub curve_repeats: Option<usize>,
     pub epochs: Option<usize>,
     pub hidden: Option<usize>,
     pub depth: Option<usize>,
     pub val_fraction: Option<f32>,
     pub seed: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CurveReport {
-    pub points: Vec<CurvePoint>,
-    pub train_frames: usize,
-    pub val_frames: usize,
-    pub feature_dim: usize,
-    pub classes: usize,
-    pub encoder: Option<String>,
-    pub budgets: Vec<usize>,
 }
 
 #[derive(Clone, Serialize)]
@@ -174,19 +162,6 @@ fn emit_avg(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f3
 /// Single-shot progress with no history to average over.
 fn emit(app: &AppHandle, stage: &str, done: usize, total: usize, last_ms: f32) {
     emit_avg(app, stage, done, total, last_ms, last_ms);
-}
-
-/// Default budget ladder: powers of two up to the pool size, always including
-/// the full pool so the curve has an endpoint.
-fn default_budgets(pool: usize) -> Vec<usize> {
-    let mut b = Vec::new();
-    let mut n = 1;
-    while n < pool {
-        b.push(n);
-        n *= 2;
-    }
-    b.push(pool);
-    b
 }
 
 /// Everything a fit needs, built once so the sweep and a single training run
@@ -321,7 +296,7 @@ fn build_split(
     app: &AppHandle,
     db: &DbState,
     state: &MlState,
-    options: &CurveOptions,
+    options: &TrainOptions,
 ) -> Result<Split, String> {
     let frames = dataset::annotated_frame_ids(db)?;
     let mut order = dataset::label_order(&db)?;
@@ -483,7 +458,7 @@ fn build_split(
     })
 }
 
-fn train_config(options: &CurveOptions) -> TrainConfig {
+fn train_config(options: &TrainOptions) -> TrainConfig {
     TrainConfig {
         // Fall back to TrainConfig's own defaults rather than repeating them —
         // these two drifted from it once already, so the head the lab built was
@@ -543,50 +518,6 @@ struct TrainTick {
     features: usize,
 }
 
-/// Run the annotation-budget sweep and report held-out quality at each point.
-///
-/// The validation split is by **frame**, drawn once and shared by every budget,
-/// so points differ only in how much training data they saw.
-#[tauri::command(async)]
-pub fn ml_run_learning_curve(
-    app: AppHandle,
-    db: State<DbState>,
-    state: State<MlState>,
-    options: CurveOptions,
-) -> Result<CurveReport, String> {
-    // Fired before any heavy work: if this never reaches the UI, the event
-    // channel itself is at fault rather than anything being slow or blocked.
-    emit(&app, "starting", 0, 1, 0.0);
-    state.cancel.store(false, Ordering::Relaxed);
-    let split = build_split(&app, &db, &state, &options)?;
-    let budgets = options
-        .budgets
-        .clone()
-        .filter(|b| !b.is_empty())
-        .unwrap_or_else(|| default_budgets(split.per_frame.len()));
-
-    let points = train::learning_curve_with(
-        &split.per_frame,
-        &split.val,
-        split.classes,
-        &budgets,
-        options.curve_repeats.unwrap_or(3),
-        &train_config(&options),
-        &|| state.cancel.load(Ordering::Relaxed),
-        &mut |p| emit_train(&app, p),
-    )?;
-
-    Ok(CurveReport {
-        points,
-        train_frames: split.per_frame.len(),
-        val_frames: split.val_frames,
-        feature_dim: split.feature_dim,
-        classes: split.classes,
-        encoder: options.encoder_id.clone(),
-        budgets,
-    })
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrainSummary {
@@ -610,7 +541,7 @@ pub fn ml_train_model(
     app: AppHandle,
     db: State<DbState>,
     state: State<MlState>,
-    options: CurveOptions,
+    options: TrainOptions,
 ) -> Result<TrainSummary, String> {
     // Clear before building the split: a stop requested against a previous run
     // must not cancel this one before it has trained a single epoch.
@@ -863,16 +794,4 @@ pub fn ml_predict_frame(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn budget_ladder_doubles_and_ends_at_the_pool() {
-        assert_eq!(default_budgets(1), vec![1]);
-        assert_eq!(default_budgets(5), vec![1, 2, 4, 5]);
-        assert_eq!(default_budgets(8), vec![1, 2, 4, 8]);
-        // Never proposes a budget larger than the pool.
-        for pool in 1..40 {
-            assert!(default_budgets(pool).iter().all(|&b| b <= pool));
-            assert_eq!(*default_budgets(pool).last().unwrap(), pool);
-        }
-    }
 }

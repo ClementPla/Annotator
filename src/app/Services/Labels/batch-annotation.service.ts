@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { api } from '../../lib/api';
+import { api, BatchClassificationPayload } from '../../lib/api';
 import { ClassificationService } from './classification.service';
 import { LabelsService } from './labels.service';
 
@@ -10,12 +10,8 @@ export interface BatchAnnotationResult {
   errors: string[];
 }
 
-export interface BatchClassificationPayload {
-  frame_id: number;
-  task_name: string;
-  selected_classes: string[];
-  is_multilabel: boolean;
-}
+/** Re-exported so existing importers of this service keep resolving it. */
+export type { BatchClassificationPayload };
 
 @Injectable({
   providedIn: 'root',
@@ -60,10 +56,10 @@ export class BatchAnnotationService {
         const value = choices[i];
         if (value !== null) {
           payload.push({
-            frame_id: frameId,
-            task_name: tasks[i].taskName,
-            selected_classes: [value],
-            is_multilabel: false,
+            frameId: frameId,
+            taskName: tasks[i].taskName,
+            selectedClasses: [value],
+            isMultilabel: false,
           });
         }
       }
@@ -112,10 +108,10 @@ export class BatchAnnotationService {
     }
 
     const payload: BatchClassificationPayload[] = frameIds.map(frameId => ({
-      frame_id: frameId,
-      task_name: multilabelTask.taskName,
-      selected_classes: values,
-      is_multilabel: true,
+      frameId: frameId,
+      taskName: multilabelTask.taskName,
+      selectedClasses: values,
+      isMultilabel: true,
     }));
 
     try {

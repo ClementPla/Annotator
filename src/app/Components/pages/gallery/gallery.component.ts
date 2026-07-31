@@ -239,22 +239,22 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
       ]);
 
       return sequences
-        .filter((seq) => seq.frame_count > 0)
+        .filter((seq) => seq.frameCount > 0)
         .map((seq) => ({
           sequenceId: seq.id,
           sequenceName: seq.name,
           title: seq.name,
-          frameCount: seq.frame_count,
-          thumbnailFrameId: seq.first_frame_id!,
+          frameCount: seq.frameCount,
+          thumbnailFrameId: seq.firstFrameId!,
           status: this.computeStatus(
-            seq.reviewed_count,
-            seq.annotated_count,
-            seq.frame_count,
+            seq.reviewedCount,
+            seq.annotatedCount,
+            seq.frameCount,
           ),
           progress:
-            seq.frame_count > 0 ? seq.reviewed_count / seq.frame_count : 0,
+            seq.frameCount > 0 ? seq.reviewedCount / seq.frameCount : 0,
           frameIds: frameIdsBySequence[seq.id] ?? [],
-          hasKeypoints: seq.has_keypoints,
+          hasKeypoints: seq.hasKeypoints,
         }));
     } catch (error) {
       console.error('Failed to load gallery items:', error);

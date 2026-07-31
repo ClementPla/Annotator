@@ -191,7 +191,6 @@ pub fn run() {
             commands::text_description::load_text_descriptions,
             commands::text_description::delete_text_description,
             // Export commands
-            commands::export::export_annotations,
             // Pluggable dataset import/export (COCO, YOLO, NIfTI, …)
             commands::dataset_io::list_dataset_formats,
             commands::dataset_io::export_dataset,
@@ -211,7 +210,6 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_dataset_summary,
             #[cfg(not(target_os = "android"))]
-            commands::ml::commands::ml_run_learning_curve,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_train_model,
             #[cfg(not(target_os = "android"))]

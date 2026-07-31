@@ -379,8 +379,8 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   public async selectSequence(sequence: {
     id: number;
     name: string;
-    frame_count: number;
-    sort_order: number;
+    frameCount: number;
+    sortOrder: number;
   }): Promise<void> {
     if (this.navInFlight) return;
     this.navInFlight = true;
@@ -542,7 +542,7 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get activeImageName(): string | null {
     const frame = this.sequenceService.currentFrame();
-    return frame?.relative_path ?? null;
+    return frame?.relativePath ?? null;
   }
 
   get isLoading(): boolean {

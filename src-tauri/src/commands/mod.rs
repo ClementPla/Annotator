@@ -10,7 +10,6 @@ pub mod classification;
 pub mod text_description;
 pub mod frame;
 pub mod sequences;
-pub mod export;
 pub mod formats;
 pub mod dataset_io;
 pub mod registration;

@@ -26,6 +26,11 @@ impl From<tauri::Error> for ComError {
 
     }
 }
+// The types below are the ZMQ wire format shared with the external Python
+// inference peer, not a Tauri API. Their field names have to match what that
+// peer sends and expects, so the `camelCase` convention used by `commands::*`
+// does not apply here and adding it would break the protocol.
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MulticlassConfig{
     name: String,

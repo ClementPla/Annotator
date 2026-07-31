@@ -105,7 +105,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
     effect(() => {
       const frame = this.sequenceService.currentFrameImage();
       if (frame && this.ctxImage) {
-        this.loadImage(frame.image_base64, frame.frame.width, frame.frame.height);
+        this.loadImage(frame.imageBase64, frame.frame.width, frame.frame.height);
       }
     });
   }
@@ -139,7 +139,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
       this.setViewportSize(r.width, r.height);
 
       const frame = this.sequenceService.currentFrameImage();
-      if (frame) this.loadImage(frame.image_base64, frame.frame.width, frame.frame.height);
+      if (frame) this.loadImage(frame.imageBase64, frame.frame.width, frame.frame.height);
     });
   }
 
@@ -581,6 +581,6 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   get currentFrameName(): string | null {
-    return this.sequenceService.currentFrame()?.relative_path ?? null;
+    return this.sequenceService.currentFrame()?.relativePath ?? null;
   }
 }

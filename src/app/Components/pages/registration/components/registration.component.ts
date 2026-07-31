@@ -241,7 +241,7 @@ export class RegistrationComponent implements OnInit, AfterViewInit, OnDestroy {
     this.frameOptions.set(
       frames.map((f, i) => ({
         id: String(f.id),
-        label: f.relative_path ?? `Frame ${i + 1}`,
+        label: f.relativePath ?? `Frame ${i + 1}`,
       })),
     );
 

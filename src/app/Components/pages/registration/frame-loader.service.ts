@@ -21,13 +21,13 @@ export class FrameLoaderService {
       return null;
     }
 
-    if (!frameImage?.image_base64) {
-      console.warn('[FrameLoader] Frame has no image_base64:', frameId);
+    if (!frameImage?.imageBase64) {
+      console.warn('[FrameLoader] Frame has no imageBase64:', frameId);
       return null;
     }
 
     try {
-      return await this.decodeBase64(frameImage.image_base64);
+      return await this.decodeBase64(frameImage.imageBase64);
     } catch (e) {
       console.error('[FrameLoader] Image decode failed for id', frameId, e);
       return null;

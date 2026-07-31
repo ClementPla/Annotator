@@ -12,6 +12,7 @@ use crate::utils::error::{AppError, Result};
 // ==========================================
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Sequence {
     pub id: i64,
     pub name: String,
@@ -20,6 +21,7 @@ pub struct Sequence {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Frame {
     pub id: i64,
     pub sequence_id: i64,
@@ -98,6 +100,7 @@ pub fn get_sequence(db: State<DbState>, sequence_id: i64) -> Result<Sequence> {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GallerySequence {
     pub id: i64,
     pub name: String,

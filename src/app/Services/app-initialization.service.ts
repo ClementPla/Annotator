@@ -141,7 +141,7 @@ export class AppInitializationService {
         await invoke('save_annotation', {
           frameId,
           annotation: {
-            label_id: label.id,
+            labelId: label.id,
             mask_data: Array.from(maskData),
             width: imageConfig.width,
             height: imageConfig.height,

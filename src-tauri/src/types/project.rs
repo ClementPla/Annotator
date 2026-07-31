@@ -1,3 +1,18 @@
+//! Project configuration, as stored in the `.dida` file.
+//!
+//! # These field names are an on-disk format, not an API
+//!
+//! Every type here is serialised whole into the `project.config` column by
+//! `queries::insert_project` and read back by `get_project_config`. The field
+//! names *are* the stored keys, so `#[serde(rename_all = "camelCase")]` — which
+//! the types crossing the Tauri boundary otherwise use — would make every
+//! project created before the change unreadable, silently: serde would find no
+//! `input_folder` and fail the whole config.
+//!
+//! They reach the frontend too, which is why the casing looks inconsistent next
+//! to `commands::*`. It is not an oversight. If these ever need to change,
+//! it takes a schema migration that rewrites stored config, not an attribute.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -9,6 +9,7 @@ use crate::utils::AppError;
 /// array of `VectorShape`, owned and validated by the frontend — the backend
 /// only stores and returns it verbatim.
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct VectorAnnotations {
     pub label_id: i64,
     pub shapes: serde_json::Value,

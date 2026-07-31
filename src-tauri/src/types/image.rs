@@ -48,6 +48,7 @@ pub struct AnnotationResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LabelId {
     pub id: i64,
     pub name: String,

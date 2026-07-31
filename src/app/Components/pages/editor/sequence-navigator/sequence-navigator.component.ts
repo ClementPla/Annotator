@@ -97,18 +97,18 @@ export class SequenceNavigatorComponent implements OnInit {
       ]);
 
       this.sequences = seqs
-        .filter((s) => s.frame_count > 0 && s.first_frame_id != null)
-        .sort((a, b) => a.sort_order - b.sort_order)
+        .filter((s) => s.frameCount > 0 && s.firstFrameId != null)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
         .map((s) => ({
           id: s.id,
           name: s.name,
-          frameCount: s.frame_count,
+          frameCount: s.frameCount,
           status: this.computeStatus(
-            s.reviewed_count,
-            s.annotated_count,
-            s.frame_count,
+            s.reviewedCount,
+            s.annotatedCount,
+            s.frameCount,
           ),
-          thumbnailFrameId: s.first_frame_id!,
+          thumbnailFrameId: s.firstFrameId!,
           frameIds: frameIdsBySequence[s.id] ?? [],
         }));
 

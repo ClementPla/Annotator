@@ -20,8 +20,6 @@ import { MessageService } from 'primeng/api';
 
 import {
   api,
-  CurvePoint,
-  CurveReport,
   DatasetSummary,
   EncoderStatus,
   MlProgress,
@@ -30,16 +28,6 @@ import {
   StorageUsage,
   TrainTick,
 } from '../../../lib/api';
-
-/** One budget's aggregated result: mean Dice plus the spread across draws. */
-interface CurveRow {
-  nFrames: number;
-  mean: number;
-  min: number;
-  max: number;
-  accuracy: number;
-  runs: number;
-}
 
 @Component({
   selector: 'app-model-lab',
@@ -61,7 +49,6 @@ interface CurveRow {
 export class ModelLabComponent implements OnInit, OnDestroy {
   readonly encoders = signal<EncoderStatus[]>([]);
   readonly summary = signal<DatasetSummary | null>(null);
-  readonly report = signal<CurveReport | null>(null);
 
   /** `null` means "local feature basis only" — the encoder ablation. */
   readonly selectedEncoder = signal<string | null>(null);
@@ -72,7 +59,7 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   readonly error = signal<string | null>(null);
 
   /** What the running job is, so the UI can label it accurately. */
-  readonly job = signal<'curve' | 'train' | null>(null);
+  readonly job = signal<'train' | null>(null);
   /** Set once stop is requested, so the button reflects the pending state.
    * The fit finishes its current epoch, so the click is not instant. */
   readonly stopping = signal(false);
@@ -100,7 +87,6 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   workingSize = 384;
   patchesPerFrame = 24;
   epochs = 40;
-  curveRepeats = 3;
 
   private unlisten: UnlistenFn[] = [];
 
@@ -169,19 +155,19 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   /** Too few reviewed frames to hold any out. */
   readonly canRun = computed(() => {
     const s = this.summary();
-    return !!s && s.annotated_frames >= 2 && s.labels > 0 && !this.running();
+    return !!s && s.annotatedFrames >= 2 && s.labels > 0 && !this.running();
   });
 
   readonly blockedReason = computed(() => {
     const s = this.summary();
     if (!s) return 'Loading project…';
     if (s.labels === 0) return 'This project defines no segmentation labels.';
-    if (s.annotated_frames < 2) {
+    if (s.annotatedFrames < 2) {
       // Say *why* there are too few. On a project with plenty of annotation but
       // nothing reviewed, a bare count reads as though the work went missing.
-      if (s.unreviewed_frames > 0)
-        return `Only ${s.annotated_frames} reviewed frame(s). ${s.unreviewed_frames} more are annotated but not reviewed — mark them reviewed in the editor to train on them. At least 2 are needed so one can be held out.`;
-      return `Only ${s.annotated_frames} reviewed frame(s). At least 2 are needed so one can be held out.`;
+      if (s.unreviewedFrames > 0)
+        return `Only ${s.annotatedFrames} reviewed frame(s). ${s.unreviewedFrames} more are annotated but not reviewed — mark them reviewed in the editor to train on them. At least 2 are needed so one can be held out.`;
+      return `Only ${s.annotatedFrames} reviewed frame(s). At least 2 are needed so one can be held out.`;
     }
     return null;
   });
@@ -219,11 +205,10 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       cacheFeatures: this.persistCacheChoice(),
       labelIds: [...this.selectedLabels()],
       epochs: this.epochs,
-      curveRepeats: this.curveRepeats,
     };
   }
 
-  private begin(job: 'curve' | 'train'): void {
+  private begin(job: 'train'): void {
     this.running.set(true);
     this.job.set(job);
     this.error.set(null);
@@ -315,24 +300,6 @@ export class ModelLabComponent implements OnInit, OnDestroy {
     }
   }
 
-  // TODO(remove): the learning-curve sweep is a development diagnostic, not an
-  // end-user feature — it retrains at increasing dataset sizes to characterise
-  // how quality scales and leaves no usable model behind. Its button has been
-  // taken out of the page; `run`, `report`, `chart` and `curveRepeats` here and
-  // `ml_run_learning_curve` in the backend can go with it once the head's
-  // behaviour is settled and the numbers are no longer needed.
-  async run(): Promise<void> {
-    this.begin('curve');
-    this.report.set(null);
-    try {
-      this.report.set(await api.mlRunLearningCurve(this.options()));
-    } catch (e) {
-      this.error.set(String(e));
-    } finally {
-      this.end();
-    }
-  }
-
   async trainModel(): Promise<void> {
     this.begin('train');
     try {
@@ -418,90 +385,6 @@ export class ModelLabComponent implements OnInit, OnDestroy {
       })
       .join(' ');
   });
-
-  /** Aggregate repeats per budget into mean and spread. */
-  readonly rows = computed<CurveRow[]>(() => {
-    const r = this.report();
-    if (!r) return [];
-    const byBudget = new Map<number, CurvePoint[]>();
-    for (const p of r.points) {
-      const list = byBudget.get(p.nFrames) ?? [];
-      list.push(p);
-      byBudget.set(p.nFrames, list);
-    }
-    return [...byBudget.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([nFrames, pts]) => {
-        const dice = pts.map((p) => p.metrics.meanDice);
-        const acc = pts.map((p) => p.metrics.accuracy);
-        return {
-          nFrames,
-          mean: dice.reduce((a, b) => a + b, 0) / dice.length,
-          min: Math.min(...dice),
-          max: Math.max(...dice),
-          accuracy: acc.reduce((a, b) => a + b, 0) / acc.length,
-          runs: pts.length,
-        };
-      });
-  });
-
-  // ── Chart geometry ─────────────────────────────────────────────────────────
-  // Budgets are spaced evenly by index rather than by value: they form a
-  // doubling ladder, so linear spacing would crush the small-budget end, which
-  // is precisely the region of interest.
-  readonly chart = computed(() => {
-    const rows = this.rows();
-    const w = 640;
-    const h = 300;
-    const padL = 46;
-    const padR = 16;
-    const padT = 14;
-    const padB = 38;
-    if (rows.length === 0) return null;
-
-    const innerW = w - padL - padR;
-    const innerH = h - padT - padB;
-    const xOf = (i: number) =>
-      padL + (rows.length === 1 ? innerW / 2 : (i / (rows.length - 1)) * innerW);
-    const yOf = (v: number) => padT + (1 - Math.max(0, Math.min(1, v))) * innerH;
-
-    const meanPts = rows.map((r, i) => `${xOf(i)},${yOf(r.mean)}`).join(' ');
-    // Spread band: max across the top, min back along the bottom.
-    const band = [
-      ...rows.map((r, i) => `${xOf(i)},${yOf(r.max)}`),
-      ...rows
-        .slice()
-        .reverse()
-        .map((r, i) => `${xOf(rows.length - 1 - i)},${yOf(r.min)}`),
-    ].join(' ');
-
-    return {
-      w,
-      h,
-      padL,
-      padT,
-      innerW,
-      innerH,
-      meanPts,
-      band,
-      dots: rows.map((r, i) => ({
-        cx: xOf(i),
-        cy: yOf(r.mean),
-        label: String(r.nFrames),
-        lx: xOf(i),
-        ly: h - padB + 16,
-        mean: r.mean,
-      })),
-      yTicks: [0, 0.25, 0.5, 0.75, 1].map((v) => ({
-        y: yOf(v),
-        label: v.toFixed(2),
-        x2: w - padR,
-        x1: padL,
-      })),
-    };
-  });
-
-  readonly hasSpread = computed(() => this.rows().some((r) => r.runs > 1));
 
   fmt(v: number): string {
     return v.toFixed(3);

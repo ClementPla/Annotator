@@ -189,7 +189,7 @@ export class NewProjectComponent implements OnInit {
       this.messageService.add({
         severity: 'success',
         summary: 'Project created',
-        detail: `Imported ${result.frames_created} images in ${result.sequences_created} sequences`,
+        detail: `Imported ${result.framesImported} images in ${result.sequencesCreated} sequences`,
       });
       this.router.navigate(['/gallery']);
     } catch (error) {
