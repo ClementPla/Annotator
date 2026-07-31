@@ -83,18 +83,25 @@ export class EditorToolbarComponent {
   /** Feed what the user has already drawn in as conditioning. */
   useScribbles = true;
 
-  /** Output choices for the split button's dropdown; picking one also runs it. */
-  get outputMenu(): MenuItem[] {
-    return OUTPUTS.map((o) => ({
-      label: o.label,
-      icon: o.icon,
-      disabled: o.id === this.outputMode,
-      command: () => {
-        this.outputMode = o.id;
-        localStorage.setItem(OUTPUT_KEY, o.id);
-        this.predict();
-      },
-    }));
+  /**
+   * Output choices for the split button's dropdown; picking one also runs it.
+   *
+   * Built once and never reassigned. `p-splitButton` is `OnPush` and hands this
+   * array straight to a `TieredMenu`, so a getter returning a fresh array on
+   * every change-detection pass rebuilt the overlay continuously and the item
+   * under the cursor was destroyed before its click could land — the menu
+   * looked live and selected nothing.
+   */
+  readonly outputMenu: MenuItem[] = OUTPUTS.map((o) => ({
+    label: o.label,
+    icon: o.icon,
+    command: () => this.runAs(o.id),
+  }));
+
+  private runAs(mode: PredictOutput): void {
+    this.outputMode = mode;
+    localStorage.setItem(OUTPUT_KEY, mode);
+    this.predict();
   }
 
   get outputLabel(): string {

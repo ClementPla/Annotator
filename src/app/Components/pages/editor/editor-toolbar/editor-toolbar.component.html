@@ -87,6 +87,7 @@
           severity="secondary"
           [outlined]="true"
           [model]="outputMenu"
+          [disabled]="prediction.running()"
           (onClick)="predict()"
           pTooltip="Predict this frame with the trained head. The arrow picks what you get back: painted pixels, editable region outlines, or centerlines. Ctrl+Z reverts."
           tooltipPosition="bottom"
