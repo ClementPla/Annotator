@@ -102,6 +102,14 @@ tauri-plugin-process = "2"
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
 
+# Dependencies only — this glob does not cover workspace members, so *this*
+# crate stays at the dev default of `opt-level = 0`. That is deliberate: fast
+# rebuilds matter more during development than fast runs.
+#
+# Worth knowing when reading timings, though. The filter bank, feature assembly
+# and patch sampling are all in this crate, so the `[ml] frame N phases` numbers
+# under `tauri dev` are several times slower than a release build's — measure
+# performance changes against release, not dev.
 [profile.dev.package."*"]
 opt-level = 3
 
