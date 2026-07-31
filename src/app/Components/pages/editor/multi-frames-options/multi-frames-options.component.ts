@@ -34,6 +34,10 @@ export class MultiFramesOptionsComponent {
    *  moment it closes — and it closes as soon as the dialog takes focus. */
   @Output() propagateRequested = new EventEmitter<void>();
 
+  /** Asks the host to confirm erasing every annotation in this sequence. Same
+   *  reason as above: the dialog cannot live inside the popover. */
+  @Output() clearSequenceRequested = new EventEmitter<void>();
+
   constructor(
     public sequenceService: SequenceService,
     private uiStateService: UIStateService,

@@ -229,6 +229,34 @@ pub fn save_annotation(
     Ok(())
 }
 
+/// Erase every annotation on every frame of `sequence_id`, returning how many
+/// frames actually carried one.
+///
+/// Both tables, because a label's annotation is raster *and* vector; clearing
+/// one alone leaves the frame looking annotated. The count is of frames rather
+/// than deleted rows so the caller can report something a user recognises.
+pub fn clear_sequence_annotations(conn: &Connection, sequence_id: i64) -> Result<usize> {
+    let affected: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM frames f WHERE f.sequence_id = ?1 \
+           AND (EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
+             OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id))",
+        params![sequence_id],
+        |row| row.get(0),
+    )?;
+
+    conn.execute(
+        "DELETE FROM annotations WHERE frame_id IN \
+           (SELECT id FROM frames WHERE sequence_id = ?1)",
+        params![sequence_id],
+    )?;
+    conn.execute(
+        "DELETE FROM vector_annotations WHERE frame_id IN \
+           (SELECT id FROM frames WHERE sequence_id = ?1)",
+        params![sequence_id],
+    )?;
+    Ok(affected as usize)
+}
+
 /// Store the fitted head, replacing whatever was there.
 ///
 /// `meta` is opaque JSON to this layer: the storage module has no business
@@ -348,6 +376,65 @@ mod tests {
 
         assert!(delete_ml_model(&conn).unwrap());
         assert!(load_ml_model(&conn).unwrap().is_none());
+    }
+
+    /// Two sequences, two frames each. Sequence 1 is annotated (frame 1 raster,
+    /// frame 2 vector), sequence 2 is annotated too so we can prove scoping.
+    fn project_with_two_sequences() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        configure_connection(&conn).unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute_batch(
+            "INSERT INTO labels (id, name, color) VALUES (1, 'a', '#ff0000');
+             INSERT INTO sequences (id, name) VALUES (1, 's1'), (2, 's2');
+             INSERT INTO frames (id, sequence_id, frame_index, width, height)
+               VALUES (1, 1, 0, 8, 8), (2, 1, 1, 8, 8),
+                      (3, 2, 0, 8, 8), (4, 2, 1, 8, 8);
+             INSERT INTO annotations (frame_id, label_id, encoding, mask_data)
+               VALUES (1, 1, 'rle8', x'00'), (3, 1, 'rle8', x'00');
+             INSERT INTO vector_annotations (frame_id, label_id, shapes)
+               VALUES (2, 1, '[{}]'), (4, 1, '[{}]');",
+        )
+        .unwrap();
+        conn
+    }
+
+    fn counts(conn: &Connection) -> (i64, i64) {
+        (
+            conn.query_row("SELECT COUNT(*) FROM annotations", [], |r| r.get(0)).unwrap(),
+            conn.query_row("SELECT COUNT(*) FROM vector_annotations", [], |r| r.get(0))
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn clearing_a_sequence_removes_both_kinds_and_leaves_others_alone() {
+        let conn = project_with_two_sequences();
+        assert_eq!(counts(&conn), (2, 2));
+
+        // Frames 1 and 2 carry annotations; frames 3 and 4 belong to sequence 2.
+        assert_eq!(clear_sequence_annotations(&conn, 1).unwrap(), 2);
+        assert_eq!(counts(&conn), (1, 1), "sequence 2 must be untouched");
+
+        let survivors: Vec<i64> = {
+            let mut stmt = conn
+                .prepare("SELECT frame_id FROM annotations UNION SELECT frame_id FROM vector_annotations ORDER BY 1")
+                .unwrap();
+            let rows = stmt.query_map([], |r| r.get(0)).unwrap();
+            rows.map(|r| r.unwrap()).collect()
+        };
+        assert_eq!(survivors, vec![3, 4]);
+    }
+
+    #[test]
+    fn clearing_an_already_empty_sequence_reports_nothing() {
+        let conn = project_with_two_sequences();
+        clear_sequence_annotations(&conn, 1).unwrap();
+        assert_eq!(
+            clear_sequence_annotations(&conn, 1).unwrap(),
+            0,
+            "a second clear has nothing left to report"
+        );
     }
 
     #[test]

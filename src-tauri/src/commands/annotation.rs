@@ -23,6 +23,17 @@ pub fn save_annotation(
     })
 }
 
+/// Erase every annotation on every frame of a sequence, returning how many
+/// frames carried one.
+///
+/// Unlike clearing a label or a frame in the editor, this is not undoable: it
+/// writes straight to the project, including frames that are not open. The
+/// caller is expected to confirm first.
+#[tauri::command]
+pub fn clear_sequence_annotations(db: State<DbState>, sequence_id: i64) -> Result<usize> {
+    db.with_conn(|conn| queries::clear_sequence_annotations(conn, sequence_id))
+}
+
 #[tauri::command]
 pub fn load_annotations(db: State<DbState>, frame_id: i64) -> Result<Vec<AnnotationResponse>> {
     db.with_conn(|conn| {

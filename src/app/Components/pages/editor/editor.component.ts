@@ -51,6 +51,8 @@ import {
   TauriEventService,
 } from '../../../Services/TauriEvent/';
 import { IOService } from '../../../Services/io.service';
+import { NotificationService } from '../../../Services/notification.service';
+import { api } from '../../../lib/api';
 import { OrchestratorService } from './drawable-canvas/service/orchestrator.service';
 
 // Core
@@ -110,6 +112,8 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Open state of the propagation dialog (opened from the frame-nav popover). */
   readonly propagationVisible = signal(false);
+  readonly clearSequenceVisible = signal(false);
+  readonly clearingSequence = signal(false);
 
   constructor(
     public editorService: EditorService,
@@ -126,7 +130,39 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
     private orchestratorService: OrchestratorService,
     private ngZone: NgZone,
     public propagation: PropagationService,
+    private notifications: NotificationService,
   ) {}
+
+  /**
+   * Erase every annotation in the open sequence, then reload the frame.
+   *
+   * Unlike clearing a label or a frame this is not undoable — it deletes rows
+   * for frames that are not loaded — which is why it is behind a confirmation.
+   */
+  async clearSequence(): Promise<void> {
+    const sequence = this.sequenceService.currentSequence();
+    if (!sequence || this.clearingSequence()) return;
+
+    this.clearingSequence.set(true);
+    try {
+      // Before the delete, not after: autosave fires seconds after the last
+      // edit, so a pending write landing afterwards would restore the frame.
+      this.ioService.discardPendingSave();
+      const frames = await api.clearSequenceAnnotations(sequence.id);
+      await this.loadCanvas();
+      this.clearSequenceVisible.set(false);
+      this.notifications.notify({
+        severity: 'success',
+        summary: 'Sequence cleared',
+        detail: `${frames} annotated frame${frames === 1 ? '' : 's'} erased`,
+        life: 4000,
+      });
+    } catch (error) {
+      this.notifications.error('Failed to clear sequence', String(error));
+    } finally {
+      this.clearingSequence.set(false);
+    }
+  }
 
   /** Spells out what the one-click propagate button is about to overwrite. */
   get propagateTooltip(): string {

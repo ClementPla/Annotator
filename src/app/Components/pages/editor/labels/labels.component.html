@@ -70,6 +70,17 @@
           ariaLabel="Show all labels"
         ></p-button>
         }
+
+        <p-button
+          icon="pi pi-trash"
+          severity="danger"
+          [rounded]="true"
+          [text]="true"
+          pTooltip="Clear every label on this frame (Ctrl+Z to undo)"
+          tooltipPosition="bottom"
+          ariaLabel="Clear every label on this frame"
+          (click)="clearFrame()"
+        ></p-button>
         <p class="flex flex-col gap-2">
           <input
             type="text"

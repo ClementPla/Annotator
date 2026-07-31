@@ -13,6 +13,7 @@ import { SelectButtonModule } from 'primeng/selectbutton';
 import { DividerModule } from 'primeng/divider';
 import { TextareaModule } from 'primeng/textarea';
 import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 
 import { LabelsService } from '../../../../Services/Labels/labels.service';
 import { ClassificationService } from '../../../../Services/Labels/classification.service';
@@ -42,6 +43,7 @@ import { api } from '../../../../lib/api';
     LabelledSwitchComponent,
     TextareaModule,
     TagModule,
+    TooltipModule,
   ],
   templateUrl: './labels.component.html',
   styleUrl: './labels.component.scss',
@@ -198,6 +200,11 @@ export class LabelsComponent implements OnInit, OnDestroy {
     if (index !== -1) {
       this.editorService.requestCanvasClear(index);
     }
+  }
+
+  /** Erase every label on this frame. Undoable as one step. */
+  public clearFrame(): void {
+    this.editorService.requestCanvasClear();
   }
 
   public changeVisibility(node: TreeNode): void {

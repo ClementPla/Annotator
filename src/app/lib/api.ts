@@ -398,6 +398,13 @@ export const api = {
     height: number,
   ) =>
     invoke<ArrayBuffer>('get_frame_tile', { frameId, x, y, width, height }),
+  /**
+   * Erase every annotation on every frame of a sequence, returning how many
+   * frames carried one. Not undoable — it writes straight to the project.
+   */
+  clearSequenceAnnotations: (sequenceId: number) =>
+    invoke<number>('clear_sequence_annotations', { sequenceId }),
+
   getFrameThumbnail: (frameId: number, maxSize: number) =>
     invoke<FrameImage>('get_frame_thumbnail', { frameId, maxSize }),
 

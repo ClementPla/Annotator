@@ -247,9 +247,11 @@ export class DrawService implements OnDestroy {
 
     this.editorService.canvasClear
       .pipe(takeUntil(this.destroy$))
-      .subscribe((value) => {
-        if (value >= 0) this.clearLabel(value);
-      });
+      // `requestCanvasClear()` defaults to -1, which has always meant "all
+      // labels" in the signature and did nothing until now.
+      .subscribe((index) =>
+        index >= 0 ? this.clearLabel(index) : this.clearFrame(),
+      );
   }
 
   /**
@@ -270,8 +272,32 @@ export class DrawService implements OnDestroy {
     if (labelId != null) this.vectorEditor.deleteShapesForLabel(labelId);
     this.undoRedoService.endGroup();
 
+    this.finishClear([index]);
+  }
+
+  /**
+   * Erase every label on this frame, raster and vector, as one undo step.
+   *
+   * Deliberately one group rather than a loop of `clearLabel`: undoing a
+   * "clear frame" should restore the frame, not require one Ctrl+Z per label.
+   */
+  private clearFrame(): void {
+    const indices = this.labelService.listSegmentationLabels.map((_, i) => i);
+    if (indices.length === 0) return;
+
+    this.undoRedoService.beginGroup();
+    this.undoRedoService.snapshotLayers(indices);
+    indices.forEach((i) => this.canvasManagerService.clearMaskAtIndex(i));
+    this.vectorEditor.deleteAllShapes();
+    this.undoRedoService.endGroup();
+
+    this.finishClear(indices);
+  }
+
+  /** Shared tail of a clear: recompute, mark dirty for save, repaint. */
+  private finishClear(indices: number[]): void {
     this.stateService.recomputeCanvasSum = true;
-    this.ioService.markLabelDirty(index);
+    indices.forEach((i) => this.ioService.markLabelDirty(i));
     this.redrawRequest.next(true);
   }
 

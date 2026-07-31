@@ -231,6 +231,17 @@ export class VectorEditorService {
     this.deleteShapesByIds(ids);
   }
 
+  /**
+   * Drop every shape on the frame, as one undoable action.
+   *
+   * Distinct from [`clear`], which resets the editor when a different frame is
+   * loaded and discards the history with it. This is an edit the user asked for
+   * and must be undoable.
+   */
+  deleteAllShapes(): void {
+    this.deleteShapesByIds(this._shapes().map((s) => s.id));
+  }
+
   shapesByLabel(): Map<number, VectorShape[]> {
     const byLabel = new Map<number, VectorShape[]>();
     for (const shape of this._shapes()) {

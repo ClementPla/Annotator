@@ -117,6 +117,19 @@ export class IOService implements OnDestroy {
   }
 
   /**
+   * Forget everything queued for saving, without writing it.
+   *
+   * For callers that are about to delete the same annotations in the database:
+   * autosave fires several seconds after the last edit, so a pending write
+   * landing after the delete would put the frame straight back.
+   */
+  public discardPendingSave(): void {
+    this.cancelAutosave();
+    this.dirty = false;
+    this.dirtyLabels.clear();
+  }
+
+  /**
    * Load annotations for the current frame from SQLite.
    */
   public async load(): Promise<void> {

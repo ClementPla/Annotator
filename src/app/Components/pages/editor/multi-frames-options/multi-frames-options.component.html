@@ -26,6 +26,14 @@
           [fluid]="true"
           (click)="propagateRequested.emit()"
         />
+        <p-button
+          label="Clear sequence…"
+          icon="pi pi-trash"
+          severity="danger"
+          [text]="true"
+          [fluid]="true"
+          (click)="clearSequenceRequested.emit()"
+        />
       </div>
     }
   </p-panel>

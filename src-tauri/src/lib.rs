@@ -173,6 +173,7 @@ pub fn run() {
             commands::sequences::move_frames_to_sequence,
             commands::annotation::save_annotation,
             commands::annotation::load_annotations,
+            commands::annotation::clear_sequence_annotations,
             commands::vector::save_vector_annotations,
             commands::vector::load_vector_annotations,
             commands::propagation::propagate_annotations,
