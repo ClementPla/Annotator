@@ -1,12 +1,16 @@
 <div class="flex flex-col gallery gap-2 h-full p-2 w-full">
 
-  @if (projectService.isClassification() && hasSelection) {
+  <!-- Shown for any selection. The classification controls inside are the only
+       part that needs a classification project; review marking applies to every
+       project and used to be hidden with them. -->
+  @if (hasSelection) {
   <p-panel
-    [header]="'Batch annotation · ' + selectedCount + ' selected'"
+    [header]="'Batch actions · ' + selectedCount + ' selected'"
     [toggleable]="true"
     [collapsed]="false"
   >
     <div class="flex flex-col gap-4">
+      @if (projectService.isClassification()) {
       <!-- Multiclass tasks -->
       @for (task of labelsService.listClassificationTasks; track task.taskName;
       let i = $index) {
@@ -38,14 +42,18 @@
       </div>
       }
 
+      }
+
       <!-- Actions -->
       <div class="flex flex-wrap gap-2">
+        @if (projectService.isClassification()) {
         <p-button
           label="Apply to {{ selectedCount }} items"
           icon="pi pi-check"
           (click)="annotateBatch()"
           [disabled]="!hasBatchChoices"
         ></p-button>
+        }
         <p-button
           label="Mark as reviewed"
           icon="pi pi-verified"
