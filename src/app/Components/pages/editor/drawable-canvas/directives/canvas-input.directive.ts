@@ -37,7 +37,7 @@ export class CanvasInputDirective {
   // Mouse
   // ==========================================
 
-  /** Right-click opens the label picker, so only the left button draws. */
+  /** Right-click opens the label picker; the button routing is in `pointerDown`. */
   @HostListener('contextmenu', ['$event'])
   onContextMenu(event: MouseEvent) {
     event.preventDefault();
@@ -46,9 +46,6 @@ export class CanvasInputDirective {
 
   @HostListener('mousedown', ['$event'])
   onMouseDown(event: MouseEvent) {
-    // Without this a right- or middle-click started a stroke, which then had no
-    // matching mouseup and left the canvas painting until the next left click.
-    if (event.button !== 0) return;
     this.pointerDown(event);
   }
 
@@ -159,6 +156,11 @@ export class CanvasInputDirective {
   // ==========================================
 
   private pointerDown(event: MouseEvent) {
+    // The right button belongs to the label picker (see `onContextMenu`), so it
+    // must not start a drag or a stroke. The middle button is the opposite case:
+    // holding it is how you pan, so it has to reach the pan branch below.
+    if (event.button === 2) return;
+
     if (event.button === 1) {
       this.editorService.activatePanMode();
     }
@@ -199,6 +201,9 @@ export class CanvasInputDirective {
       return;
     }
 
+    // The raster pen is the one branch with no button check of its own — every
+    // vector branch above already guards on `button === 0`.
+    if (event.button !== 0) return;
     this.drawService.startDraw(event);
   }
 

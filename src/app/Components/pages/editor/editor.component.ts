@@ -288,8 +288,10 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
       save: async () => {
         await this.save();
       },
-      nextImage: () => this.navigateNext(),
-      previousImage: () => this.navigatePrevious(),
+      nextSequence: () => this.navigateNext(),
+      previousSequence: () => this.navigatePrevious(),
+      nextFrame: () => this.stepFrame(1),
+      previousFrame: () => this.stepFrame(-1),
 
       'panMode:start': () => this.editorService.activatePanMode(),
       'panMode:end': () => this.editorService.restoreLastTool(),
@@ -356,7 +358,7 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
     // cycles can't overlap and race the shared canvas.
     if (this.navInFlight) return;
     this.navInFlight = true;
-    this.uiStateService.setLoading(true, 'Loading next image');
+    this.uiStateService.setLoading(true, 'Loading next sequence');
 
     try {
       // Save current if dirty
@@ -379,7 +381,7 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   public async navigatePrevious(): Promise<void> {
     if (this.navInFlight) return;
     this.navInFlight = true;
-    this.uiStateService.setLoading(true, 'Loading previous image');
+    this.uiStateService.setLoading(true, 'Loading previous sequence');
 
     try {
       // Save current if dirty
@@ -397,6 +399,21 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
       this.uiStateService.endLoading();
       this.navInFlight = false;
     }
+  }
+
+  /**
+   * Move `step` frames within the open sequence, wrapping at either end.
+   *
+   * This used to be a pair of `window:keydown` listeners on the frame-navigation
+   * popover's component. The popover renders its content lazily and destroys it
+   * on close, so the arrow keys only worked while the popover was open — while
+   * the hint inside it claimed otherwise.
+   */
+  private stepFrame(step: number): void {
+    const total = this.sequenceService.frameCount();
+    if (total < 2) return;
+    const from = this.sequenceService.currentFrameIndex();
+    void this.changedOfFrame((((from + step) % total) + total) % total);
   }
 
   public async changedOfFrame(newFrameIndex: number): Promise<void> {

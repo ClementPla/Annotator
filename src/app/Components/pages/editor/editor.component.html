@@ -37,7 +37,7 @@
             ? 'pi pi-angle-double-right'
             : 'pi pi-angle-double-left'
         "
-        [pTooltip]="labelsCollapsed ? 'Show panel' : 'Hide panel'"
+        [pTooltip]="labelsCollapsed ? 'Show labels panel' : 'Hide labels panel'"
         [attr.aria-label]="
           labelsCollapsed ? 'Show left panel' : 'Hide left panel'
         "
@@ -59,7 +59,7 @@
             ? 'pi pi-angle-double-left'
             : 'pi pi-angle-double-right'
         "
-        [pTooltip]="settingsCollapsed ? 'Show settings' : 'Hide settings'"
+        [pTooltip]="settingsCollapsed ? 'Show settings panel' : 'Hide settings panel'"
         [attr.aria-label]="
           settingsCollapsed ? 'Show settings panel' : 'Hide settings panel'
         "
@@ -111,7 +111,7 @@
         icon="pi pi-undo"
         [raised]="true"
         (click)="editorService.requestUndo()"
-        pTooltip="Ctrl+Z"
+        pTooltip="Undo (Ctrl+Z)"
         aria-label="Undo"
       ></button>
       <button
@@ -120,7 +120,7 @@
         icon="pi pi-refresh"
         [raised]="true"
         (click)="editorService.requestRedo()"
-        pTooltip="Ctrl+Y"
+        pTooltip="Redo (Ctrl+Y)"
         tooltipPosition="left"
         aria-label="Redo"
       ></button>
@@ -166,7 +166,7 @@
           icon="pi pi-images"
           severity="secondary"
           [raised]="true"
-          pTooltip="Jump to a frame in this sequence"
+          pTooltip="Frames and sequence actions: jump to a frame, propagate labels, clear the sequence"
           tooltipPosition="left"
           aria-label="Frame navigation"
           (click)="frameNavPopover.toggle($event)"
@@ -191,9 +191,17 @@
         offIcon="pi pi-verified"
         [onLabel]="''"
         [offLabel]="''"
-        pTooltip="Mark sequence reviewed"
+        [pTooltip]="
+          isSequenceReviewed
+            ? 'Mark this sequence as not reviewed'
+            : 'Mark every frame of this sequence reviewed'
+        "
         tooltipPosition="left"
-        ariaLabel="Mark sequence reviewed"
+        [ariaLabel]="
+          isSequenceReviewed
+            ? 'Mark this sequence as not reviewed'
+            : 'Mark every frame of this sequence reviewed'
+        "
         severity="primary"
         fluid
       ></p-togglebutton>
@@ -222,7 +230,7 @@
         offIcon="pi pi-sliders-h"
         [onLabel]="''"
         [offLabel]="''"
-        pTooltip="Image adjustments (settings in the panel)"
+        pTooltip="Apply image adjustments (settings in the panel)"
         tooltipPosition="left"
         ariaLabel="Image adjustments"
       ></p-togglebutton>
@@ -266,7 +274,7 @@
           offIcon="pi pi-eraser"
           [onLabel]="''"
           [offLabel]="''"
-          pTooltip="Click a box to erase it"
+          pTooltip="Erase an object by clicking its bounding box"
           tooltipPosition="left"
           ariaLabel="Click a box to erase it"
         ></p-togglebutton>

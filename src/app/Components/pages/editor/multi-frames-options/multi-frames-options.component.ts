@@ -1,4 +1,4 @@
-import { Component, EventEmitter, HostListener, Output } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
@@ -7,8 +7,6 @@ import { PanelModule } from 'primeng/panel';
 import { ButtonModule } from 'primeng/button';
 
 import { SequenceService } from '../../../../Services/sequence.service';
-import { UIStateService } from '../../../../Services/uistate.service';
-import { Sequence } from '../../../../lib/api';
 
 @Component({
   selector: 'app-multi-frames-options',
@@ -40,7 +38,6 @@ export class MultiFramesOptionsComponent {
 
   constructor(
     public sequenceService: SequenceService,
-    private uiStateService: UIStateService,
   ) {}
 
   // ==========================================
@@ -70,14 +67,6 @@ export class MultiFramesOptionsComponent {
     return this.totalFrames > 1;
   }
 
-  get currentSequence(): Sequence | null {
-    return this.sequenceService.currentSequence();
-  }
-
-  get sequences(): Sequence[] {
-    return this.sequenceService.sequences();
-  }
-
   get progress(): { current: number; total: number } {
     return this.sequenceService.sequenceProgress();
   }
@@ -91,48 +80,5 @@ export class MultiFramesOptionsComponent {
       return;
     }
     this.changeOfFrame.emit(this.currentFrame);
-  }
-
-  async selectSequence(sequence: Sequence): Promise<void> {
-    this.uiStateService.setLoading(true, 'Loading sequence');
-    try {
-      await this.sequenceService.selectSequence(sequence);
-    } finally {
-      this.uiStateService.endLoading();
-    }
-  }
-  async selectSequenceById(sequenceId: number): Promise<void> {
-    const sequence = this.sequences.find((s) => s.id === sequenceId);
-    if (sequence) {
-      await this.selectSequence(sequence);
-    }
-  }
-
-  // ==========================================
-  // Keyboard Navigation
-  // ==========================================
-
-  @HostListener('window:keydown.ArrowUp')
-  nextFrame() {
-    if (!this.hasMultipleFrames) return;
-
-    const nextIndex = this.currentFrame + 1;
-    if (nextIndex >= this.totalFrames) {
-      this.changeOfFrame.emit(0); // Wrap to first frame
-    } else {
-      this.changeOfFrame.emit(nextIndex);
-    }
-  }
-
-  @HostListener('window:keydown.ArrowDown')
-  previousFrame() {
-    if (!this.hasMultipleFrames) return;
-
-    const prevIndex = this.currentFrame - 1;
-    if (prevIndex < 0) {
-      this.changeOfFrame.emit(this.totalFrames - 1); // Wrap to last frame
-    } else {
-      this.changeOfFrame.emit(prevIndex);
-    }
   }
 }

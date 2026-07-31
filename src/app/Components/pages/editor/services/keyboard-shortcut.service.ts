@@ -53,8 +53,13 @@ export class KeyboardShortcutService implements OnDestroy {
 
     // File / Navigation
     { keys: ['ctrl+s'], action: 'save', description: 'Save annotations', category: 'file' },
-    { keys: ['arrowright'], action: 'nextImage', description: 'Next image', category: 'navigation' },
-    { keys: ['arrowleft'], action: 'previousImage', description: 'Previous image', category: 'navigation' },
+    // Left/right move between sequences, up/down between frames within one.
+    // Both live here rather than as component listeners so they work whenever
+    // the editor is focused and show up in the shortcut help.
+    { keys: ['arrowright'], action: 'nextSequence', description: 'Next sequence', category: 'navigation' },
+    { keys: ['arrowleft'], action: 'previousSequence', description: 'Previous sequence', category: 'navigation' },
+    { keys: ['arrowup'], action: 'nextFrame', description: 'Next frame in sequence', category: 'navigation' },
+    { keys: ['arrowdown'], action: 'previousFrame', description: 'Previous frame in sequence', category: 'navigation' },
   ];
 
   // Keys that trigger hold-to-activate behavior
