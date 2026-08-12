@@ -1,6 +1,6 @@
 import { computed, Injectable, Injector, signal } from '@angular/core';
-import { postProcessingOptions } from '../Core/tools';
-import { EditorService } from '../Components/pages/editor/services/editor.service';
+import { postProcessingOptions } from '../core/tools';
+import { EditorService } from '../features/editor/services/editor.service';
 import { ExperimentalFeature } from './descriptor';
 import {
   EXPERIMENTAL_FEATURES,

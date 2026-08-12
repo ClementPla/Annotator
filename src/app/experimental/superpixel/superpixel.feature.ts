@@ -1,4 +1,4 @@
-import { PostProcessOption } from '../../Core/tools';
+import { PostProcessOption } from '../../core/tools';
 import { ExperimentalFeatureDescriptor } from '../descriptor';
 import { SuperpixelService } from './superpixel.service';
 import { SuperpixelSettingsComponent } from './superpixel-settings.component';

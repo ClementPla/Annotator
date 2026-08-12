@@ -1,5 +1,5 @@
 import { Injector } from '@angular/core';
-import { PostProcessOption } from '../Core/tools';
+import { PostProcessOption } from '../core/tools';
 import {
   ExperimentalFeatureDescriptor,
   ExperimentalPostProcess,

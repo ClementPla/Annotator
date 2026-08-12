@@ -1,4 +1,4 @@
-import { PostProcessOption } from '../../Core/tools';
+import { PostProcessOption } from '../../core/tools';
 import { ExperimentalFeatureDescriptor } from '../descriptor';
 import { CrfService } from './crf.service';
 import { CrfSettingsComponent } from './crf-settings.component';

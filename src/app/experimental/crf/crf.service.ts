@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
-import { applyRegionResult } from '../../Core/misc/label-ops';
-import { CanvasManagerService } from '../../Components/pages/editor/drawable-canvas/service/canvas-manager.service';
-import { StateManagerService } from '../../Components/pages/editor/drawable-canvas/service/state-manager.service';
-import { ImageAdjustmentService } from '../../Components/pages/editor/drawable-canvas/service/image-adjustment/image-adjustment.service';
-import { LabelsService } from '../../Services/Labels/labels.service';
+import { applyRegionResult } from '../../core/misc/label-ops';
+import { CanvasManagerService } from '../../features/editor/drawable-canvas/service/canvas-manager.service';
+import { StateManagerService } from '../../features/editor/drawable-canvas/service/state-manager.service';
+import { ImageAdjustmentService } from '../../features/editor/drawable-canvas/service/image-adjustment/image-adjustment.service';
+import { LabelsService } from '../../services/labels/labels.service';
 
 /**
  * Experimental: turn the current brush stroke into a segmentation with a

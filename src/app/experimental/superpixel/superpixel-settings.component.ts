@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { SliderModule } from 'primeng/slider';
-import { GenericsModule } from '../../generics/generics.module';
+import { GenericsModule } from '../../shared/generics/generics.module';
 import { SuperpixelService } from './superpixel.service';
 
 /** Settings pane for the superpixel post-process mode, rendered by the tool

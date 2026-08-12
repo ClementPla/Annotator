@@ -1,0 +1,200 @@
+import {
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  NgZone,
+  ViewChild,
+} from '@angular/core';
+import {
+  WheelMenuComponent,
+  MenuItem,
+  SegmentType,
+} from '../../../shared/generics/wheel-menu/wheel-menu.component';
+import { ALL_TOOLS, Tools } from '../../../core/tools';
+import { NgClass } from '@angular/common';
+import { EditorService } from '../services/editor.service';
+import { VectorEditorService } from '../drawable-canvas/service/vector-editor.service';
+import { ConvertService } from '../drawable-canvas/service/convert.service';
+
+@Component({
+    selector: 'app-quick-access-menu',
+    imports: [WheelMenuComponent, NgClass],
+    templateUrl: './quick-access-menu.component.html',
+    styleUrl: './quick-access-menu.component.scss'
+})
+export class QuickAccessMenuComponent {
+  @ViewChild('quickAccessMenu') quickAccessMenu!: WheelMenuComponent;
+
+  constructor(
+    private cdr: ChangeDetectorRef,
+    private editorService: EditorService,
+    private vectorEditor: VectorEditorService,
+    private convertService: ConvertService
+  ) {}
+
+  public radius = 200;
+
+  public isOpen = false;
+
+  public position: { x: number; y: number } = { x: 0, y: 0 };
+
+  getMenuItems(): MenuItem[] {
+    return [
+      {
+        label: Tools.PAN.name,
+        icon: Tools.PAN.icon,
+        command: () => this.editorService.selectTool(Tools.PAN),
+      },
+      {
+        label: Tools.LASSO_ERASER.name,
+        icon: Tools.LASSO_ERASER.icon,
+        command: () => this.editorService.selectTool(Tools.LASSO_ERASER),
+        children: [
+          {
+            label: 'Erase all labels',
+            icon: Tools.LASSO_ERASER.icon,
+            command: () =>
+              (this.editorService.eraseAll = !this.editorService.eraseAll),
+            type: SegmentType.toggle,
+          },
+          {
+            label: 'Erase connected',
+            icon: Tools.LASSO_ERASER.icon,
+            command: () =>
+              (this.editorService.eraserPostProcess =
+                !this.editorService.eraserPostProcess),
+            type: SegmentType.toggle,
+          },
+        ],
+      },
+      {
+        label: Tools.ERASER.name,
+        icon: Tools.ERASER.icon,
+        command: () => this.editorService.selectTool(Tools.ERASER),
+        children: [
+          {
+            label: 'Erase all labels',
+            icon: Tools.LASSO_ERASER.icon,
+            command: () =>
+              (this.editorService.eraseAll = !this.editorService.eraseAll),
+            type: SegmentType.toggle,
+          },
+          {
+            label: 'Erase connected',
+            icon: Tools.LASSO_ERASER.icon,
+            command: () =>
+              (this.editorService.eraserPostProcess =
+                !this.editorService.eraserPostProcess),
+            type: SegmentType.toggle,
+          },
+        ],
+      },
+
+      {
+        label: Tools.PEN.name,
+        icon: Tools.PEN.icon,
+        command: () => this.editorService.selectTool(Tools.PEN),
+        children: [
+          {
+            label: 'Swap labels',
+            icon: Tools.PEN.icon,
+            command: () =>
+              (this.editorService.swapMarkers =
+                !this.editorService.swapMarkers),
+            type: SegmentType.toggle,
+          },
+        ],
+      },
+      {
+        label: Tools.LASSO.name,
+        icon: Tools.LASSO.icon,
+        command: () => this.editorService.selectTool(Tools.LASSO),
+        children: [
+          {
+            label: 'Swap labels',
+            icon: Tools.LASSO.icon,
+            command: () =>
+              (this.editorService.swapMarkers =
+                !this.editorService.swapMarkers),
+            type: SegmentType.toggle,
+          },
+        ],
+      },
+      {
+        label: Tools.LINE.name,
+        icon: Tools.LINE.icon,
+        command: () => this.editorService.selectTool(Tools.LINE),
+        children: [
+          {
+            label: 'Swap labels',
+            icon: Tools.LINE.icon,
+            command: () =>
+              (this.editorService.swapMarkers =
+                !this.editorService.swapMarkers),
+            type: SegmentType.toggle,
+          },
+        ],
+      },
+      {
+        label: Tools.PATH.name,
+        icon: Tools.PATH.icon,
+        command: () => this.editorService.selectTool(Tools.PATH),
+      },
+      {
+        label: Tools.NODE.name,
+        icon: Tools.NODE.icon,
+        command: () => this.editorService.selectTool(Tools.NODE),
+        children: [
+          {
+            label: 'Delete shape',
+            icon: 'pi pi-trash',
+            command: () => this.vectorEditor.deleteSelectedShape(),
+            type: SegmentType.button,
+          },
+          {
+            label: 'Toggle fill',
+            icon: 'pi pi-stop',
+            command: () => this.vectorEditor.toggleFilled(),
+            type: SegmentType.toggle,
+          },
+          {
+            label: 'Open / close',
+            icon: 'pi pi-circle',
+            command: () => this.vectorEditor.toggleClosed(),
+            type: SegmentType.toggle,
+          },
+          {
+            label: 'Rasterize',
+            icon: 'pi pi-th-large',
+            command: () => this.convertService.rasterize(),
+            type: SegmentType.button,
+          },
+        ],
+      },
+      {
+        label: Tools.VECTORIZE.name,
+        icon: Tools.VECTORIZE.icon,
+        command: () => this.editorService.selectTool(Tools.VECTORIZE),
+      },
+    ];
+  }
+
+  open() {
+    this.isOpen = true;
+    // Wait until Angular finishes DOM updates
+    this.cdr.detectChanges(); // flush the change so the element is visible
+    this.quickAccessMenu.focus();
+  }
+
+  close() {
+    this.isOpen = false;
+  }
+
+  toggleOpen() {
+    if (this.isOpen) {
+      this.close();
+    } else {
+      this.open();
+    }
+  }
+}

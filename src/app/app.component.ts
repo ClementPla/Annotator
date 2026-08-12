@@ -1,11 +1,11 @@
 // app.component.ts
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ToolbarModule } from 'primeng/toolbar';
-import { LoadingComponent } from './Components/pages/loading/loading.component';
+import { LoadingComponent } from './features/loading/loading.component';
 import { RouterOutlet, RouterModule } from '@angular/router';
-import { EditorService } from './Components/pages/editor/services/editor.service';
-import { AppInitializationService } from './Services/app-initialization.service';
-import { ThemeService } from './Services/theme.service';
+import { EditorService } from './features/editor/services/editor.service';
+import { AppInitializationService } from './services/app-initialization.service';
+import { ThemeService } from './services/theme.service';
 import { Button } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
 import { BlockUIModule } from 'primeng/blockui';
@@ -14,12 +14,12 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { Subject, takeUntil } from 'rxjs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { UIStateService } from './Services/uistate.service';
-import { NotificationService } from './Services/notification.service';
-import { IOService } from './Services/io.service';
-import { FpsDisplayComponent } from "./Components/Utils/fps-display/fps-display.component";
-import { ProjectService } from './Services/ProjectService/project.service';
-import { UpdateService } from './Services/update.service';
+import { UIStateService } from './services/uistate.service';
+import { NotificationService } from './services/notification.service';
+import { IOService } from './services/io.service';
+import { FpsDisplayComponent } from "./shared/fps-display/fps-display.component";
+import { ProjectService } from './services/project/project.service';
+import { UpdateService } from './services/update.service';
 import { ExperimentalSettingsComponent } from './experimental/experimental-settings/experimental-settings.component';
 @Component({
   selector: 'app-root',

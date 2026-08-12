@@ -1,5 +1,5 @@
 import { Injector, Type } from '@angular/core';
-import { PostProcessOption } from '../Core/tools';
+import { PostProcessOption } from '../core/tools';
 
 /** Identifier of an experimental feature. Extend this union when adding one. */
 export type ExperimentalFeature = 'crf' | 'superpixel';

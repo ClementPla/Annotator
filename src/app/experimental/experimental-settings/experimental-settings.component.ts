@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
-import { GenericsModule } from '../../generics/generics.module';
+import { GenericsModule } from '../../shared/generics/generics.module';
 import { FeatureFlagsService } from '../feature-flags.service';
 import { EXPERIMENTAL_FEATURES } from '../registry';
 
