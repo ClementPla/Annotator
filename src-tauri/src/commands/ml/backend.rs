@@ -102,6 +102,21 @@ compile_error!(
      Remove `panic = \"abort\"` from the release profile in Cargo.toml."
 );
 
+/// The CUDA version this binary was *built* against, as `"major.minor"`.
+///
+/// Not a property of the machine — of the build. cudarc fixes it at compile
+/// time (from `nvcc --version` on the build host, or `CUDARC_CUDA_VERSION`) and
+/// derives the NVRTC file names it will search from it. A build made where
+/// `nvcc` was absent falls back to the newest CUDA cudarc knows and then cannot
+/// find an older toolkit's `nvrtc64_120_0.dll`, which looks exactly like having
+/// no GPU. Shipped that way in 0.8.0; see `CUDARC_CUDA_VERSION` in
+/// `.github/workflows/main.yml`.
+#[cfg(feature = "gpu")]
+fn built_for_cuda() -> String {
+    let v = cudarc::driver::sys::CUDA_VERSION;
+    format!("{}.{}", v / 1000, (v % 1000) / 10)
+}
+
 /// Whether a CUDA context can be created *and used* on this machine.
 ///
 /// Probed once. Allocation alone would prove nothing — burn is lazy, so a
@@ -145,8 +160,13 @@ pub fn cuda_works() -> bool {
             log::info!("[ml] CUDA backend available — head will train on the GPU");
         } else {
             log::info!(
-                "[ml] CUDA backend unavailable (no device, driver, or NVRTC) — \
-                 falling back to CPU"
+                "[ml] CUDA backend unavailable — falling back to CPU. \
+                 This build targets CUDA {} and loads NVRTC by trying {:?}. \
+                 NVRTC ships with the CUDA Toolkit, not the driver, so this is \
+                 expected on a machine with no toolkit; if one *is* installed, \
+                 check that its nvrtc DLL is named in that list and is on PATH.",
+                built_for_cuda(),
+                cudarc::get_lib_name_candidates("nvrtc"),
             );
         }
         ok

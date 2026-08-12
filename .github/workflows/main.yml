@@ -55,6 +55,22 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Which CUDA the head's GPU backend is built against.
+          #
+          # cudarc derives the NVRTC DLL names it loads at *run* time from a
+          # version baked in at *build* time, normally by running `nvcc
+          # --version`. These runners have no CUDA toolkit, and cubecl-cuda
+          # enables cudarc's `fallback-latest`, so without this the build
+          # silently targets the newest CUDA cudarc knows (13.3) and then looks
+          # for `nvrtc64_130_0.dll` — a name no CUDA 12 toolkit ships. The
+          # result is not a build failure but a silent CPU fallback on every
+          # user's machine, which reads as "training is slow".
+          #
+          # 12.6 is not this machine's toolkit specifically: every CUDA 12.x
+          # release ships `nvrtc64_120_0.dll`, and that is the name cudarc
+          # derives from any 12.x value here. Bump only when CUDA 13 toolkits
+          # are the common case, since it trades one generation for the other.
+          CUDARC_CUDA_VERSION: "12060"
           # Auto-update signing. Generate a keypair once with
           #   npm run tauri signer generate -- -w ~/.tauri/didascalie.key
           # then add these as repository secrets (Settings → Secrets → Actions)

@@ -20,7 +20,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # Build with `--no-default-features` on a machine with no CUDA toolkit: burn's
 # CUDA backend needs NVRTC at compile time, which ships with the toolkit.
 default = ["gpu"]
-gpu = ["burn/cuda"]
+gpu = ["burn/cuda", "dep:cudarc"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
@@ -95,6 +95,13 @@ ort = { version = "=2.0.0-rc.10", features = ["cuda", "copy-dylibs"] }
 # so it can stream progress through Tauri events instead of a terminal
 # dashboard.
 burn = { version = "0.21", default-features = false, features = ["std", "ndarray", "autodiff"] }
+# Not used to compute anything — pulled in only so `commands::ml::backend` can
+# *report* which CUDA this binary was built against. cudarc picks the NVRTC DLL
+# names it loads from a version fixed at compile time, so a mismatch there fails
+# with no symptom beyond a silent CPU fallback. The features mirror
+# cubecl-cuda's exactly, so cargo's feature union leaves the cudarc that burn
+# already builds unchanged.
+cudarc = { version = "0.19", optional = true, default-features = false, features = ["std", "driver", "nvrtc", "nccl", "fallback-dynamic-loading", "cuda-version-from-build-system", "fallback-latest"] }
 # Desktop auto-update (GitHub releases). Registered under #[cfg(desktop)].
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"

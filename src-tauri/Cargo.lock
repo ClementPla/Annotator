@@ -2346,6 +2346,7 @@ dependencies = [
  "base64 0.22.1",
  "bitvec",
  "burn",
+ "cudarc",
  "futures",
  "futures-util",
  "hex_color",
