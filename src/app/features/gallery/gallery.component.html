@@ -83,8 +83,8 @@
     class="flex flex-1 min-h-0 w-full"
     styleClass="gallery-dataview"
     [value]="filteredItems"
-    [layout]="galleryService.viewLayout"
-    [rows]="galleryService.itemPerPage"
+    [layout]="galleryService.viewLayout()"
+    [rows]="galleryService.itemPerPage()"
     [paginator]="true"
     [showJumpToPageDropdown]="true"
     paginatorPosition="bottom"
@@ -102,14 +102,14 @@
               type="search"
               pInputText
               placeholder="Search sequences..."
-              [(ngModel)]="galleryService.filterTitle"
+              [ngModel]="galleryService.filterTitle()" (ngModelChange)="galleryService.filterTitle.set($event)"
               (ngModelChange)="applyFilters()"
             />
           </p-iconfield>
 
           <p-selectbutton
             [options]="statusOptions"
-            [(ngModel)]="galleryService.selectedStatuses"
+            [ngModel]="galleryService.selectedStatuses()" (ngModelChange)="galleryService.selectedStatuses.set($event)"
             [multiple]="true"
             optionLabel="label"
             optionValue="value"
@@ -125,7 +125,7 @@
 
           <p-select
             [options]="sortOptions"
-            [(ngModel)]="galleryService.sortKey"
+            [ngModel]="galleryService.sortKey()" (ngModelChange)="galleryService.sortKey.set($event)"
             optionLabel="label"
             optionValue="value"
             styleClass="sort-select"
@@ -139,10 +139,10 @@
             Advanced
           </app-labelled-switch>
 
-          @if (galleryService.viewLayout === 'grid') {
+          @if (galleryService.viewLayout() === 'grid') {
           <div class="size-control" pTooltip="Thumbnail size">
             <i class="opacity-50 pi pi-image text-sm"></i>
-            <p-slider [(ngModel)]="galleryService.imgSize" [min]="128" [max]="512" />
+            <p-slider [ngModel]="galleryService.imgSize()" (ngModelChange)="galleryService.imgSize.set($event)" [min]="128" [max]="512" />
           </div>
           }
 
@@ -176,7 +176,7 @@
 
           <p-selectbutton
             [options]="layoutOptions"
-            [(ngModel)]="galleryService.viewLayout"
+            [ngModel]="galleryService.viewLayout()" (ngModelChange)="galleryService.viewLayout.set($event)"
             optionValue="value"
             optionLabel="label"
             [allowEmpty]="false"
@@ -191,25 +191,25 @@
         </div>
 
         <!-- Advanced row: frame-count range + reset -->
-        @if (galleryService.showAdvancedFilters) {
+        @if (galleryService.showAdvancedFilters()) {
         <div class="advanced-row toolbar-row">
           <span class="advanced-label">Frame count</span>
           <p-slider
             class="frame-range"
-            [(ngModel)]="galleryService.frameCountRange"
+            [ngModel]="galleryService.frameCountRange()" (ngModelChange)="galleryService.frameCountRange.set($event)"
             [range]="true"
             [min]="0"
             [max]="maxFrameCount || 1"
             (onSlideEnd)="applyFilters()"
           />
           <span class="range-value">
-            {{ galleryService.frameCountRange[0] }} - {{ galleryService.frameCountRange[1] }}
+            {{ galleryService.frameCountRange()[0] }} - {{ galleryService.frameCountRange()[1] }}
           </span>
 
           <span class="advanced-label">Keypoints</span>
           <p-selectbutton
             [options]="keypointFilterOptions"
-            [(ngModel)]="galleryService.keypointFilter"
+            [ngModel]="galleryService.keypointFilter()" (ngModelChange)="galleryService.keypointFilter.set($event)"
             optionLabel="label"
             optionValue="value"
             [allowEmpty]="false"
@@ -226,7 +226,7 @@
             size="small"
             icon="pi pi-filter-slash"
             label="Reset filters"
-            [disabled]="!hasActiveFilters && galleryService.sortKey === 'name-asc'"
+            [disabled]="!hasActiveFilters && galleryService.sortKey() === 'name-asc'"
             (click)="resetFilters()"
           ></button>
         </div>
@@ -290,7 +290,7 @@
           [hasKeypoints]="item.hasKeypoints"
           [selected]="selectedItems.includes(item.sequenceId)"
           [id]="item.sequenceId"
-          [imgSize]="galleryService.imgSize"
+          [imgSize]="galleryService.imgSize()"
           [frameIds]="item.frameIds"
           (thumbnailSelected)="handleSelect($event)"
           (thumbnailClicked)="openItem(item)"

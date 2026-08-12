@@ -92,20 +92,20 @@
     <p-button
       icon="pi pi-gauge"
       [rounded]="true"
-      [text]="!uiStateService.showFpsCounter"
+      [text]="!uiStateService.showFpsCounter()"
       [raised]="true"
       pTooltip="Performance overlay (FPS / render timings)"
       tooltipPosition="bottom"
       ariaLabel="Toggle performance overlay"
-      (onClick)="uiStateService.showFpsCounter = !uiStateService.showFpsCounter"
+      (onClick)="uiStateService.showFpsCounter.set(!uiStateService.showFpsCounter())"
     ></p-button>
     <app-experimental-settings></app-experimental-settings>
   </ng-template>
 </p-toolbar>
-@if (uiStateService.isLoading) {
+@if (uiStateService.isLoading()) {
   <app-loading> </app-loading>
 }
-@if (uiStateService.showFpsCounter) {
+@if (uiStateService.showFpsCounter()) {
   <app-fps-display></app-fps-display>
 }
 <!-- <app-testing></app-testing> -->

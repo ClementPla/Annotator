@@ -525,7 +525,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   public get isLoading(): boolean {
-    return this.uiStateService.isLoading || this.sequenceService.loading();
+    return this.uiStateService.isLoading() || this.sequenceService.loading();
   }
 
   public getCursorStyle() {

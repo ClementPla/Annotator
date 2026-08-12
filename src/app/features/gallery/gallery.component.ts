@@ -191,9 +191,9 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
       (max, item) => Math.max(max, item.frameCount),
       0,
     );
-    if (!this.galleryService.frameRangeInitialized) {
-      this.galleryService.frameCountRange = [0, this.maxFrameCount];
-      this.galleryService.frameRangeInitialized = true;
+    if (!this.galleryService.frameRangeInitialized()) {
+      this.galleryService.frameCountRange.set([0, this.maxFrameCount]);
+      this.galleryService.frameRangeInitialized.set(true);
     }
 
     this.applyFilters();
@@ -283,24 +283,24 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
   applyFilters(): void {
     let items = [...this.galleryItems];
 
-    const query = this.galleryService.filterTitle.trim().toLowerCase();
+    const query = this.galleryService.filterTitle().trim().toLowerCase();
     if (query) {
       items = items.filter((item) => item.title.toLowerCase().includes(query));
     }
 
-    if (this.galleryService.selectedStatuses.length > 0) {
+    if (this.galleryService.selectedStatuses().length > 0) {
       items = items.filter((item) =>
-        this.galleryService.selectedStatuses.includes(item.status),
+        this.galleryService.selectedStatuses().includes(item.status),
       );
     }
 
-    if (this.galleryService.keypointFilter !== 'all') {
-      const wantKeypoints = this.galleryService.keypointFilter === 'with';
+    if (this.galleryService.keypointFilter() !== 'all') {
+      const wantKeypoints = this.galleryService.keypointFilter() === 'with';
       items = items.filter((item) => item.hasKeypoints === wantKeypoints);
     }
 
-    if (this.galleryService.showAdvancedFilters) {
-      const [min, max] = this.galleryService.frameCountRange;
+    if (this.galleryService.showAdvancedFilters()) {
+      const [min, max] = this.galleryService.frameCountRange();
       items = items.filter(
         (item) => item.frameCount >= min && item.frameCount <= max,
       );
@@ -312,7 +312,7 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
   }
 
   private compareItems(a: GalleryItem, b: GalleryItem): number {
-    switch (this.galleryService.sortKey) {
+    switch (this.galleryService.sortKey()) {
       case 'name-desc':
         return b.title.localeCompare(a.title);
       case 'frames-desc':
@@ -330,24 +330,24 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
   }
 
   resetFilters(): void {
-    this.galleryService.filterTitle = '';
-    this.galleryService.selectedStatuses = [];
-    this.galleryService.keypointFilter = 'all';
-    this.galleryService.sortKey = 'name-asc';
-    this.galleryService.frameCountRange = [0, this.maxFrameCount];
+    this.galleryService.filterTitle.set('');
+    this.galleryService.selectedStatuses.set([]);
+    this.galleryService.keypointFilter.set('all');
+    this.galleryService.sortKey.set('name-asc');
+    this.galleryService.frameCountRange.set([0, this.maxFrameCount]);
     this.applyFilters();
   }
 
   /** True when any count-affecting filter is active (used for the footer + reset). */
   get hasActiveFilters(): boolean {
     const rangeNarrowed =
-      this.galleryService.showAdvancedFilters &&
-      (this.galleryService.frameCountRange[0] > 0 ||
-        this.galleryService.frameCountRange[1] < this.maxFrameCount);
+      this.galleryService.showAdvancedFilters() &&
+      (this.galleryService.frameCountRange()[0] > 0 ||
+        this.galleryService.frameCountRange()[1] < this.maxFrameCount);
     return (
-      this.galleryService.filterTitle.trim() !== '' ||
-      this.galleryService.selectedStatuses.length > 0 ||
-      this.galleryService.keypointFilter !== 'all' ||
+      this.galleryService.filterTitle().trim() !== '' ||
+      this.galleryService.selectedStatuses().length > 0 ||
+      this.galleryService.keypointFilter() !== 'all' ||
       rangeNarrowed
     );
   }

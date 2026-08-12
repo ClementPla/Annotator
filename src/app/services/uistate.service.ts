@@ -1,7 +1,6 @@
 // ui-state.service.ts
-import { Injectable, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
 
 export interface LoadingState {
   isLoading: boolean;
@@ -22,37 +21,35 @@ export interface LoadingState {
 export class UIStateService {
   private router = inject(Router);
 
-  // Loading state
-  private loadingSubject = new BehaviorSubject<LoadingState>({ 
-    isLoading: false, 
-    message: '' 
+  /**
+   * Signals rather than plain fields, because templates read these directly.
+   * Reading a signal in a template marks that view dirty on change; reading a
+   * plain property does not, so a component using OnPush would simply stop
+   * repainting when this state moved. The previous `loading$` observable had no
+   * consumers and is gone.
+   */
+  private readonly loadingState = signal<LoadingState>({
+    isLoading: false,
+    message: '',
   });
-  public loading$ = this.loadingSubject.asObservable();
+
+  readonly isLoading = computed(() => this.loadingState().isLoading);
+  readonly loadingStatus = computed(() => this.loadingState().message);
 
   // UI preferences
-  public thumbnailsSize = 128;
-
-  public showFpsCounter = false;
+  readonly thumbnailsSize = signal(128);
+  readonly showFpsCounter = signal(false);
 
   // ==========================================
   // Loading State Management
   // ==========================================
 
   public setLoading(isLoading: boolean, message = ''): void {
-    this.loadingSubject.next({ isLoading, message });
+    this.loadingState.set({ isLoading, message });
   }
 
   public endLoading(): void {
-    this.loadingSubject.next({ isLoading: false, message: '' });
-  }
-
-  // Legacy getters for backward compatibility
-  public get isLoading(): boolean {
-    return this.loadingSubject.value.isLoading;
-  }
-
-  public get loadingStatus(): string {
-    return this.loadingSubject.value.message;
+    this.loadingState.set({ isLoading: false, message: '' });
   }
 
   // ==========================================

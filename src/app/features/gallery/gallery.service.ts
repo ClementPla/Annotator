@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { SequenceService } from '../../services/sequence.service';
 import { ProjectScoped } from '../../core/project-scoped';
 
@@ -13,23 +13,38 @@ export type KeypointFilter = 'all' | 'with' | 'without';
 export class GalleryService implements ProjectScoped {
   private sequenceService = inject(SequenceService);
 
-  itemPerPage = 64;
+  /**
+   * Signals rather than plain fields. The gallery template reads all of this
+   * directly, and reading a signal marks that view dirty when it changes —
+   * a plain property does not, so the component could not use OnPush.
+   */
+  readonly itemPerPage = signal(64);
 
   // Persisted filter / view state (survives gallery <-> editor navigation)
-  filterTitle = '';
-  selectedStatuses: SequenceStatus[] = [];
-  keypointFilter: KeypointFilter = 'all';
-  sortKey = 'name-asc';
-  frameCountRange: number[] = [0, 0];
-  frameRangeInitialized = false;
-  showAdvancedFilters = false;
-  imgSize = 256;
+  readonly filterTitle = signal('');
+  readonly selectedStatuses = signal<SequenceStatus[]>([]);
+  readonly keypointFilter = signal<KeypointFilter>('all');
+  readonly sortKey = signal('name-asc');
+  readonly frameCountRange = signal<number[]>([0, 0]);
+  readonly frameRangeInitialized = signal(false);
+  readonly showAdvancedFilters = signal(false);
+  readonly imgSize = signal(256);
 
   // Grid (thumbnail cards) vs list (rows) layout.
-  viewLayout: 'grid' | 'list' = 'grid';
+  readonly viewLayout = signal<'grid' | 'list'>('grid');
 
   // Explicit page set by user pagination. null = fall back to active-frame.
-  private explicitFirst: number | null = null;
+  private readonly explicitFirst = signal<number | null>(null);
+
+  /**
+   * No project I/O here.
+   *
+   * This used to kick off `loadSequences()` from the constructor. That is now
+   * unsafe as well as redundant: the service is registered as `ProjectScoped`,
+   * so a reset can be what first constructs it — which happens *after* the old
+   * project is closed and *before* the new one is open, firing a query against
+   * no database. The gallery loads its own sequences when it initialises.
+   */
 
   /**
    * @see ProjectScoped
@@ -43,26 +58,27 @@ export class GalleryService implements ProjectScoped {
    * project, and resetting them would be its own small annoyance.
    */
   resetForProject(): void {
-    this.filterTitle = '';
-    this.selectedStatuses = [];
-    this.keypointFilter = 'all';
-    this.frameCountRange = [0, 0];
-    this.frameRangeInitialized = false;
-    this.showAdvancedFilters = false;
-    this.explicitFirst = null;
+    this.filterTitle.set('');
+    this.selectedStatuses.set([]);
+    this.keypointFilter.set('all');
+    this.frameCountRange.set([0, 0]);
+    this.frameRangeInitialized.set(false);
+    this.showAdvancedFilters.set(false);
+    this.explicitFirst.set(null);
   }
 
   setFirstPage(first: number): void {
-    this.explicitFirst = first;
+    this.explicitFirst.set(first);
   }
 
   getFirstPage(): number {
-    if (this.explicitFirst !== null) {
-      return this.explicitFirst;
+    const explicit = this.explicitFirst();
+    if (explicit !== null) {
+      return explicit;
     }
     const activeIndex = this.sequenceService.currentFrameIndex();
     if (activeIndex > 0) {
-      return Math.floor(activeIndex / this.itemPerPage) * this.itemPerPage;
+      return Math.floor(activeIndex / this.itemPerPage()) * this.itemPerPage();
     }
     return 0;
   }
@@ -73,11 +89,11 @@ export class GalleryService implements ProjectScoped {
 
   getCurrentPage(): number {
     return Math.floor(
-      this.sequenceService.currentFrameIndex() / this.itemPerPage,
+      this.sequenceService.currentFrameIndex() / this.itemPerPage(),
     );
   }
 
   getTotalPages(): number {
-    return Math.ceil(this.getTotalFrames() / this.itemPerPage);
+    return Math.ceil(this.getTotalFrames() / this.itemPerPage());
   }
 }

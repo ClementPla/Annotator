@@ -579,11 +579,11 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get isLoading(): boolean {
-    return this.uiStateService.isLoading || this.sequenceService.loading();
+    return this.uiStateService.isLoading() || this.sequenceService.loading();
   }
 
   get loadingStatus(): string {
-    return this.uiStateService.loadingStatus;
+    return this.uiStateService.loadingStatus();
   }
 
   get shouldShowLabels(): boolean {
