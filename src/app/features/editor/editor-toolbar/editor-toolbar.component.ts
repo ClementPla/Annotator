@@ -13,7 +13,7 @@ import { SliderModule } from 'primeng/slider';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { BlockUIModule } from 'primeng/blockui';
 import { PanelModule } from 'primeng/panel';
-import { GenericsModule } from '../../../shared/generics/generics.module';
+import { LabelledSwitchComponent } from '../../../shared/generics/labelled-switch/labelled-switch.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { SplitButtonModule } from 'primeng/splitbutton';
 import { MenuItem } from 'primeng/api';
@@ -41,7 +41,7 @@ const OUTPUTS: { id: PredictOutput; label: string; icon: string }[] = [
         FormsModule,
         SliderModule,
         ToggleSwitchModule,
-        GenericsModule,
+        LabelledSwitchComponent,
         TooltipModule,
         SplitButtonModule,
     ],

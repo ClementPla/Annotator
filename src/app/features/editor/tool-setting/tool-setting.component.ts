@@ -11,7 +11,7 @@ import { ProjectService } from '../../../services/project/project.service';
 import { ImageAdjustmentService } from '../drawable-canvas/service/image-adjustment/image-adjustment.service';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import { PostProcessOption } from '../../../core/tools';
-import { GenericsModule } from '../../../shared/generics/generics.module';
+import { LabelledSwitchComponent } from '../../../shared/generics/labelled-switch/labelled-switch.component';
 import { MessageModule } from 'primeng/message';
 import { FeatureFlagsService } from '../../../experimental/feature-flags.service';
 import { ExperimentalPostProcess } from '../../../experimental/descriptor';
@@ -30,7 +30,7 @@ import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/
     SelectButtonModule,
     FormsModule,
     CardModule,
-    GenericsModule,
+    LabelledSwitchComponent,
     FieldsetModule,
     AccordionModule,
     MessageModule,

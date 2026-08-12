@@ -2,7 +2,7 @@ import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
-import { GenericsModule } from '../../shared/generics/generics.module';
+import { LabelledSwitchComponent } from '../../shared/generics/labelled-switch/labelled-switch.component';
 import { FeatureFlagsService } from '../feature-flags.service';
 import { EXPERIMENTAL_FEATURES } from '../registry';
 
@@ -11,7 +11,7 @@ import { EXPERIMENTAL_FEATURES } from '../registry';
 @Component({
   selector: 'app-experimental-settings',
   standalone: true,
-  imports: [ButtonModule, PopoverModule, TooltipModule, GenericsModule],
+  imports: [ButtonModule, PopoverModule, TooltipModule, LabelledSwitchComponent],
   templateUrl: './experimental-settings.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

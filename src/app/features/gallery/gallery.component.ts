@@ -31,7 +31,7 @@ import {
   GalleryElementComponent,
   ThumbnailSelectionEvent,
 } from './gallery-element/gallery-element.component';
-import { GenericsModule } from '../../shared/generics/generics.module';
+import { LabelledSwitchComponent } from '../../shared/generics/labelled-switch/labelled-switch.component';
 import { NavigationEnd, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
@@ -66,7 +66,7 @@ interface GalleryItem {
     ButtonModule,
     KnobModule,
     FormsModule,
-    GenericsModule,
+    LabelledSwitchComponent,
     SelectButtonModule,
     SelectModule,
     InputTextModule,
