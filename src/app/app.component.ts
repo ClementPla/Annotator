@@ -1,5 +1,5 @@
 // app.component.ts
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ToolbarModule } from 'primeng/toolbar';
 import { LoadingComponent } from './features/loading/loading.component';
 import { RouterOutlet, RouterModule } from '@angular/router';
@@ -41,22 +41,22 @@ import { ExperimentalSettingsComponent } from './experimental/experimental-setti
   styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit, OnDestroy {
+  uiStateService = inject(UIStateService);
+  editorService = inject(EditorService);
+  notificationService = inject(NotificationService);
+  private appInitialization = inject(AppInitializationService);
+  private themeService = inject(ThemeService);
+  private messageService = inject(MessageService);
+  private ioService = inject(IOService);
+  projectService = inject(ProjectService);
+  updateService = inject(UpdateService);
+
   title = 'Didascalie';
 
   private readonly destroy$ = new Subject<void>();
   private unlistenClose: (() => void) | null = null;
 
-  constructor(
-    public uiStateService: UIStateService,
-    public editorService: EditorService,
-    public notificationService: NotificationService,
-    private appInitialization: AppInitializationService,
-    private themeService: ThemeService,
-    private messageService: MessageService,
-    private ioService: IOService,
-    public projectService: ProjectService,
-    public updateService: UpdateService
-  ) {
+  constructor() {
     this.themeService.init();
   }
 

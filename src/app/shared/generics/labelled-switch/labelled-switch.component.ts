@@ -1,7 +1,7 @@
-import { Component, ElementRef, Input, Output, ViewChild, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, ChangeDetectionStrategy, inject, input, model } from '@angular/core';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { FormsModule } from '@angular/forms';
-import { EventEmitter } from '@angular/core';
+
 import { BlockableUI } from 'primeng/api';
 import { TooltipModule } from 'primeng/tooltip';
 @Component({
@@ -12,14 +12,16 @@ import { TooltipModule } from 'primeng/tooltip';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LabelledSwitchComponent implements BlockableUI {
-  @Input() checked: boolean;
-  @Output() checkedChange = new EventEmitter<boolean>();
-  @Input() tooltipLabel: string | null = null;
+  private el = inject(ElementRef);
 
-  updateCheck() {
-    this.checkedChange.emit(this.checked);
-  }
-  constructor(private el: ElementRef) {}
+  /**
+   * Two-way: callers bind `[(checked)]`. `model()` supplies the `checkedChange`
+   * output implicitly, so writing the signal is what notifies the parent — the
+   * previous explicit output plus a `(click)` handler emitted a second time,
+   * after ngModel had already written.
+   */
+  readonly checked = model(false);
+  readonly tooltipLabel = input<string | null>(null);
 
   getBlockableElement(): HTMLElement {
     return this.el.nativeElement.children[0];

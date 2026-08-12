@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, effect } from '@angular/core';
+import { Component, OnDestroy, OnInit, effect, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { TreeModule } from 'primeng/tree';
 import { ColorPickerModule } from 'primeng/colorpicker';
@@ -50,19 +50,19 @@ import { api } from '../../../lib/api';
   standalone: true,
 })
 export class LabelsComponent implements OnInit, OnDestroy {
+  labelsService = inject(LabelsService);
+  editorService = inject(EditorService);
+  projectService = inject(ProjectService);
+  sequenceService = inject(SequenceService);
+  private classificationService = inject(ClassificationService);
+
   public classificationChoices: (string | null)[] = [];
   public multilabelChoices: string[] = [];
   public textContents = new Map<string, string>();
 
   private destroy$ = new Subject<void>();
 
-  constructor(
-    public labelsService: LabelsService,
-    public editorService: EditorService,
-    public projectService: ProjectService,
-    public sequenceService: SequenceService,
-    private classificationService: ClassificationService,
-  ) {
+  constructor() {
     effect(() => {
       const frame = this.sequenceService.currentFrame();
       if (frame) {

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { applyResultMask } from '../../core/misc/label-ops';
 import { CanvasManagerService } from '../../features/editor/drawable-canvas/service/canvas-manager.service';
@@ -13,6 +13,11 @@ import { LabelsService } from '../../services/labels/labels.service';
  */
 @Injectable({ providedIn: 'root' })
 export class SuperpixelService {
+  private canvasManagerService = inject(CanvasManagerService);
+  private stateService = inject(StateManagerService);
+  private imageProcessingService = inject(ImageAdjustmentService);
+  private labelService = inject(LabelsService);
+
   /** Approximate number of superpixels in the map. */
   public count = 2000;
   /** CIEDE2000 similarity tolerance between a superpixel and the stroke. */
@@ -26,13 +31,6 @@ export class SuperpixelService {
   private mapComputed = false;
   /** Cached boundary overlay at image-native resolution. */
   private overlayCanvas: OffscreenCanvas | null = null;
-
-  constructor(
-    private canvasManagerService: CanvasManagerService,
-    private stateService: StateManagerService,
-    private imageProcessingService: ImageAdjustmentService,
-    private labelService: LabelsService
-  ) {}
 
   /** Refine the stroke in the buffer canvas: keep only the touched
    *  superpixels that match the dominant color under the stroke. */

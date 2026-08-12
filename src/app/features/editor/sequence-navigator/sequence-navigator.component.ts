@@ -1,11 +1,10 @@
 import {
   Component,
   ElementRef,
-  EventEmitter,
   OnInit,
-  Output,
   effect,
   inject,
+  output
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -46,7 +45,7 @@ export class SequenceNavigatorComponent implements OnInit {
   private readonly host = inject(ElementRef<HTMLElement>);
 
   /** Emits the id of the sequence the user wants to jump to. */
-  @Output() sequenceSelected = new EventEmitter<number>();
+  readonly sequenceSelected = output<number>();
 
   sequences: NavSequence[] = [];
 

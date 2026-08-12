@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { SliderModule } from 'primeng/slider';
@@ -13,5 +13,5 @@ import { CrfService } from './crf.service';
   templateUrl: './crf-settings.component.html',
 })
 export class CrfSettingsComponent {
-  constructor(public crf: CrfService) {}
+  crf = inject(CrfService);
 }

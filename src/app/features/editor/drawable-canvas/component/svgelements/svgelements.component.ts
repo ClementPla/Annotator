@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, inject, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -22,6 +22,12 @@ import { Point2D } from '../../interface';
   styleUrl: './svgelements.component.scss',
 })
 export class SVGElementsComponent implements OnInit, OnDestroy {
+  labelService = inject(LabelsService);
+  editorService = inject(EditorService);
+  bboxManager = inject(BboxManagerService);
+  drawService = inject(DrawService);
+  vectorEditor = inject(VectorEditorService);
+
   formattedPoints = '';
   /**
    * Stroke width for line/lasso previews, expressed in *image* px since
@@ -29,17 +35,9 @@ export class SVGElementsComponent implements OnInit, OnDestroy {
    * and (for visual-only strokes) inverse view scale, but we just use raw
    * image-px values here — viewBox scaling handles the rest.
    */
-  @ViewChild('svg') svg: ElementRef<SVGSVGElement>;
+  readonly svg = viewChild<ElementRef<SVGSVGElement>>('svg');
 
   private destroy$ = new Subject<void>();
-
-  constructor(
-    public labelService: LabelsService,
-    public editorService: EditorService,
-    public bboxManager: BboxManagerService,
-    public drawService: DrawService,
-    public vectorEditor: VectorEditorService,
-  ) {}
 
   ngOnInit(): void {
     this.drawService.previewPoints$
@@ -60,10 +58,11 @@ export class SVGElementsComponent implements OnInit, OnDestroy {
    * via CSS; the viewBox controls how image-space contents map to viewport px.
    */
   setViewBox(viewbox: Rect) {
-    if (!this.svg) return;
+    const svg = this.svg();
+    if (!svg) return;
     const w = Math.max(1, viewbox.width);
     const h = Math.max(1, viewbox.height);
-    this.svg.nativeElement.setAttribute(
+    svg.nativeElement.setAttribute(
       'viewBox',
       `${viewbox.x} ${viewbox.y} ${w} ${h}`
     );

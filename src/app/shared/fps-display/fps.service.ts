@@ -1,5 +1,5 @@
 // fps-worker.service.ts
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
 export interface FpsMetrics {
@@ -18,6 +18,8 @@ const BUFFER_INDEX = {
 
 @Injectable({ providedIn: 'root' })
 export class FpsWorkerService {
+  private ngZone = inject(NgZone);
+
   private metrics$ = new BehaviorSubject<FpsMetrics>({
     fps: 0,
     frameTime: 0,
@@ -31,8 +33,6 @@ export class FpsWorkerService {
   private sharedBuffer: Float64Array | null = null;
   private rafId: number | null = null;
   private started = false;
-
-  constructor(private ngZone: NgZone) {}
 
   async start(): Promise<boolean> {
     if (this.started) return true;

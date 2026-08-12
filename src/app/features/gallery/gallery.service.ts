@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { SequenceService } from '../../services/sequence.service';
 import { ProjectScoped } from '../../core/project-scoped';
 
@@ -11,6 +11,8 @@ export type KeypointFilter = 'all' | 'with' | 'without';
   providedIn: 'root',
 })
 export class GalleryService implements ProjectScoped {
+  private sequenceService = inject(SequenceService);
+
   itemPerPage = 64;
 
   // Persisted filter / view state (survives gallery <-> editor navigation)
@@ -28,17 +30,6 @@ export class GalleryService implements ProjectScoped {
 
   // Explicit page set by user pagination. null = fall back to active-frame.
   private explicitFirst: number | null = null;
-
-  /**
-   * No project I/O here.
-   *
-   * This used to kick off `loadSequences()` from the constructor. That is now
-   * unsafe as well as redundant: the service is registered as `ProjectScoped`,
-   * so a reset can be what first constructs it — which happens *after* the old
-   * project is closed and *before* the new one is open, firing a query against
-   * no database. The gallery loads its own sequences when it initialises.
-   */
-  constructor(private sequenceService: SequenceService) {}
 
   /**
    * @see ProjectScoped

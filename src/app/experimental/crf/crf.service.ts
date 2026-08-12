@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { applyRegionResult } from '../../core/misc/label-ops';
 import { CanvasManagerService } from '../../features/editor/drawable-canvas/service/canvas-manager.service';
@@ -15,6 +15,11 @@ import { LabelsService } from '../../services/labels/labels.service';
  */
 @Injectable({ providedIn: 'root' })
 export class CrfService {
+  private canvasManagerService = inject(CanvasManagerService);
+  private stateService = inject(StateManagerService);
+  private imageProcessingService = inject(ImageAdjustmentService);
+  private labelService = inject(LabelsService);
+
   /** Shifts the foreground/background decision boundary. 0 keeps the color
    *  model's own split; positive grows the mask into more of the region,
    *  negative trims it back. */
@@ -38,13 +43,6 @@ export class CrfService {
   private static readonly EDGE_SPATIAL = 5.0;
   private static readonly EDGE_COLOR = 13.0;
   private static readonly ITERATIONS = 5;
-
-  constructor(
-    private canvasManagerService: CanvasManagerService,
-    private stateService: StateManagerService,
-    private imageProcessingService: ImageAdjustmentService,
-    private labelService: LabelsService
-  ) {}
 
   async refineStroke(): Promise<void> {
     const bbox = this.stateService.getBoundingBox();

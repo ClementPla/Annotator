@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -14,15 +14,13 @@ import { ImageFromCLI } from './tauri-event';
   providedIn: 'root',
 })
 export class AppInitializationService {
-  private destroy$ = new Subject<void>();
+  private cliService = inject(CLIService);
+  private tauriEventService = inject(TauriEventService);
+  private projectService = inject(ProjectService);
+  private sequenceService = inject(SequenceService);
+  private ioService = inject(IOService);
 
-  constructor(
-    private cliService: CLIService,
-    private tauriEventService: TauriEventService,
-    private projectService: ProjectService,
-    private sequenceService: SequenceService,
-    private ioService: IOService
-  ) {}
+  private destroy$ = new Subject<void>();
 
   /**
    * Initialize all Tauri event services and set up application-level event handling.

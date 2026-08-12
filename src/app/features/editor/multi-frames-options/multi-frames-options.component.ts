@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, inject, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
@@ -23,22 +23,20 @@ import { SequenceService } from '../../../services/sequence.service';
   styleUrl: './multi-frames-options.component.scss',
 })
 export class MultiFramesOptionsComponent {
+  sequenceService = inject(SequenceService);
+
   _isLoaded = false;
 
-  @Output() changeOfFrame: EventEmitter<number> = new EventEmitter<number>();
+  readonly changeOfFrame = output<number>();
 
   /** Asks the host to open the propagation dialog. The dialog cannot live in
    *  this component: it is rendered inside a popover, which is destroyed the
    *  moment it closes — and it closes as soon as the dialog takes focus. */
-  @Output() propagateRequested = new EventEmitter<void>();
+  readonly propagateRequested = output<void>();
 
   /** Asks the host to confirm erasing every annotation in this sequence. Same
    *  reason as above: the dialog cannot live inside the popover. */
-  @Output() clearSequenceRequested = new EventEmitter<void>();
-
-  constructor(
-    public sequenceService: SequenceService,
-  ) {}
+  readonly clearSequenceRequested = output<void>();
 
   // ==========================================
   // Getters for Template

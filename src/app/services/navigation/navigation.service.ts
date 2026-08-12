@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Subject, Observable } from 'rxjs';
 
 import { SequenceService } from '../sequence.service';
@@ -33,6 +33,10 @@ export type NavigationDirection = 'next' | 'previous';
   providedIn: 'root',
 })
 export class NavigationService {
+  private sequenceService = inject(SequenceService);
+  private ioService = inject(IOService);
+  private orchestrator = inject(OrchestratorService);
+
   private readonly progressSource = new Subject<ProgressInfo | null>();
   private readonly frameChangedSource = new Subject<NavigationResult>();
 
@@ -43,12 +47,6 @@ export class NavigationService {
   /** Hook for secondary systems (like Image Registration) to react to global navigation changes */
   public readonly frameChanged$: Observable<NavigationResult> =
     this.frameChangedSource.asObservable();
-
-  constructor(
-    private sequenceService: SequenceService,
-    private ioService: IOService,
-    private orchestrator: OrchestratorService,
-  ) {}
 
   // ==========================================
   // Primary Navigation API

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
@@ -15,7 +15,7 @@ import { EXPERIMENTAL_FEATURES } from '../registry';
   templateUrl: './experimental-settings.component.html',
 })
 export class ExperimentalSettingsComponent {
-  readonly features = EXPERIMENTAL_FEATURES;
+  flags = inject(FeatureFlagsService);
 
-  constructor(public flags: FeatureFlagsService) {}
+  readonly features = EXPERIMENTAL_FEATURES;
 }

@@ -1,10 +1,4 @@
-import {
-  ChangeDetectorRef,
-  Component,
-  Input,
-  OnDestroy,
-  OnInit,
-} from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject, input } from '@angular/core';
 import { Subject, merge } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
 import { NgClass } from '@angular/common';
@@ -32,20 +26,18 @@ import { UndoRedoService } from '../../drawable-canvas/service/undo-redo.service
   styleUrl: './instance-label.component.scss',
 })
 export class InstanceLabelComponent implements OnInit, OnDestroy {
-  @Input() label!: SegLabel;
+  labelService = inject(LabelsService);
+  private canvasManager = inject(CanvasManagerService);
+  private ioService = inject(IOService);
+  private drawService = inject(DrawService);
+  private undoRedo = inject(UndoRedoService);
+  private cdr = inject(ChangeDetectorRef);
+
+  readonly label = input.required<SegLabel>();
 
   /** Instance ids currently painted on this label's mask (recomputed lazily). */
   private usedInstances = new Set<number>();
   private readonly destroy$ = new Subject<void>();
-
-  constructor(
-    public labelService: LabelsService,
-    private canvasManager: CanvasManagerService,
-    private ioService: IOService,
-    private drawService: DrawService,
-    private undoRedo: UndoRedoService,
-    private cdr: ChangeDetectorRef,
-  ) {}
 
   ngOnInit(): void {
     this.recomputeUsed();
@@ -71,7 +63,7 @@ export class InstanceLabelComponent implements OnInit, OnDestroy {
 
   /** Scan this label's mask for the distinct instance ids in use. */
   private recomputeUsed(): void {
-    const index = this.labelService.listSegmentationLabels.indexOf(this.label);
+    const index = this.labelService.listSegmentationLabels.indexOf(this.label());
     const mask = index >= 0 ? this.canvasManager.getAllMasks()[index] : undefined;
     const used = new Set<number>();
     if (mask) {
@@ -95,21 +87,22 @@ export class InstanceLabelComponent implements OnInit, OnDestroy {
   private shades(): string[] {
     // Instance labels get their shades at project load; regenerate once only if
     // somehow missing (deterministic, so this stays stable).
-    if (!this.label.shades || this.label.shades.length === 0) {
-      this.label.shades = generate_shades(this.label.color, 256);
+    const label = this.label();
+    if (!label.shades || label.shades.length === 0) {
+      label.shades = generate_shades(label.color, 256);
     }
-    return this.label.shades;
+    return label.shades;
   }
 
   shadeFor(value: number): string {
     const shades = this.shades();
-    return shades[value] ?? shades[value % shades.length] ?? this.label.color;
+    return shades[value] ?? shades[value % shades.length] ?? this.label().color;
   }
 
   /** The instance id selected for this label, or null if none / another label. */
   activeInstance(): number | null {
     const inst = this.labelService.activeSegInstance;
-    return inst && inst.label === this.label && inst.instance >= 1 ? inst.instance : null;
+    return inst && inst.label === this.label() && inst.instance >= 1 ? inst.instance : null;
   }
 
   isSelected(value: number): boolean {
@@ -117,7 +110,7 @@ export class InstanceLabelComponent implements OnInit, OnDestroy {
   }
 
   changeActive(value: number): void {
-    this.labelService.activate(this.label, value, this.shadeFor(value));
+    this.labelService.activate(this.label(), value, this.shadeFor(value));
   }
 
   /**

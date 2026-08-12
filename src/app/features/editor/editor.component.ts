@@ -1,12 +1,4 @@
-import {
-  AfterViewInit,
-  Component,
-  NgZone,
-  OnDestroy,
-  OnInit,
-  ViewChild,
-  signal,
-} from '@angular/core';
+import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal, inject, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -91,10 +83,25 @@ import { MenuGroupDirective } from '../../shared/generics/vertical-menu/menu-gro
   styleUrl: './editor.component.scss',
 })
 export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild(DrawableCanvasComponent) canvas: DrawableCanvasComponent;
-  @ViewChild(MultiFramesOptionsComponent)
-  multiFramesOptions: MultiFramesOptionsComponent;
-  @ViewChild('quickAccessMenu') quickAccessMenu: QuickAccessMenuComponent;
+  editorService = inject(EditorService);
+  private labelService = inject(LabelsService);
+  private uiStateService = inject(UIStateService);
+  sequenceService = inject(SequenceService);
+  projectService = inject(ProjectService);
+  private zoomPanService = inject(ZoomPanService);
+  private canvasManagerService = inject(CanvasManagerService);
+  private stateManagerService = inject(StateManagerService);
+  private keyboardService = inject(KeyboardShortcutService);
+  private tauriEvents = inject(TauriEventService);
+  private ioService = inject(IOService);
+  private orchestratorService = inject(OrchestratorService);
+  private ngZone = inject(NgZone);
+  propagation = inject(PropagationService);
+  private notifications = inject(NotificationService);
+
+  readonly canvas = viewChild(DrawableCanvasComponent);
+  readonly multiFramesOptions = viewChild(MultiFramesOptionsComponent);
+  readonly quickAccessMenu = viewChild<QuickAccessMenuComponent>('quickAccessMenu');
 
   public viewPortSize = 800;
   public displayDownloadDialog = false;
@@ -114,24 +121,6 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly propagationVisible = signal(false);
   readonly clearSequenceVisible = signal(false);
   readonly clearingSequence = signal(false);
-
-  constructor(
-    public editorService: EditorService,
-    private labelService: LabelsService,
-    private uiStateService: UIStateService,
-    public sequenceService: SequenceService,
-    public projectService: ProjectService,
-    private zoomPanService: ZoomPanService,
-    private canvasManagerService: CanvasManagerService,
-    private stateManagerService: StateManagerService,
-    private keyboardService: KeyboardShortcutService,
-    private tauriEvents: TauriEventService,
-    private ioService: IOService,
-    private orchestratorService: OrchestratorService,
-    private ngZone: NgZone,
-    public propagation: PropagationService,
-    private notifications: NotificationService,
-  ) {}
 
   /**
    * Erase every annotation in the open sequence, then reload the frame.
@@ -296,8 +285,12 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
       'panMode:start': () => this.editorService.activatePanMode(),
       'panMode:end': () => this.editorService.restoreLastTool(),
       'quickMenu:start': () => {
-        this.quickAccessMenu.position = this.mousePosition;
-        this.quickAccessMenu.toggleOpen();
+        // Guarded rather than `.required`: the shortcut is bound at the window,
+        // so it can fire before this view has initialised.
+        const quickAccessMenu = this.quickAccessMenu();
+        if (!quickAccessMenu) return;
+        quickAccessMenu.position = this.mousePosition;
+        quickAccessMenu.toggleOpen();
       },
       'quickMenu:end': () => {},
     };
@@ -330,7 +323,7 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
 
   public async loadCanvas(): Promise<void> {
     const frame = this.sequenceService.currentFrame();
-    if (!this.canvas || !frame) {
+    if (!this.canvas() || !frame) {
       console.warn('Canvas or current frame not available');
       return;
     }
@@ -486,8 +479,9 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private resetFrameIfNeeded() {
-    if (this.multiFramesOptions) {
-      this.multiFramesOptions.currentFrame =
+    const multiFramesOptions = this.multiFramesOptions();
+    if (multiFramesOptions) {
+      multiFramesOptions.currentFrame =
         this.sequenceService.currentFrameIndex();
     }
   }

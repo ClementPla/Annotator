@@ -1,5 +1,5 @@
 // ui-state.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 
@@ -20,6 +20,8 @@ export interface LoadingState {
   providedIn: 'root',
 })
 export class UIStateService {
+  private router = inject(Router);
+
   // Loading state
   private loadingSubject = new BehaviorSubject<LoadingState>({ 
     isLoading: false, 
@@ -31,8 +33,6 @@ export class UIStateService {
   public thumbnailsSize = 128;
 
   public showFpsCounter = false;
-
-  constructor(private router: Router) {}
 
   // ==========================================
   // Loading State Management

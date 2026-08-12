@@ -1,11 +1,4 @@
-import {
-  Component,
-  NgZone,
-  OnDestroy,
-  OnInit,
-  computed,
-  signal,
-} from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
@@ -47,6 +40,9 @@ import {
   styleUrl: './model-lab.component.scss',
 })
 export class ModelLabComponent implements OnInit, OnDestroy {
+  private messages = inject(MessageService);
+  private zone = inject(NgZone);
+
   readonly encoders = signal<EncoderStatus[]>([]);
   readonly summary = signal<DatasetSummary | null>(null);
 
@@ -89,11 +85,6 @@ export class ModelLabComponent implements OnInit, OnDestroy {
   epochs = 40;
 
   private unlisten: UnlistenFn[] = [];
-
-  constructor(
-    private messages: MessageService,
-    private zone: NgZone,
-  ) {}
 
   async ngOnInit(): Promise<void> {
     // Tauri event callbacks fire outside Angular's zone, so a signal set here

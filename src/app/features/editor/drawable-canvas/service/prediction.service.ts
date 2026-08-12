@@ -1,4 +1,4 @@
-import { Injectable, NgZone, signal } from '@angular/core';
+import { Injectable, NgZone, signal, inject } from '@angular/core';
 import { listen } from '@tauri-apps/api/event';
 
 import { LabelsService } from '../../../../services/labels/labels.service';
@@ -30,23 +30,23 @@ import { OrchestratorService } from './orchestrator.service';
  */
 @Injectable({ providedIn: 'root' })
 export class PredictionService {
+  private labelService = inject(LabelsService);
+  private sequenceService = inject(SequenceService);
+  private canvasManager = inject(CanvasManagerService);
+  private stateManager = inject(StateManagerService);
+  private undoRedo = inject(UndoRedoService);
+  private io = inject(IOService);
+  private notifications = inject(NotificationService);
+  private vectorEditor = inject(VectorEditorService);
+  private orchestrator = inject(OrchestratorService);
+  private zone = inject(NgZone);
+
   readonly running = signal(false);
   readonly lastError = signal<string | null>(null);
   /** Coarse phase of the in-flight prediction, e.g. "encoder". */
   readonly stage = signal<string | null>(null);
 
-  constructor(
-    private labelService: LabelsService,
-    private sequenceService: SequenceService,
-    private canvasManager: CanvasManagerService,
-    private stateManager: StateManagerService,
-    private undoRedo: UndoRedoService,
-    private io: IOService,
-    private notifications: NotificationService,
-    private vectorEditor: VectorEditorService,
-    private orchestrator: OrchestratorService,
-    private zone: NgZone,
-  ) {
+  constructor() {
     // Prediction on a large frame takes seconds; a bare spinner leaves the user
     // guessing. Tauri callbacks fire outside Angular's zone, so this must be
     // wrapped or the signal updates without ever repainting.

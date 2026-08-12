@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { Rect } from '../../../../../core/interface';
@@ -39,20 +39,19 @@ interface HandleDeco {
   styleUrl: './vector-layer.component.scss',
 })
 export class VectorLayerComponent {
-  @ViewChild('svg') svg: ElementRef<SVGSVGElement>;
+  vectorEditor = inject(VectorEditorService);
+  labelService = inject(LabelsService);
+  editorService = inject(EditorService);
+  private zoomPan = inject(ZoomPanService);
 
-  constructor(
-    public vectorEditor: VectorEditorService,
-    public labelService: LabelsService,
-    public editorService: EditorService,
-    private zoomPan: ZoomPanService,
-  ) {}
+  readonly svg = viewChild<ElementRef<SVGSVGElement>>('svg');
 
   setViewBox(viewbox: Rect): void {
-    if (!this.svg) return;
+    const svg = this.svg();
+    if (!svg) return;
     const w = Math.max(1, viewbox.width);
     const h = Math.max(1, viewbox.height);
-    this.svg.nativeElement.setAttribute(
+    svg.nativeElement.setAttribute(
       'viewBox',
       `${viewbox.x} ${viewbox.y} ${w} ${h}`,
     );

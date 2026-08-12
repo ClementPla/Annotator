@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { api } from '../../../../lib/api';
 import { CanvasManagerService } from './canvas-manager.service';
@@ -36,16 +36,15 @@ import {
  */
 @Injectable({ providedIn: 'root' })
 export class ConvertService {
-  constructor(
-    private canvasManager: CanvasManagerService,
-    private state: StateManagerService,
-    private undoRedo: UndoRedoService,
-    private vectorEditor: VectorEditorService,
-    private editor: EditorService,
-    private labels: LabelsService,
-    private project: ProjectService,
-    private io: IOService,
-  ) {}
+  private canvasManager = inject(CanvasManagerService);
+  private state = inject(StateManagerService);
+  private undoRedo = inject(UndoRedoService);
+  private vectorEditor = inject(VectorEditorService);
+  private editor = inject(EditorService);
+  private labels = inject(LabelsService);
+  private project = inject(ProjectService);
+  private io = inject(IOService);
+
 
   // ── Rasterize (vector → raster) ─────────────────────────────────────────────
 

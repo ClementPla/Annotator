@@ -1,4 +1,4 @@
-import { Injectable, Injector } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { EditorService } from '../../services/editor.service';
 import { CanvasManagerService } from './canvas-manager.service';
 import { StateManagerService } from './state-manager.service';
@@ -27,17 +27,16 @@ import { findExperimentalPostProcess } from '../../../../experimental/registry';
   providedIn: 'root',
 })
 export class PostProcessService {
+  private editorService = inject(EditorService);
+  private imageProcessingService = inject(ImageAdjustmentService);
+  private canvasManagerService = inject(CanvasManagerService);
+  private stateService = inject(StateManagerService);
+  private labelService = inject(LabelsService);
+  private projectService = inject(ProjectService);
+  private zoomPanService = inject(ZoomPanService);
+  private injector = inject(Injector);
+
   public featuresExtracted = false;
-  constructor(
-    private editorService: EditorService,
-    private imageProcessingService: ImageAdjustmentService,
-    private canvasManagerService: CanvasManagerService,
-    private stateService: StateManagerService,
-    private labelService: LabelsService,
-    private projectService: ProjectService,
-    private zoomPanService: ZoomPanService,
-    private injector: Injector
-  ) {}
 
   /** Active mask value to write: instance id, or 1 for semantic labels. */
   private activeValue(): number {

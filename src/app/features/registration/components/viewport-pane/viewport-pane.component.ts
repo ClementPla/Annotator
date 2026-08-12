@@ -7,11 +7,12 @@ import {
   OnChanges,
   OnDestroy,
   SimpleChanges,
-  ViewChild,
   computed,
   effect,
   inject,
   signal,
+  input,
+  viewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { applyTransform, invertHomography, Point2D } from '../../registration.model';
@@ -40,15 +41,15 @@ export type PaneSide = 'ref' | 'moving';
 export class ViewportPaneComponent
   implements AfterViewInit, OnChanges, OnDestroy
 {
-  @Input({ required: true }) side!: PaneSide;
-  @Input({ required: true }) controller!: ViewportController;
-  @Input() pyramid: Pyramid | null = null;
-  @Input() label = '';
+  readonly side = input.required<PaneSide>();
+  readonly controller = input.required<ViewportController>();
+  readonly pyramid = input<Pyramid | null>(null);
+  readonly label = input('');
 
-  @ViewChild('host') hostEl!: ElementRef<HTMLDivElement>;
-  @ViewChild('canvas') canvasEl!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('svg') svgEl!: ElementRef<SVGSVGElement>;
-  @Input() movingImageUrl: string | null = null;
+  readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
+  readonly canvasEl = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
+  readonly svgEl = viewChild.required<ElementRef<SVGSVGElement>>('svg');
+  readonly movingImageUrl = input<string | null>(null);
   private readonly state = inject(RegistrationStateService);
   private readonly pyramidSvc = inject(PyramidService);
 
@@ -79,7 +80,7 @@ export class ViewportPaneComponent
    * on-screen size at any zoom and never bloat over the target pixel.
    */
   readonly markerScale = computed(() => {
-    const c = this.controller;
+    const c = this.controller();
     return c ? 1 / Math.max(1e-4, c.scale()) : 1;
   });
   /**
@@ -110,7 +111,7 @@ export class ViewportPaneComponent
 
   readonly residualSegments = computed<{ from: Point2D; to: Point2D }[]>(
     () => {
-      if (this.side !== 'moving') return [];
+      if (this.side() !== 'moving') return [];
       const t = this.transform();
       if (t.type !== 'homography') return [];
       return this.pairs().map((p) => {
@@ -135,7 +136,7 @@ export class ViewportPaneComponent
   }
 
   ngAfterViewInit(): void {
-    this.controller.onRedrawNeeded = () => {
+    this.controller().onRedrawNeeded = () => {
       this.redraw();
       this.updateSvgViewBox();
     };
@@ -148,24 +149,26 @@ export class ViewportPaneComponent
       if (w === this.lastSize.w && h === this.lastSize.h) return;
       this.lastSize = { w, h };
 
-      this.controller.setSize(w, h);
+      this.controller().setSize(w, h);
       this.resizeCanvas(w, h);
       this.redraw();
       this.updateSvgViewBox();
     });
-    this.resizeObs.observe(this.hostEl.nativeElement);
+    this.resizeObs.observe(this.hostEl().nativeElement);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     // When the pyramid input changes (new frame loaded), fit & redraw.
-    if (changes['pyramid'] && this.pyramid) {
-      const { nativeWidth: w, nativeHeight: h } = this.pyramid;
-      this.controller.smooth = Math.max(w, h) < 4096;
+    const pyramid = this.pyramid();
+    if (changes['pyramid'] && pyramid) {
+      const { nativeWidth: w, nativeHeight: h } = pyramid;
+      const controller = this.controller();
+      controller.smooth = Math.max(w, h) < 4096;
       // Only fit if the controller has been sized — otherwise the fit
       // math divides by zero and we wait for the ResizeObserver tick.
-      const size = this.controller.size();
+      const size = controller.size();
       if (size.width > 0 && size.height > 0) {
-        this.controller.fitImage(w, h, false);
+        controller.fitImage(w, h, false);
       }
       this.redraw();
       this.updateSvgViewBox();
@@ -174,11 +177,11 @@ export class ViewportPaneComponent
 
   ngOnDestroy(): void {
     this.resizeObs?.disconnect();
-    this.controller.onRedrawNeeded = undefined;
+    this.controller().onRedrawNeeded = undefined;
   }
   readonly shouldShowWarped = computed(
     () =>
-      this.side === 'moving' &&
+      this.side() === 'moving' &&
       this.state.vis().showMovingWarped &&
       this.state.transform().type === 'homography',
   );
@@ -188,8 +191,8 @@ export class ViewportPaneComponent
     if (!this.shouldShowWarped()) return null;
     return buildWarpedImageTransform(
       this.state.transform(),
-      this.controller.scale(), // moving controller, synced with ref via SyncGroup
-      this.controller.offset(),
+      this.controller().scale(), // moving controller, synced with ref via SyncGroup
+      this.controller().offset(),
     );
   });
 
@@ -203,45 +206,48 @@ export class ViewportPaneComponent
       this.shouldShowWarped() &&
       this.warpedTransform() !== null &&
       this.warpedDiagnostic() === null &&
-      this.movingImageUrl !== null,
+      this.movingImageUrl() !== null,
   );
 
   private redraw(): void {
-    const canvas = this.canvasEl?.nativeElement;
-    if (!canvas || !this.pyramid) return;
+    const canvas = this.canvasEl()?.nativeElement;
+    const pyramid = this.pyramid();
+    if (!canvas || !pyramid) return;
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     const level = this.pyramidSvc.getLevelForViewport(
-      this.pyramid,
-      this.controller.scale(),
-      this.controller.size().width,
-      this.controller.size().height,
+      pyramid,
+      this.controller().scale(),
+      this.controller().size().width,
+      this.controller().size().height,
     );
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    this.controller.applyToContextForLevel(ctx, this.dpr, level);
-    ctx.imageSmoothingEnabled = this.controller.scale() < 1;
+    this.controller().applyToContextForLevel(ctx, this.dpr, level);
+    ctx.imageSmoothingEnabled = this.controller().scale() < 1;
     ctx.drawImage(level.canvas, 0, 0);
     ctx.restore();
   }
 
   private updateSvgViewBox(): void {
-    if (!this.svgEl || !this.pyramid) return;
-    this.svgEl.nativeElement.setAttribute(
+    const pyramid = this.pyramid();
+    const svgEl = this.svgEl();
+    if (!svgEl || !pyramid) return;
+    svgEl.nativeElement.setAttribute(
       'viewBox',
-      this.controller.getSVGViewBox(
-        this.pyramid.nativeWidth,
-        this.pyramid.nativeHeight,
+      this.controller().getSVGViewBox(
+        pyramid.nativeWidth,
+        pyramid.nativeHeight,
       ),
     );
   }
 
   private resizeCanvas(w: number, h: number): void {
-    const canvas = this.canvasEl?.nativeElement;
+    const canvas = this.canvasEl()?.nativeElement;
     if (!canvas) return;
     canvas.width = Math.round(w * this.dpr);
     canvas.height = Math.round(h * this.dpr);
@@ -255,15 +261,15 @@ export class ViewportPaneComponent
 
   onMouseDown(event: MouseEvent): void {
     if (event.button === 1) {
-      this.controller.startDrag(event.clientX, event.clientY);
+      this.controller().startDrag(event.clientX, event.clientY);
       return;
     }
     if (event.button !== 0) return;
 
     // Block placement on the moving pane while the warp overlay is showing.
     if (this.shouldShowWarped()) return;
-    const rect = this.canvasEl.nativeElement.getBoundingClientRect();
-    const native = this.controller.clientToNative(
+    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+    const native = this.controller().clientToNative(
       event.clientX,
       event.clientY,
       rect,
@@ -277,7 +283,7 @@ export class ViewportPaneComponent
     }
 
     // Otherwise, register the click with the placement state machine.
-    if (this.side === 'ref') {
+    if (this.side() === 'ref') {
       this.state.placeRefPoint(native);
     } else {
       this.state.placeMovingPoint(native);
@@ -285,18 +291,19 @@ export class ViewportPaneComponent
   }
 
   onMouseMove(event: MouseEvent): void {
-    if (this.controller.isDragging) {
-      this.controller.drag(event.clientX, event.clientY);
+    const controller = this.controller();
+    if (controller.isDragging) {
+      controller.drag(event.clientX, event.clientY);
       return;
     }
     if (this.draggingPairId) {
-      const rect = this.canvasEl.nativeElement.getBoundingClientRect();
-      const native = this.controller.clientToNative(
+      const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+      const native = controller.clientToNative(
         event.clientX,
         event.clientY,
         rect,
       );
-      if (this.side === 'ref') {
+      if (this.side() === 'ref') {
         this.state.updatePairRef(this.draggingPairId, native);
       } else {
         this.state.updatePairMoving(this.draggingPairId, native);
@@ -305,32 +312,32 @@ export class ViewportPaneComponent
     }
 
     // Hover detection — runs only when not dragging.
-    const rect = this.canvasEl.nativeElement.getBoundingClientRect();
-    const native = this.controller.clientToNative(
+    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+    const native = controller.clientToNative(
       event.clientX,
       event.clientY,
       rect,
     );
-    this.state.setHoverPoint(this.side, native);
+    this.state.setHoverPoint(this.side(), native);
     const hit = this.hitTestPair(native);
     this.localHoverPairId.set(hit);
     this.state.setHoveredPair(hit);
   }
 
   onMouseLeave(): void {
-    this.controller.endDrag();
+    this.controller().endDrag();
     this.localHoverPairId.set(null);
     this.state.setHoveredPair(null);
   }
 
   onMouseUp(): void {
-    this.controller.endDrag();
+    this.controller().endDrag();
     this.draggingPairId = null;
   }
 
   onWheel(event: WheelEvent): void {
-    const rect = this.canvasEl.nativeElement.getBoundingClientRect();
-    this.controller.wheel(event, rect);
+    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+    this.controller().wheel(event, rect);
   }
   readonly shadowCursor = computed<Point2D | null>(() => {
     if (!this.state.vis().showShadowCursor) return null;
@@ -338,19 +345,20 @@ export class ViewportPaneComponent
     if (!hover) return null;
 
     // Only show shadow on the OPPOSITE pane from where the mouse is.
-    if (hover.side === this.side) return null;
+    const side = this.side();
+    if (hover.side === side) return null;
 
     const t = this.state.transform();
     if (t.type !== 'homography') return null;
 
     // Mouse on ref → show shadow on moving (use inverse homography: ref → moving).
     // Mouse on moving → show shadow on ref (use forward homography: moving → ref).
-    if (hover.side === 'ref' && this.side === 'moving') {
+    if (hover.side === 'ref' && side === 'moving') {
       // Map ref point to moving via H⁻¹.
       const inv = invertHomography(t);
       if (!inv) return null;
       return applyTransform(inv, hover.pt);
-    } else if (hover.side === 'moving' && this.side === 'ref') {
+    } else if (hover.side === 'moving' && side === 'ref') {
       // Map moving point to ref via H.
       return applyTransform(t, hover.pt);
     }
@@ -358,11 +366,11 @@ export class ViewportPaneComponent
   });
 
   private hitTestPair(native: Point2D): string | null {
-    const scale = Math.max(0.001, this.controller.scale());
+    const scale = Math.max(0.001, this.controller().scale());
     const radius = Math.min(60, 12 / scale);
     const sq = radius * radius;
     for (const p of this.pairs()) {
-      const target = this.side === 'ref' ? p.ref : p.moving;
+      const target = this.side() === 'ref' ? p.ref : p.moving;
       const dx = target.x - native.x;
       const dy = target.y - native.y;
       if (dx * dx + dy * dy < sq) return p.id;
@@ -376,7 +384,7 @@ export class ViewportPaneComponent
 
   /** The point on this side for a pair. */
   pointFor(pair: { ref: Point2D; moving: Point2D }): Point2D {
-    return this.side === 'ref' ? pair.ref : pair.moving;
+    return this.side() === 'ref' ? pair.ref : pair.moving;
   }
 
   /**
@@ -389,24 +397,24 @@ export class ViewportPaneComponent
 
   /** True if the awaiting-moving placement marker should render. */
   get showPendingRef(): boolean {
-    return this.side === 'ref' && this.pendingRef() !== null;
+    return this.side() === 'ref' && this.pendingRef() !== null;
   }
   get showPendingMoving(): boolean {
-    return this.side === 'moving' && this.pendingMoving() !== null;
+    return this.side() === 'moving' && this.pendingMoving() !== null;
   }
 
   /** True if the predicted-moving indicator should render. */
   get showPredictedMoving(): boolean {
-    return this.side === 'moving' && this.predictedMoving() !== null;
+    return this.side() === 'moving' && this.predictedMoving() !== null;
   }
 
   get showPredictedRef(): boolean {
-    return this.side === 'ref' && this.predictedRef() !== null;
+    return this.side() === 'ref' && this.predictedRef() !== null;
   }
   get movingNativeWidth(): number {
-    return this.pyramid?.nativeWidth ?? 0;
+    return this.pyramid()?.nativeWidth ?? 0;
   }
   get movingNativeHeight(): number {
-    return this.pyramid?.nativeHeight ?? 0;
+    return this.pyramid()?.nativeHeight ?? 0;
   }
 }

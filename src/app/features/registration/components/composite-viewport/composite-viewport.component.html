@@ -17,7 +17,7 @@
     @case ('overlay') {
       <img
         class="warped-moving warped-moving--overlay"
-        [src]="movingImageUrl!"
+        [src]="movingImageUrl()!"
         [style.width.px]="movingNativeWidth"
         [style.height.px]="movingNativeHeight"
         [style.transform]="warpedTransform()!"
@@ -34,7 +34,7 @@
       >
         <img
           class="warped-moving warped-moving--checker-inner"
-          [src]="movingImageUrl!"
+          [src]="movingImageUrl()!"
           [style.width.px]="movingNativeWidth"
           [style.height.px]="movingNativeHeight"
           [style.transform]="warpedTransform()!"

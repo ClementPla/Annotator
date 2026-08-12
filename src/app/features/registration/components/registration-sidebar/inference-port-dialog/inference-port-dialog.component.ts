@@ -1,6 +1,7 @@
 // components/inference-port-dialog/inference-port-dialog.component.ts
 import {
-  ChangeDetectionStrategy, Component, EventEmitter, Output, signal, inject,
+  ChangeDetectionStrategy, Component, signal, inject,
+  output
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -19,8 +20,11 @@ import { InferenceClientService } from '../../../../../services/inference-client
   templateUrl: './inference-port-dialog.component.html',
 })
 export class InferencePortDialogComponent {
-  @Output() configured = new EventEmitter<{ host: string; port: number }>();
-  @Output() cancelled  = new EventEmitter<void>();
+  readonly configured = output<{
+    host: string;
+    port: number;
+}>();
+  readonly cancelled = output<void>();
 
   readonly inference = inject(InferenceClientService);
   readonly statusError = (() => {
@@ -37,6 +41,7 @@ export class InferencePortDialogComponent {
   }
   cancel(): void {
     this.visible = false;
+    // TODO: The 'emit' function requires a mandatory void argument
     this.cancelled.emit();
   }
 }

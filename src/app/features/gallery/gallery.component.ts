@@ -1,11 +1,4 @@
-import {
-  AfterViewInit,
-  ChangeDetectorRef,
-  Component,
-  NgZone,
-  OnDestroy,
-  OnInit,
-} from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -87,6 +80,17 @@ interface GalleryItem {
   styleUrl: './gallery.component.scss',
 })
 export class GalleryComponent implements AfterViewInit, OnDestroy {
+  projectService = inject(ProjectService);
+  sequenceService = inject(SequenceService);
+  labelsService = inject(LabelsService);
+  galleryService = inject(GalleryService);
+  private batchAnnotationService = inject(BatchAnnotationService);
+  private uiState = inject(UIStateService);
+  private notifications = inject(NotificationService);
+  private router = inject(Router);
+  private cdr = inject(ChangeDetectorRef);
+  private zone = inject(NgZone);
+
   // View options
   autoRefresh = false;
 
@@ -134,18 +138,7 @@ export class GalleryComponent implements AfterViewInit, OnDestroy {
     { icon: 'pi pi-bars', value: 'list' as const, label: 'List view' },
   ];
 
-  constructor(
-    public projectService: ProjectService,
-    public sequenceService: SequenceService,
-    public labelsService: LabelsService,
-    public galleryService: GalleryService,
-    private batchAnnotationService: BatchAnnotationService,
-    private uiState: UIStateService,
-    private notifications: NotificationService,
-    private router: Router,
-    private cdr: ChangeDetectorRef,
-    private zone: NgZone,
-  ) {
+  constructor() {
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),

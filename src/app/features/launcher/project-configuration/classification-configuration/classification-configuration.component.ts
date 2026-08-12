@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { LabelsService } from '../../../../services/labels/labels.service';
 import { FormsModule } from '@angular/forms';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -18,8 +18,8 @@ import { TagModule } from 'primeng/tag';
     styleUrl: './classification-configuration.component.scss'
 })
 export class ClassificationConfigurationComponent {
+  labelService = inject(LabelsService);
 
-  constructor(public labelService: LabelsService) { }
 
   addMulticlassTask(){
     this.labelService.addNewClassificationTask();

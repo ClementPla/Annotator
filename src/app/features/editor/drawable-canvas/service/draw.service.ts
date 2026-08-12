@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -25,6 +25,17 @@ import { IOService } from '../../../../services/io.service';
 
 @Injectable({ providedIn: 'root' })
 export class DrawService implements OnDestroy {
+  private labelService = inject(LabelsService);
+  private projectService = inject(ProjectService);
+  private zoomPanService = inject(ZoomPanService);
+  private editorService = inject(EditorService);
+  private stateService = inject(StateManagerService);
+  private canvasManagerService = inject(CanvasManagerService);
+  private undoRedoService = inject(UndoRedoService);
+  private postProcessService = inject(PostProcessService);
+  private ioService = inject(IOService);
+  private vectorEditor = inject(VectorEditorService);
+
   public redrawRequest = new Subject<boolean>();
   public singleDrawRequest = new Subject<OffscreenCanvasRenderingContext2D | null>();
   public previewPoints$ = new BehaviorSubject<Point2D[]>([]);
@@ -40,18 +51,7 @@ export class DrawService implements OnDestroy {
   private currentToolContext: ToolContext | null = null;
   private destroy$ = new Subject<void>();
 
-  constructor(
-    private labelService: LabelsService,
-    private projectService: ProjectService,
-    private zoomPanService: ZoomPanService,
-    private editorService: EditorService,
-    private stateService: StateManagerService,
-    private canvasManagerService: CanvasManagerService,
-    private undoRedoService: UndoRedoService,
-    private postProcessService: PostProcessService,
-    private ioService: IOService,
-    private vectorEditor: VectorEditorService
-  ) {
+  constructor() {
     this.initializeSubscriptions();
   }
 

@@ -1,9 +1,9 @@
-<svg #wheel [attr.viewBox]="getViewbox()" [style.width.px]="radius * 2">
+<svg #wheel [attr.viewBox]="getViewbox()" [style.width.px]="radius() * 2">
   @for (segment of segments; track i; let i = $index) {
     <g
       class="cursor-pointer"
       (mouseenter)="hoverSegment(i)"
-      (click)="callCommand(items[i])"
+      (click)="callCommand(items()[i])"
     >
       <path
         class="primary-color"
@@ -18,7 +18,7 @@
         text-anchor="middle"
         dominant-baseline="central"
       >
-        {{ items[i].label }}
+        {{ items()[i].label }}
       </text>
       <!-- PrimeNG Icon -->
       <foreignObject
@@ -32,7 +32,7 @@
           style="display: flex; justify-content: center; align-items: center"
         >
           <i
-            [ngClass]="items[i].icon"
+            [ngClass]="items()[i].icon"
             style="font-size: 14px; color: var(--text-color)"
           ></i>
         </div>
@@ -43,9 +43,9 @@
           <g
             class="cursor-pointer"
             [ngClass]="{ hidden: selectedIndex !== i }"
-            (click)="callCommand(items[i].children![j])"
+            (click)="callCommand(items()[i].children![j])"
           >
-            @switch (items[i].children && items[i].children![j].type) {
+            @switch (items()[i].children && items()[i].children![j].type) {
               @case (segmentType.toggle) {
                 <path
                   [attr.d]="child.path"
@@ -69,7 +69,7 @@
               text-anchor="middle"
               dominant-baseline="central"
             >
-              {{ items[i].children![j].label }}
+              {{ items()[i].children![j].label }}
             </text>
 
             <foreignObject
@@ -83,7 +83,7 @@
                 style="display: flex; justify-content: center; align-items: center"
               >
                 <i
-                  [ngClass]="items[i].children![j].icon"
+                  [ngClass]="items()[i].children![j].icon"
                   style="font-size: 14px; color: var(--text-color)"
                 ></i>
               </div>

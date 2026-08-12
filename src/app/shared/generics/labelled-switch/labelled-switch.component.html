@@ -1,8 +1,8 @@
 <p class="flex flex-col gap-0 items-center">
   <p-toggleswitch
-    [(ngModel)]="checked"
-    (click)="updateCheck()"
-    pTooltip="{{ tooltipLabel }}"
+    [ngModel]="checked()"
+    (ngModelChange)="checked.set($event)"
+    pTooltip="{{ tooltipLabel() }}"
   ></p-toggleswitch>
   <label>
     <small><ng-content></ng-content></small>

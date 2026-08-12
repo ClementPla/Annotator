@@ -1,4 +1,4 @@
-import { Component, ContentChildren, QueryList, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, TemplateRef, ChangeDetectionStrategy, contentChildren } from '@angular/core';
 import { ButtonModule } from "primeng/button";
 import { RippleModule } from "primeng/ripple";
 import { CommonModule } from '@angular/common';
@@ -18,11 +18,11 @@ export interface MenuGroup {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VerticalMenuComponent {
-  @ContentChildren(MenuGroupDirective) groupTemplates!: QueryList<MenuGroupDirective>;
+  readonly groupTemplates = contentChildren(MenuGroupDirective);
 
   get groups(): MenuGroup[] {
-    return this.groupTemplates?.map(item => ({
-      title: item.title,
+    return this.groupTemplates()?.map(item => ({
+      title: item.title(),
       template: item.templateRef
     })) || [];
   }

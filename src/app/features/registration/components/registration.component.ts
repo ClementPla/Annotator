@@ -53,6 +53,8 @@ import { emit, emitTo, listen, UnlistenFn } from '@tauri-apps/api/event';
   styleUrl: './registration.component.scss',
 })
 export class RegistrationComponent implements OnInit, AfterViewInit, OnDestroy {
+  state = inject(RegistrationStateService);
+
   // ── Owned controllers ─────────────────────────────────────────────────────
   readonly refVP = new ViewportController();
   readonly movingVP = new ViewportController();
@@ -113,7 +115,7 @@ export class RegistrationComponent implements OnInit, AfterViewInit, OnDestroy {
     // Simple version: current position in sequence list.
     return Math.round(((this.currentSequenceIndex() + 1) / total) * 100);
   });
-  constructor(public state: RegistrationStateService) {
+  constructor() {
     effect(() => {
       if (!this.isPoppedOut()) return;
       if (this.broadcastPaused()) return;

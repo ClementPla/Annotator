@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PanelModule } from 'primeng/panel';
@@ -42,6 +42,9 @@ interface Progress {
   styleUrl: './export.component.scss',
 })
 export class ExportComponent implements OnInit, OnDestroy {
+  projectService = inject(ProjectService);
+  private cdr = inject(ChangeDetectorRef);
+
   private readonly formats = signal<DatasetFormat[]>([]);
   readonly exportFormats = computed(() => this.formats().filter((f) => f.canExport));
 
@@ -61,11 +64,6 @@ export class ExportComponent implements OnInit, OnDestroy {
   ];
 
   private unlisten: UnlistenFn | null = null;
-
-  constructor(
-    public projectService: ProjectService,
-    private cdr: ChangeDetectorRef,
-  ) {}
 
   async ngOnInit(): Promise<void> {
     this.unlisten = await listen<Progress>('export-progress', (event) => {

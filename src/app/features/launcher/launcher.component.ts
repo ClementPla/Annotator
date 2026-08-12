@@ -1,6 +1,6 @@
 // launcher.component.ts
 
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -37,17 +37,15 @@ import { ImportDialogComponent } from './import-dialog/import-dialog.component';
   styleUrl: './launcher.component.scss',
 })
 export class LauncherComponent implements OnInit {
+  private projectService = inject(ProjectService);
+  private router = inject(Router);
+  private messageService = inject(MessageService);
+  theme = inject(ThemeService);
+  update = inject(UpdateService);
+
   readonly recentProjects = signal<RecentProject[]>([]);
   readonly isLoading = signal(false);
   showImportDialog = false;
-
-  constructor(
-    private projectService: ProjectService,
-    private router: Router,
-    private messageService: MessageService,
-    public theme: ThemeService,
-    public update: UpdateService,
-  ) {}
 
   ngOnInit(): void {
     this.recentProjects.set(this.projectService.getRecentProjects());

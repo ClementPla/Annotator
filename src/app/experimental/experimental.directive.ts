@@ -1,6 +1,7 @@
 import {
   Directive,
   effect,
+  inject,
   input,
   TemplateRef,
   ViewContainerRef,
@@ -22,11 +23,12 @@ export class ExperimentalDirective {
   /** Which feature this UI belongs to (kept for future per-feature flags). */
   readonly experimental = input.required<ExperimentalFeature>();
 
-  constructor(
-    templateRef: TemplateRef<unknown>,
-    viewContainer: ViewContainerRef,
-    flags: FeatureFlagsService
-  ) {
+  private readonly templateRef = inject<TemplateRef<unknown>>(TemplateRef);
+  private readonly viewContainer = inject(ViewContainerRef);
+  private readonly flags = inject(FeatureFlagsService);
+
+  constructor() {
+    const { templateRef, viewContainer, flags } = this;
     effect(() => {
       if (flags.isEnabled(this.experimental())) {
         if (viewContainer.length === 0) {

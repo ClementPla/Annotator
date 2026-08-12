@@ -1,14 +1,4 @@
-import {
-  AfterViewInit,
-  ChangeDetectorRef,
-  Component,
-  ElementRef,
-  HostListener,
-  Injector,
-  OnDestroy,
-  ViewChild,
-  effect,
-} from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostListener, Injector, OnDestroy, effect, inject, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { animationFrameScheduler, Subject } from 'rxjs';
@@ -49,6 +39,22 @@ import { TiledImageService } from '../service/tiled-image.service';
   standalone: true,
 })
 export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
+  editorService = inject(EditorService);
+  labelService = inject(LabelsService);
+  sequenceService = inject(SequenceService);
+  orchestrator = inject(OrchestratorService);
+  private drawService = inject(DrawService);
+  private stateService = inject(StateManagerService);
+  zoomPanService = inject(ZoomPanService);
+  private changeDetectorRef = inject(ChangeDetectorRef);
+  private uiStateService = inject(UIStateService);
+  vectorEditor = inject(VectorEditorService);
+  private featureFlags = inject(FeatureFlagsService);
+  private injector = inject(Injector);
+  private renderStats = inject(RenderStatsService);
+  private pyramidService = inject(PyramidService);
+  private tiledImage = inject(TiledImageService);
+
   // UI state
   public cursor: Point2D = { x: 0, y: 0 };          // viewport CSS px
   public viewBox: Viewbox = { xmin: 0, ymin: 0, xmax: 0, ymax: 0 };
@@ -58,7 +64,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   // margin around a zoomed-out image keeps a regular, clickable cursor.
   public isCursorInsideImage = false;
 
-  @ViewChild('labelMenu') labelMenu?: ContextMenu;
+  readonly labelMenu = viewChild<ContextMenu>('labelMenu');
   /**
    * Labels offered by the right-click picker.
    *
@@ -86,7 +92,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
         command: () => this.labelService.activate(label),
       }),
     );
-    this.labelMenu?.show(event);
+    this.labelMenu()?.show(event);
   }
 
   // Viewport CSS dimensions (drive both canvas style and internal resolution)
@@ -109,30 +115,14 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private destroy$ = new Subject<void>();
 
-  @ViewChild('viewport', { static: true })   public viewportRef: ElementRef<HTMLDivElement>;
-  @ViewChild('imageCanvas', { static: true }) public imgCanvas: ElementRef<HTMLCanvasElement>;
-  @ViewChild('overlayCanvas', { static: true }) public overlayCanvas: ElementRef<HTMLCanvasElement>;
-  @ViewChild('labelCanvas', { static: true }) public labelCanvas: ElementRef<HTMLCanvasElement>;
-  @ViewChild('svg')                           public svg: SVGElementsComponent;
-  @ViewChild('vectorLayer')                   public vectorLayer: VectorLayerComponent;
+  public readonly viewportRef = viewChild.required<ElementRef<HTMLDivElement>>('viewport');
+  public readonly imgCanvas = viewChild.required<ElementRef<HTMLCanvasElement>>('imageCanvas');
+  public readonly overlayCanvas = viewChild.required<ElementRef<HTMLCanvasElement>>('overlayCanvas');
+  public readonly labelCanvas = viewChild.required<ElementRef<HTMLCanvasElement>>('labelCanvas');
+  public readonly svg = viewChild.required<SVGElementsComponent>('svg');
+  public readonly vectorLayer = viewChild<VectorLayerComponent>('vectorLayer');
 
-  constructor(
-    public editorService: EditorService,
-    public labelService: LabelsService,
-    public sequenceService: SequenceService,
-    public orchestrator: OrchestratorService,
-    private drawService: DrawService,
-    private stateService: StateManagerService,
-    public zoomPanService: ZoomPanService,
-    private changeDetectorRef: ChangeDetectorRef,
-    private uiStateService: UIStateService,
-    public vectorEditor: VectorEditorService,
-    private featureFlags: FeatureFlagsService,
-    private injector: Injector,
-    private renderStats: RenderStatsService,
-    private pyramidService: PyramidService,
-    private tiledImage: TiledImageService,
-  ) {
+  constructor() {
     this.initSubscriptions();
 
     effect(() => {
@@ -148,11 +138,12 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   // ==========================================
 
   ngAfterViewInit() {
-    this.ctxImage = this.imgCanvas.nativeElement.getContext('2d', { alpha: true })!;
-    this.ctxLabel = this.labelCanvas.nativeElement.getContext('2d', { alpha: true })!;
-    this.ctxOverlay = this.overlayCanvas.nativeElement.getContext('2d', { alpha: true })!;
+    this.ctxImage = this.imgCanvas().nativeElement.getContext('2d', { alpha: true })!;
+    this.ctxLabel = this.labelCanvas().nativeElement.getContext('2d', { alpha: true })!;
+    this.ctxOverlay = this.overlayCanvas().nativeElement.getContext('2d', { alpha: true })!;
 
-    this.orchestrator.setViewportRef(this.viewportRef.nativeElement);
+    const viewportRef = this.viewportRef();
+    this.orchestrator.setViewportRef(viewportRef.nativeElement);
 
     // ResizeObserver drives viewport size. Pushes into ZoomPanService and
     // resizes display canvases to (CSS px × DPR) so the bitmap matches what's
@@ -161,14 +152,14 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
       const rect = entries[0].contentRect;
       this.setViewportSize(rect.width, rect.height);
     });
-    this.resizeObserver.observe(this.viewportRef.nativeElement);
+    this.resizeObserver.observe(viewportRef.nativeElement);
 
     // Initial size sync + first draw. Deferred out of the AfterViewInit check:
     // setViewportSize triggers a redraw that updates view-bound state (viewBox,
     // image dimensions), which would otherwise mutate values already rendered
     // this pass and raise NG0100 (ExpressionChangedAfterItHasBeenChecked).
     setTimeout(() => {
-      const r = this.viewportRef.nativeElement.getBoundingClientRect();
+      const r = this.viewportRef().nativeElement.getBoundingClientRect();
       this.setViewportSize(r.width, r.height);
 
       const frame = this.sequenceService.currentFrameImage();
@@ -230,9 +221,9 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
       c.style.width = `${width}px`;
       c.style.height = `${height}px`;
     };
-    setCanvas(this.imgCanvas.nativeElement);
-    setCanvas(this.overlayCanvas.nativeElement);
-    setCanvas(this.labelCanvas.nativeElement);
+    setCanvas(this.imgCanvas().nativeElement);
+    setCanvas(this.overlayCanvas().nativeElement);
+    setCanvas(this.labelCanvas().nativeElement);
 
     this.orchestrator.setViewportSize(width, height);
     this.changeDetectorRef.detectChanges();
@@ -249,7 +240,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
     const newDpr = Math.max(1, window.devicePixelRatio || 1);
     if (newDpr !== this.dpr) {
       this.dpr = newDpr;
-      const r = this.viewportRef.nativeElement.getBoundingClientRect();
+      const r = this.viewportRef().nativeElement.getBoundingClientRect();
       this.viewportWidth = 0; // force resize
       this.setViewportSize(r.width, r.height);
     }
@@ -269,8 +260,8 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
       // Offscreen layers were resized inside the orchestrator.
       // The display canvases follow the viewport, not the image, so no
       // further sizing here.
-      this.svg.setViewBox(this.orchestrator.getSVGViewBox());
-      this.vectorLayer?.setViewBox(this.orchestrator.getSVGViewBox());
+      this.svg().setViewBox(this.orchestrator.getSVGViewBox());
+      this.vectorLayer()?.setViewBox(this.orchestrator.getSVGViewBox());
       this.changeDetectorRef.detectChanges();
     } catch (e) {
       console.error('Failed to load image:', e);
@@ -370,8 +361,8 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
     if (!this.ctxImage || !this.ctxLabel) return;
 
     this.viewBox = this.orchestrator.getViewBox();
-    this.svg.setViewBox(this.orchestrator.getSVGViewBox());
-    this.vectorLayer?.setViewBox(this.orchestrator.getSVGViewBox());
+    this.svg().setViewBox(this.orchestrator.getSVGViewBox());
+    this.vectorLayer()?.setViewBox(this.orchestrator.getSVGViewBox());
 
     // Image layer
     this.clearDisplayCanvas(this.ctxImage);

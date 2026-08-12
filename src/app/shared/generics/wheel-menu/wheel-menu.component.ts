@@ -1,11 +1,4 @@
-import {
-  AfterViewInit,
-  ChangeDetectorRef,
-  Component,
-  Input,
-  Output,
-  ViewChild,
-  EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ChangeDetectionStrategy, inject, input, output, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { FormsModule } from '@angular/forms';
@@ -47,10 +40,12 @@ interface Segment {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WheelMenuComponent implements AfterViewInit {
-  @Input() radius = 256;
-  @Input() items: MenuItem[] = [];
-  @Output() closeMenu: EventEmitter<boolean> = new EventEmitter<boolean>();
-  @ViewChild('wheel') wheel!: HTMLElement;
+  private cdr = inject(ChangeDetectorRef);
+
+  readonly radius = input(256);
+  readonly items = input<MenuItem[]>([]);
+  readonly closeMenu = output<boolean>();
+  readonly wheel = viewChild.required<HTMLElement>('wheel');
 
   public segmentType = SegmentType;
 
@@ -58,24 +53,23 @@ export class WheelMenuComponent implements AfterViewInit {
   public segments: Segment[] = [];
 
   innerRadius = 32;
-  outerRadius: number = this.radius + this.innerRadius * 3;
-  constructor(private cdr: ChangeDetectorRef) {}
+  outerRadius: number = this.radius() + this.innerRadius * 3;
 
   ngAfterViewInit(): void {
-    this.outerRadius = this.radius + this.innerRadius * 3;
+    this.outerRadius = this.radius() + this.innerRadius * 3;
     this.segments = this.buildMultiSegmentPaths();
     this.cdr.detectChanges();
   }
   buildMultiSegmentPaths(): Segment[] {
-    const n = this.items.length;
+    const n = this.items().length;
 
     // This function generates a path for an SVG element that represents a circular segment.
     // The path starts at the top of the circle and goes around to create a segment.
 
     const segments: Segment[] = [];
     const angleStep = 360 / n;
-    const innerRadius = this.radius / 3;
-    const radius = this.radius;
+    const innerRadius = this.radius() / 3;
+    const radius = this.radius();
     for (let i = 0; i < n; i++) {
       const startAngle = i * angleStep;
       const endAngle = (i + 1) * angleStep;
@@ -116,8 +110,9 @@ export class WheelMenuComponent implements AfterViewInit {
         startAngle,
         endAngle,
       };
-      if (this.items[i].children && this.items[i].children!.length > 0) {
-        children = this.items[i].children!.map((child, index) => {
+      const items = this.items();
+      if (items[i].children && items[i].children!.length > 0) {
+        children = items[i].children!.map((child, index) => {
           return this.getChildSegmentPath(segment, i, index);
         });
       }
@@ -132,10 +127,10 @@ export class WheelMenuComponent implements AfterViewInit {
   }
 
   getViewbox(): string {
-    const areTheyAnyChildren = this.items.some(
+    const areTheyAnyChildren = this.items().some(
       (item) => item.children && item.children.length > 0
     );
-    let dim = this.radius * 2;
+    let dim = this.radius() * 2;
     if (areTheyAnyChildren) {
       dim = this.outerRadius * 2;
     }
@@ -153,7 +148,7 @@ export class WheelMenuComponent implements AfterViewInit {
     childIndex: number
   ): Segment {
     const currentSegment = parentSegment;
-    const nChildren = this.items[segmentIndex].children!.length;
+    const nChildren = this.items()[segmentIndex].children!.length;
     const startAngle = currentSegment.startAngle;
     const endAngle = currentSegment.endAngle;
     const angleDiff = endAngle - startAngle;
@@ -162,7 +157,7 @@ export class WheelMenuComponent implements AfterViewInit {
     const childEndAngle =
       startAngle + (angleDiff * (childIndex + 1)) / nChildren;
 
-    const startRadius = this.radius;
+    const startRadius = this.radius();
     const endRadius = this.outerRadius;
     const path = `
       M ${startRadius * Math.cos((childStartAngle * Math.PI) / 180)} ${

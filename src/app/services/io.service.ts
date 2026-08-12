@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -35,6 +35,13 @@ import { ProjectScoped } from '../core/project-scoped';
   providedIn: 'root',
 })
 export class IOService implements OnDestroy, ProjectScoped {
+  private labelService = inject(LabelsService);
+  private sequenceService = inject(SequenceService);
+  private canvasManagerService = inject(CanvasManagerService);
+  private stateManagerService = inject(StateManagerService);
+  private vectorEditor = inject(VectorEditorService);
+  private notifications = inject(NotificationService);
+
   public requestedReload = new Subject<boolean>();
   /** Emits after a frame's masks have been loaded into the canvas manager, so
    *  UI derived from mask contents (e.g. the instance picker) can refresh. */
@@ -48,14 +55,7 @@ export class IOService implements OnDestroy, ProjectScoped {
   private readonly autosaveDelayMs = 5000;
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    private labelService: LabelsService,
-    private sequenceService: SequenceService,
-    private canvasManagerService: CanvasManagerService,
-    private stateManagerService: StateManagerService,
-    private vectorEditor: VectorEditorService,
-    private notifications: NotificationService
-  ) {
+  constructor() {
     // Vector edits flow back here so the same dirty flag / autosave covers them.
     this.vectorEditor.changed$.subscribe(() => this.markDirty());
   }

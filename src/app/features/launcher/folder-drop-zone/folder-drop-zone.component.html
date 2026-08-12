@@ -1,8 +1,8 @@
 <div class="drop-inner">
-  @if (folderPath) {
+  @if (folderPath()) {
     <div class="folder-display">
       <i class="pi pi-folder"></i>
-      <span class="folder-path" [title]="folderPath">{{ folderPath }}</span>
+      <span class="folder-path" [title]="folderPath()">{{ folderPath() }}</span>
       <button
         type="button"
         class="clear-btn"

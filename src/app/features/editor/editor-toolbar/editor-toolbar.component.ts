@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, Component } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, inject } from '@angular/core';
 import { ToolbarModule } from 'primeng/toolbar';
 import { ButtonModule } from 'primeng/button';
 import { SelectButtonModule } from 'primeng/selectbutton';
@@ -49,6 +49,11 @@ const OUTPUTS: { id: PredictOutput; label: string; icon: string }[] = [
     styleUrl: './editor-toolbar.component.scss'
 })
 export class EditorToolbarComponent {
+  editorService = inject(EditorService);
+  vectorEditor = inject(VectorEditorService);
+  prediction = inject(PredictionService);
+  private convertService = inject(ConvertService);
+
   tools = ALL_TOOLS;
   vectorTools = VECTOR_TOOLS;
   convertTools = CONVERT_TOOLS;
@@ -58,13 +63,6 @@ export class EditorToolbarComponent {
   private readonly brushMin = 1;
   private readonly brushMax = 1024;
   private readonly brushSteps = 1000;
-
-  constructor(
-    public editorService: EditorService,
-    public vectorEditor: VectorEditorService,
-    public prediction: PredictionService,
-    private convertService: ConvertService,
-  ) {}
 
   /** Burn the selected shape (or the active label's shapes) into the masks. */
   rasterize(): void {

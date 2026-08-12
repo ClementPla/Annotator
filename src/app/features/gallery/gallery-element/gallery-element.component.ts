@@ -1,16 +1,4 @@
-import {
-  Component,
-  Input,
-  Output,
-  EventEmitter,
-  ElementRef,
-  OnDestroy,
-  OnChanges,
-  AfterViewInit,
-  ChangeDetectionStrategy,
-  ChangeDetectorRef,
-  NgZone,
-} from '@angular/core';
+import { Component, Input, ElementRef, OnDestroy, OnChanges, AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, NgZone, inject, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { PanelModule } from 'primeng/panel';
@@ -49,32 +37,36 @@ export interface ThumbnailSelectionEvent {
 export class GalleryElementComponent
   implements OnDestroy, OnChanges, AfterViewInit
 {
+  private elementRef = inject(ElementRef);
+  private zone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef);
+
   // Frame data
-  @Input() frameId!: number;
-  @Input() title = '';
-  @Input() status: 'empty' | 'annotated' | 'reviewed' = 'empty';
-  @Input() frameCount = 1;
+  readonly frameId = input.required<number>();
+  readonly title = input('');
+  readonly status = input<'empty' | 'annotated' | 'reviewed'>('empty');
+  readonly frameCount = input(1);
   /** Whether the sequence contains at least one keypoint pair (registration). */
-  @Input() hasKeypoints = false;
+  readonly hasKeypoints = input(false);
 
   // Display options
-  @Input() id!: number; // Sequence ID for selection tracking
-  @Input() imgSize = 256;
+  readonly id = input.required<number>(); // Sequence ID for selection tracking
+  readonly imgSize = input(256);
   @Input() selected = false;
-  @Input() frameIds: number[] = [];
+  readonly frameIds = input<number[]>([]);
   /** Render as a full-width list row instead of a card. */
-  @Input() listMode = false;
+  readonly listMode = input(false);
   /** Show the per-row "Reviewed" toggle (list mode only). */
-  @Input() showReviewedToggle = true;
+  readonly showReviewedToggle = input(true);
   /** Tint the row background by status / current selection (list mode only). */
-  @Input() colorByStatus = false;
+  readonly colorByStatus = input(false);
   // Events
-  @Output() thumbnailSelected = new EventEmitter<ThumbnailSelectionEvent>();
-  @Output() thumbnailClicked = new EventEmitter<void>();
-  @Output() reviewedToggled = new EventEmitter<{
+  readonly thumbnailSelected = output<ThumbnailSelectionEvent>();
+  readonly thumbnailClicked = output<void>();
+  readonly reviewedToggled = output<{
     id: number;
     reviewed: boolean;
-  }>();
+}>();
 
   // Internal state
   public imagePath = '';
@@ -100,12 +92,6 @@ export class GalleryElementComponent
   private observer: IntersectionObserver | null = null;
   private hasLoadedThumbnail = false;
 
-  constructor(
-    private elementRef: ElementRef,
-    private zone: NgZone,
-    private cdr: ChangeDetectorRef,
-  ) {}
-
   ngOnChanges(): void {
     this.recomputeDerived();
   }
@@ -116,7 +102,7 @@ export class GalleryElementComponent
 
   /** Recompute the status/selection-derived strings the template binds to. */
   private recomputeDerived(): void {
-    switch (this.status) {
+    switch (this.status()) {
       case 'reviewed':
         this.statusLabel = 'Reviewed';
         this.statusBadgeClass = 'bg-green-500';
@@ -142,9 +128,9 @@ export class GalleryElementComponent
    * then reviewed (green), then annotated (orange).
    */
   private computeRowBackground(): string {
-    if (!this.colorByStatus) return '';
+    if (!this.colorByStatus()) return '';
     if (this.selected) return 'rgba(59, 130, 246, 0.22)'; // blue – current
-    switch (this.status) {
+    switch (this.status()) {
       case 'reviewed':
         return 'rgba(34, 197, 94, 0.20)'; // green
       case 'annotated':
@@ -171,7 +157,7 @@ export class GalleryElementComponent
             if (entry.isIntersecting && !this.hasLoadedThumbnail) {
               this.hasLoadedThumbnail = true;
               this.cleanupObserver();
-              this.zone.run(() => void this.loadThumbnail(this.frameId));
+              this.zone.run(() => void this.loadThumbnail(this.frameId()));
               break;
             }
           }
@@ -215,7 +201,7 @@ export class GalleryElementComponent
     this.cdr.markForCheck();
 
     try {
-      const result = await api.getFrameThumbnail(frameId, this.imgSize);
+      const result = await api.getFrameThumbnail(frameId, this.imgSize());
       this.imagePath = result.imageBase64;
     } catch (error) {
       console.error('Error loading thumbnail:', error);
@@ -241,7 +227,7 @@ export class GalleryElementComponent
   // ==========================================
 
   public onMouseEnter(): void {
-    const frameIds = this.frameIds; // Use cached, don't await here
+    const frameIds = this.frameIds(); // Use cached, don't await here
     if (frameIds.length <= 1) return;
 
     if (this.hoverTimer || this.loopInterval) return; // Already active
@@ -253,7 +239,7 @@ export class GalleryElementComponent
   }
 
   public onMouseLeave(): void {
-    const frameIds = this.frameIds;
+    const frameIds = this.frameIds();
     if (frameIds.length <= 1) return;
 
     if (this.hoverTimer) {
@@ -294,7 +280,7 @@ export class GalleryElementComponent
 
   private async resetToFirstFrame(): Promise<void> {
     this.currentFrameIndex = 0;
-    await this.loadThumbnail(this.frameId);
+    await this.loadThumbnail(this.frameId());
   }
 
   // ==========================================
@@ -305,6 +291,7 @@ export class GalleryElementComponent
    * Open editor at this sequence.
    */
   public openEditor(): void {
+    // TODO: The 'emit' function requires a mandatory void argument
     this.thumbnailClicked.emit();
   }
 
@@ -324,7 +311,7 @@ export class GalleryElementComponent
       'shiftKey' in event && (event as MouseEvent | KeyboardEvent).shiftKey;
 
     this.thumbnailSelected.emit({
-      id: this.id,
+      id: this.id(),
       selected: this.selected,
       isShiftClick,
     });
@@ -335,24 +322,24 @@ export class GalleryElementComponent
   // ==========================================
 
   public get displayTitle(): string {
-    return this.title || `Sequence ${this.id}`;
+    return this.title() || `Sequence ${this.id()}`;
   }
 
   public get isReviewed(): boolean {
-    return this.status === 'reviewed';
+    return this.status() === 'reviewed';
   }
 
   /** Emit a request to (un)mark the whole sequence as reviewed. */
   public onReviewedToggle(reviewed: boolean): void {
-    this.reviewedToggled.emit({ id: this.id, reviewed });
+    this.reviewedToggled.emit({ id: this.id(), reviewed });
   }
 
   public get hasMultipleFrames(): boolean {
-    return this.frameCount > 1;
+    return this.frameCount() > 1;
   }
 
   async getFrameIds(): Promise<number[]> {
-    const frames = await api.getSequenceFrames(this.id);
+    const frames = await api.getSequenceFrames(this.id());
     return frames.map((f) => f.id);
   }
 }

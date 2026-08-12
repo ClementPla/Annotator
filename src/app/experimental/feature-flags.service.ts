@@ -1,4 +1,4 @@
-import { computed, Injectable, Injector, signal } from '@angular/core';
+import { computed, Injectable, Injector, signal, inject } from '@angular/core';
 import { postProcessingOptions } from '../core/tools';
 import { EditorService } from '../features/editor/services/editor.service';
 import { ExperimentalFeature } from './descriptor';
@@ -16,6 +16,9 @@ const STORAGE_KEY = 'didascalie.experimentalFeatures';
  */
 @Injectable({ providedIn: 'root' })
 export class FeatureFlagsService {
+  private injector = inject(Injector);
+  private editorService = inject(EditorService);
+
   readonly experimentalEnabled = signal(
     localStorage.getItem(STORAGE_KEY) === 'true'
   );
@@ -27,11 +30,6 @@ export class FeatureFlagsService {
       ? [...postProcessingOptions, ...experimentalPostProcessOptions()]
       : postProcessingOptions
   );
-
-  constructor(
-    private injector: Injector,
-    private editorService: EditorService
-  ) {}
 
   isEnabled(_feature: ExperimentalFeature): boolean {
     // Single master switch for now; the parameter keeps call sites tagged so

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { StateManagerService } from './state-manager.service';
 import { LabelsService } from '../../../../services/labels/labels.service';
@@ -37,6 +37,14 @@ const BUFFER_MAX_DIM = 4096;
   providedIn: 'root',
 })
 export class CanvasManagerService implements ProjectScoped {
+  private stateService = inject(StateManagerService);
+  private labelService = inject(LabelsService);
+  private editorService = inject(EditorService);
+  private bboxManager = inject(BboxManagerService);
+  private webgpuCompositor = inject(WebGPUCanvasCompositorService);
+  private zoomPan = inject(ZoomPanService);
+  private renderStats = inject(RenderStatsService);
+
   /** One value mask per segmentation label, row-major, `width*height`. */
   labelMasks: Uint8Array[] = [];
   /** One 256-entry RGBA lookup table per label (value -> display colour). */
@@ -67,15 +75,7 @@ export class CanvasManagerService implements ProjectScoped {
     return this.useViewportComposite;
   }
 
-  constructor(
-    private stateService: StateManagerService,
-    private labelService: LabelsService,
-    private editorService: EditorService,
-    private bboxManager: BboxManagerService,
-    private webgpuCompositor: WebGPUCanvasCompositorService,
-    private zoomPan: ZoomPanService,
-    private renderStats: RenderStatsService
-  ) {
+  constructor() {
     this.initializeWebGPU();
   }
 

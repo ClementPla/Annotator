@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { UIStateService } from '../../services/uistate.service';
 @Component({
@@ -7,8 +7,7 @@ import { UIStateService } from '../../services/uistate.service';
     templateUrl: './loading.component.html',
     styleUrl: './loading.component.scss'
 })
-export class LoadingComponent {
+export class LoadingComponent {  uiStateService = inject(UIStateService);
 
-  constructor(public uiStateService: UIStateService) { }
 
 }

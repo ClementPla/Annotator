@@ -1,6 +1,6 @@
 // image-adjustments.component.ts
 
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -47,6 +47,8 @@ interface TabSpec {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ImageAdjustmentsComponent implements OnInit, OnDestroy {
+  service = inject(ImageAdjustmentService);
+
   readonly tabs: TabSpec[] = [
     { id: 'rgb', label: 'RGB', color: '#e0e0e0', sliderTarget: 'luma', curveTarget: 'luma', histKey: 'luma' },
     { id: 'r',   label: 'R',   color: '#e35d6a', sliderTarget: 'r',    curveTarget: 'r',    histKey: 'r'    },
@@ -58,8 +60,6 @@ export class ImageAdjustmentsComponent implements OnInit, OnDestroy {
   histogram: Histogram | null = null;
 
   private destroy$ = new Subject<void>();
-
-  constructor(public service: ImageAdjustmentService) {}
 
   ngOnInit() {
     this.service.histogram$

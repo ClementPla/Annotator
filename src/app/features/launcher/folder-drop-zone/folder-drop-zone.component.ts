@@ -1,15 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  EventEmitter,
-  HostBinding,
-  HostListener,
-  Input,
-  OnDestroy,
-  OnInit,
-  Output,
-  signal,
-} from '@angular/core';
+import { Component, ElementRef, HostBinding, HostListener, Input, OnDestroy, OnInit, signal, inject, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -34,18 +23,19 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
   styleUrl: './folder-drop-zone.component.scss',
 })
 export class FolderDropZoneComponent implements OnInit, OnDestroy {
+  private elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
+
   /** Currently selected folder path, or null. Drives the resting visual. */
-  @Input() folderPath: string | null = null;
+  readonly folderPath = input<string | null>(null);
 
   /** Compact mode: smaller drop zone, used when a folder is already chosen. */
-  @Input() compact = false;
+  readonly compact = input(false);
 
-  @Output() folderChange = new EventEmitter<string>();
+  readonly folderChange = output<string>();
 
   readonly hovering = signal(false);
 
   private unlistenDrop?: UnlistenFn;
-  constructor(private elementRef: ElementRef<HTMLElement>) {}
   async ngOnInit(): Promise<void> {
     try {
       const { getCurrentWebview } = await import('@tauri-apps/api/webview');
@@ -124,12 +114,12 @@ export class FolderDropZoneComponent implements OnInit, OnDestroy {
 
   @HostBinding('class.is-compact')
   get compactClass(): boolean {
-    return this.compact;
+    return this.compact();
   }
 
   @HostBinding('class.has-folder')
   get hasFolderClass(): boolean {
-    return !!this.folderPath;
+    return !!this.folderPath();
   }
 
   // ==========================================

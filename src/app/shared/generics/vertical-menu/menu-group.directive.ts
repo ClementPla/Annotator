@@ -1,10 +1,11 @@
-import { Directive, Input, TemplateRef } from '@angular/core';
+import { Directive, TemplateRef, inject, input } from '@angular/core';
 
 @Directive({
   selector: '[appMenuGroup]',
   standalone: true
 })
 export class MenuGroupDirective {
-  @Input('appMenuGroup') title = '';
-  constructor(public templateRef: TemplateRef<any>) {}
+  templateRef = inject<TemplateRef<any>>(TemplateRef);
+
+  readonly title = input('', { alias: "appMenuGroup" });
 }

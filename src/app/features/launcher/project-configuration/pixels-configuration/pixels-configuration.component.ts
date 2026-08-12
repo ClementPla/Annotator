@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LabelsService } from '../../../../services/labels/labels.service';
 import { FormsModule } from '@angular/forms';
@@ -15,7 +15,8 @@ import { getDefaultColor } from '../../../../core/misc/colors';
     styleUrl: './pixels-configuration.component.scss'
 })
 export class PixelsConfigurationComponent {
-  constructor(public labelService: LabelsService) { }
+  labelService = inject(LabelsService);
+
 
   deleteSegmentationClass(segLabel: SegLabel) {
     this.labelService.removeSegLabel(segLabel);

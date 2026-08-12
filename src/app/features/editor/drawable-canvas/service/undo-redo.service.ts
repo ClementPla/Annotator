@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { UndoRedo } from '../../../../core/misc/undo-redo';
 import { CanvasManagerService } from './canvas-manager.service';
 import { StateManagerService } from './state-manager.service';
@@ -30,6 +30,13 @@ type UndoToken =
   providedIn: 'root',
 })
 export class UndoRedoService implements ProjectScoped {
+  private canvasManagerService = inject(CanvasManagerService);
+  private stateService = inject(StateManagerService);
+  private editorService = inject(EditorService);
+  private labelService = inject(LabelsService);
+  private ioService = inject(IOService);
+  private vectorEditor = inject(VectorEditorService);
+
   public redrawRequest: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(
     false
   );
@@ -50,14 +57,7 @@ export class UndoRedoService implements ProjectScoped {
   private grouping = false;
   private groupBuffer: UndoToken[] = [];
 
-  constructor(
-    private canvasManagerService: CanvasManagerService,
-    private stateService: StateManagerService,
-    private editorService: EditorService,
-    private labelService: LabelsService,
-    private ioService: IOService,
-    private vectorEditor: VectorEditorService
-  ) {
+  constructor() {
     this.editorService.undo.subscribe((value) => {
       if (value) {
         this.stateService.recomputeCanvasSum = true;

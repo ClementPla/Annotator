@@ -5,14 +5,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
-  Input,
   OnChanges,
   OnDestroy,
   SimpleChanges,
-  ViewChild,
   computed,
   effect,
   inject,
+  input,
+  viewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -38,19 +38,19 @@ import {
 export class CompositeViewportComponent
   implements AfterViewInit, OnChanges, OnDestroy
 {
-  @Input({ required: true }) refController!: ViewportController;
-  @Input({ required: true }) movingController!: ViewportController;
-  @Input() refPyramid: Pyramid | null = null;
-  @Input() movingPyramid: Pyramid | null = null;
+  readonly refController = input.required<ViewportController>();
+  readonly movingController = input.required<ViewportController>();
+  readonly refPyramid = input<Pyramid | null>(null);
+  readonly movingPyramid = input<Pyramid | null>(null);
   /**
    * Source URL of the moving image to render via CSS transform.
    * Provided by the orchestrator alongside the pyramid.
    */
-  @Input() movingImageUrl: string | null = null;
+  readonly movingImageUrl = input<string | null>(null);
 
-  @ViewChild('host') hostEl!: ElementRef<HTMLDivElement>;
-  @ViewChild('canvas') canvasEl!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('svg') svgEl!: ElementRef<SVGSVGElement>;
+  readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
+  readonly canvasEl = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
+  readonly svgEl = viewChild.required<ElementRef<SVGSVGElement>>('svg');
 
   private readonly state = inject(RegistrationStateService);
   private readonly pyramidSvc = inject(PyramidService);
@@ -72,7 +72,7 @@ export class CompositeViewportComponent
     }
     const reason = diagnoseHomography(t);
     if (reason) return { kind: 'bad-fit', reason };
-    if (!this.movingImageUrl) return { kind: 'no-image' };
+    if (!this.movingImageUrl()) return { kind: 'no-image' };
     return { kind: 'ok' };
   });
 
@@ -99,7 +99,7 @@ export class CompositeViewportComponent
    * zoom, with the target pixel always visible through the open center.
    */
   readonly markerScale = computed(() => {
-    const c = this.refController;
+    const c = this.refController();
     return c ? 1 / Math.max(1e-4, c.scale()) : 1;
   });
 
@@ -111,8 +111,8 @@ export class CompositeViewportComponent
   /** CSS transform string for the warped moving <img>. */
   readonly warpedTransform = computed(() => {
     const t = this.state.transform();
-    const refScale = this.refController.scale();
-    const refOffset = this.refController.offset();
+    const refScale = this.refController().scale();
+    const refOffset = this.refController().offset();
 
     if (t.type === 'homography') {
       return buildWarpedImageTransform(t, refScale, refOffset);
@@ -121,7 +121,7 @@ export class CompositeViewportComponent
     return `translate(${refOffset.x}px, ${refOffset.y}px) scale(${refScale})`;
   });
   readonly showWarped = computed(() => {
-    if (this.movingImageUrl === null) return false;
+    if (this.movingImageUrl() === null) return false;
     // If we have a homography and it's degenerate, hide rather than show garbage.
     const t = this.state.transform();
     if (t.type === 'homography' && diagnoseHomography(t) !== null) return false;
@@ -156,10 +156,10 @@ export class CompositeViewportComponent
   // ==========================================
 
   ngAfterViewInit(): void {
-    if (!this.refController || !this.movingController) {
+    if (!this.refController() || !this.movingController()) {
       // Re-check inside a short microtask execution deferral if initialization raced ahead
       queueMicrotask(() => {
-        if (this.refController && this.movingController) {
+        if (this.refController() && this.movingController()) {
           this.setupViewportEngine();
         }
       });
@@ -169,12 +169,14 @@ export class CompositeViewportComponent
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['refPyramid'] && this.refPyramid) {
-      const { nativeWidth: w, nativeHeight: h } = this.refPyramid;
-      this.refController.smooth = Math.max(w, h) < 4096;
-      const size = this.refController.size();
+    const refPyramid = this.refPyramid();
+    if (changes['refPyramid'] && refPyramid) {
+      const { nativeWidth: w, nativeHeight: h } = refPyramid;
+      const refController = this.refController();
+      refController.smooth = Math.max(w, h) < 4096;
+      const size = refController.size();
       if (size.width > 0 && size.height > 0) {
-        this.refController.fitImage(w, h, false);
+        refController.fitImage(w, h, false);
       }
       this.redrawReference();
       this.updateSvgViewBox();
@@ -183,11 +185,11 @@ export class CompositeViewportComponent
 
   ngOnDestroy(): void {
     this.resizeObs?.disconnect();
-    this.refController.onRedrawNeeded = undefined;
+    this.refController().onRedrawNeeded = undefined;
   }
 
   private setupViewportEngine(): void {
-    this.refController.onRedrawNeeded = () => {
+    this.refController().onRedrawNeeded = () => {
       this.redrawReference();
       this.updateSvgViewBox();
     };
@@ -200,13 +202,13 @@ export class CompositeViewportComponent
       if (w === this.lastSize.w && h === this.lastSize.h) return;
       this.lastSize = { w, h };
 
-      this.refController.setSize(w, h);
-      this.movingController.setSize(w, h);
+      this.refController().setSize(w, h);
+      this.movingController().setSize(w, h);
       this.resizeCanvas(w, h);
       this.redrawReference();
       this.updateSvgViewBox();
     });
-    this.resizeObs.observe(this.hostEl.nativeElement);
+    this.resizeObs.observe(this.hostEl().nativeElement);
   }
 
   // ==========================================
@@ -214,41 +216,44 @@ export class CompositeViewportComponent
   // ==========================================
 
   private redrawReference(): void {
-    const canvas = this.canvasEl?.nativeElement;
-    if (!canvas || !this.refPyramid) return;
+    const canvas = this.canvasEl()?.nativeElement;
+    const refPyramid = this.refPyramid();
+    if (!canvas || !refPyramid) return;
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     const level = this.pyramidSvc.getLevelForViewport(
-      this.refPyramid,
-      this.refController.scale(),
-      this.refController.size().width,
-      this.refController.size().height,
+      refPyramid,
+      this.refController().scale(),
+      this.refController().size().width,
+      this.refController().size().height,
     );
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    this.refController.applyToContextForLevel(ctx, this.dpr, level);
-    ctx.imageSmoothingEnabled = this.refController.scale() < 1;
+    this.refController().applyToContextForLevel(ctx, this.dpr, level);
+    ctx.imageSmoothingEnabled = this.refController().scale() < 1;
     ctx.drawImage(level.canvas, 0, 0);
     ctx.restore();
   }
 
   private updateSvgViewBox(): void {
-    if (!this.svgEl || !this.refPyramid) return;
-    this.svgEl.nativeElement.setAttribute(
+    const refPyramid = this.refPyramid();
+    const svgEl = this.svgEl();
+    if (!svgEl || !refPyramid) return;
+    svgEl.nativeElement.setAttribute(
       'viewBox',
-      this.refController.getSVGViewBox(
-        this.refPyramid.nativeWidth,
-        this.refPyramid.nativeHeight,
+      this.refController().getSVGViewBox(
+        refPyramid.nativeWidth,
+        refPyramid.nativeHeight,
       ),
     );
   }
 
   private resizeCanvas(w: number, h: number): void {
-    const canvas = this.canvasEl?.nativeElement;
+    const canvas = this.canvasEl()?.nativeElement;
     if (!canvas) return;
     canvas.width = Math.round(w * this.dpr);
     canvas.height = Math.round(h * this.dpr);
@@ -262,27 +267,28 @@ export class CompositeViewportComponent
 
   onMouseDown(event: MouseEvent): void {
     if (event.button === 1) {
-      this.refController?.startDrag(event.clientX, event.clientY);
+      this.refController()?.startDrag(event.clientX, event.clientY);
     }
   }
 
   onMouseMove(event: MouseEvent): void {
-    if (this.refController?.isDragging) {
-      this.refController?.drag(event.clientX, event.clientY);
+    const refController = this.refController();
+    if (refController?.isDragging) {
+      refController?.drag(event.clientX, event.clientY);
     }
   }
 
   onMouseUp(): void {
-    this.refController?.endDrag();
+    this.refController()?.endDrag();
   }
 
   onMouseLeave(): void {
-    this.refController?.endDrag();
+    this.refController()?.endDrag();
   }
 
   onWheel(event: WheelEvent): void {
-    const rect = this.canvasEl.nativeElement.getBoundingClientRect();
-    this.refController?.wheel(event, rect);
+    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+    this.refController()?.wheel(event, rect);
   }
 
   // ==========================================
@@ -291,9 +297,9 @@ export class CompositeViewportComponent
 
   /** Native dimensions of the moving image, used to size the <img> element. */
   get movingNativeWidth(): number {
-    return this.movingPyramid?.nativeWidth ?? 0;
+    return this.movingPyramid()?.nativeWidth ?? 0;
   }
   get movingNativeHeight(): number {
-    return this.movingPyramid?.nativeHeight ?? 0;
+    return this.movingPyramid()?.nativeHeight ?? 0;
   }
 }

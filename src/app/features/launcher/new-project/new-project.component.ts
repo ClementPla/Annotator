@@ -1,6 +1,6 @@
 // new-project.component.ts
 
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -48,6 +48,11 @@ import { LabelsService } from '../../../services/labels/labels.service';
   styleUrl: './new-project.component.scss',
 })
 export class NewProjectComponent implements OnInit {
+  projectService = inject(ProjectService);
+  labelService = inject(LabelsService);
+  private router = inject(Router);
+  private messageService = inject(MessageService);
+
   readonly isLoading = signal(false);
   readonly savePath = signal<string | null>(null);
 
@@ -64,14 +69,6 @@ export class NewProjectComponent implements OnInit {
       this.projectService.isConfigValid() &&
       !this.isLoading(),
   );
-
-
-  constructor(
-    public projectService: ProjectService,
-    public labelService: LabelsService,
-    private router: Router,
-    private messageService: MessageService,
-  ) {}
 
   ngOnInit(): void {
     // If the user lands here mid-state (e.g. from a back nav), clear stale errors.

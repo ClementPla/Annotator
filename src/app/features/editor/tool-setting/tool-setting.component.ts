@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { PanelModule } from 'primeng/panel';
 import { AccordionModule } from 'primeng/accordion';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
@@ -41,13 +41,12 @@ import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/
     standalone: true,
 })
 export class ToolSettingComponent {
+  editorService = inject(EditorService);
+  projectService = inject(ProjectService);
+  imageProcess = inject(ImageAdjustmentService);
+  flags = inject(FeatureFlagsService);
+
   ppOption = PostProcessOption;
-  constructor(
-    public editorService: EditorService,
-    public projectService: ProjectService,
-    public imageProcess: ImageAdjustmentService,
-    public flags: FeatureFlagsService
-  ) {}
 
   /** The registry entry for the selected post-process mode when it is an
    *  experimental one (rendered by the template's @default branch). */

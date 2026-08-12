@@ -1,5 +1,5 @@
 // tauri-event.service.ts
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { TauriEventBase } from './tauri-event-base';
 import { DownloadProgress } from './interface';
@@ -19,7 +19,9 @@ export class TauriEventService extends TauriEventBase {
   public segmentationStarted$ = this.segmentationStartedSubject.asObservable();
   public segmentationCompleted$ = this.segmentationCompletedSubject.asObservable();
 
-  constructor(ngZone: NgZone) {
+  constructor() {
+    const ngZone = inject(NgZone);
+
     super(ngZone);
   }
 

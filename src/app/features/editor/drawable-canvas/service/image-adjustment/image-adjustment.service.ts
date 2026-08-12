@@ -1,6 +1,6 @@
 // image-adjustment.service.ts
 
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { EditorService } from '../../../services/editor.service';
 import {
@@ -23,6 +23,8 @@ import { ImageAdjustmentRenderer } from './image-adjustment.renderer';
 
 @Injectable({ providedIn: 'root' })
 export class ImageAdjustmentService implements OnDestroy {
+  private editorService = inject(EditorService);
+
   // Public state, mutated by the UI.
   public state: AdjustmentState = makeIdentityState();
 
@@ -54,7 +56,7 @@ export class ImageAdjustmentService implements OnDestroy {
     return this.isActive() ? composeRGBLUT(this.state) : null;
   }
 
-  constructor(private editorService: EditorService) {
+  constructor() {
     // Fire and forget; CPU fallback used until ready.
     this.renderer.initialize();
   }

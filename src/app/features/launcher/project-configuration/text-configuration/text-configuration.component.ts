@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
 import { LabelsService } from '../../../../services/labels/labels.service';
 import { TextLabel } from '../../../../core/interface';
@@ -13,7 +13,7 @@ import { InputTextModule } from 'primeng/inputtext';
     styleUrl: './text-configuration.component.scss'
 })
 export class TextConfigurationComponent {
-  constructor(public labelService: LabelsService){}
+  labelService = inject(LabelsService);
 
 
   removeTextLabel(label: TextLabel){

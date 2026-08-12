@@ -85,7 +85,7 @@
         class="frame-select"
         [(ngModel)]="selectedReferenceFrameId"
       >
-        @for (f of frameOptions; track f.id) {
+        @for (f of frameOptions(); track f.id) {
           <option [value]="f.id">{{ f.label }}</option>
         }
       </select>
@@ -96,7 +96,7 @@
         class="frame-select"
         [(ngModel)]="selectedMovingFrameId"
       >
-        @for (f of frameOptions; track f.id) {
+        @for (f of frameOptions(); track f.id) {
           <option [value]="f.id">{{ f.label }}</option>
         }
       </select>

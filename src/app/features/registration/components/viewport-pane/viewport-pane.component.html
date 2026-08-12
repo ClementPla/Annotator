@@ -13,7 +13,7 @@
   @if (showWarpedImg()) {
     <img
       class="warped-moving-overlay"
-      [src]="movingImageUrl!"
+      [src]="movingImageUrl()!"
       [style.width.px]="movingNativeWidth"
       [style.height.px]="movingNativeHeight"
       [style.transform]="warpedTransform()!"
@@ -135,7 +135,7 @@
     </div>
   }
 
-  @if (label) {
-    <div class="pane-tag">{{ label }}</div>
+  @if (label()) {
+    <div class="pane-tag">{{ label() }}</div>
   }
 </div>

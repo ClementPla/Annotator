@@ -3,14 +3,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
-  EventEmitter,
   HostListener,
   Input,
   OnChanges,
   OnDestroy,
-  Output,
   SimpleChanges,
-  ViewChild,
+  input,
+  output,
+  viewChild
 } from '@angular/core';
 import {
   CurveNode,
@@ -30,16 +30,15 @@ export class CurveEditorComponent
   implements AfterViewInit, OnChanges, OnDestroy
 {
   @Input() curve: CurvePoints = IDENTITY_CURVE.map((p) => ({ ...p }));
-  @Input() histogram: Uint32Array | null = null;
+  readonly histogram = input<Uint32Array | null>(null);
   /** Color for the curve line + selected node (channel tint). */
-  @Input() color = '#e0e0e0';
+  readonly color = input('#e0e0e0');
   /** Show grid lines. */
-  @Input() showGrid = true;
+  readonly showGrid = input(true);
 
-  @Output() curveChange = new EventEmitter<CurvePoints>();
+  readonly curveChange = output<CurvePoints>();
 
-  @ViewChild('canvas', { static: true })
-  canvasRef!: ElementRef<HTMLCanvasElement>;
+  readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
 
   private ctx!: CanvasRenderingContext2D;
   private dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -59,13 +58,13 @@ export class CurveEditorComponent
   private readonly maxNodes = 16;
 
   ngAfterViewInit() {
-    this.ctx = this.canvasRef.nativeElement.getContext('2d')!;
+    this.ctx = this.canvasRef().nativeElement.getContext('2d')!;
 
     this.resizeObserver = new ResizeObserver(() => {
       this.resizeCanvas();
       this.redraw();
     });
-    this.resizeObserver.observe(this.canvasRef.nativeElement);
+    this.resizeObserver.observe(this.canvasRef().nativeElement);
 
     // Initial sync if the element already has a size (active tab).
     this.resizeCanvas();
@@ -88,7 +87,7 @@ export class CurveEditorComponent
   }
 
   private resizeCanvas() {
-    const el = this.canvasRef.nativeElement;
+    const el = this.canvasRef().nativeElement;
     const rect = el.getBoundingClientRect();
     // Bail silently when the panel is hidden; the observer will fire again
     // when it becomes visible.
@@ -208,7 +207,7 @@ export class CurveEditorComponent
   };
 
   private localCoords(event: MouseEvent): { offsetX: number; offsetY: number } {
-    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+    const rect = this.canvasRef().nativeElement.getBoundingClientRect();
     return {
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
@@ -250,12 +249,12 @@ export class CurveEditorComponent
     this.ctx.fillRect(0, 0, w, h);
 
     // Histogram (behind everything else, semi-transparent)
-    if (this.histogram) {
+    if (this.histogram()) {
       this.drawHistogram(w, h);
     }
 
     // Grid
-    if (this.showGrid) this.drawGrid(w, h);
+    if (this.showGrid()) this.drawGrid(w, h);
 
     // Identity reference line
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
@@ -288,7 +287,7 @@ export class CurveEditorComponent
   }
 
   private drawHistogram(w: number, h: number) {
-    const hist = this.histogram!;
+    const hist = this.histogram()!;
     let max = 0;
     // Skip pure black/white peaks that dominate vertical scale
     for (let i = 1; i < 255; i++) if (hist[i] > max) max = hist[i];
@@ -305,7 +304,7 @@ export class CurveEditorComponent
 
   private drawCurve(w: number, h: number) {
     const lut = sampleCurve(this.curve);
-    this.ctx.strokeStyle = this.color;
+    this.ctx.strokeStyle = this.color();
     this.ctx.lineWidth = 2;
     this.ctx.beginPath();
     for (let i = 0; i < 256; i++) {
@@ -321,8 +320,8 @@ export class CurveEditorComponent
     for (let i = 0; i < this.curve.length; i++) {
       const { cx, cy } = this.curveToCanvas(this.curve[i]);
       const isActive = i === this.draggingIndex || i === this.hoverIndex;
-      this.ctx.fillStyle = isActive ? this.color : '#1a1a1a';
-      this.ctx.strokeStyle = this.color;
+      this.ctx.fillStyle = isActive ? this.color() : '#1a1a1a';
+      this.ctx.strokeStyle = this.color();
       this.ctx.lineWidth = 2;
       this.ctx.beginPath();
       this.ctx.arc(cx, cy, this.nodeRadius, 0, Math.PI * 2);

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { api, BatchClassificationPayload } from '../../lib/api';
 import { ClassificationService } from './classification.service';
 import { LabelsService } from './labels.service';
@@ -17,10 +17,9 @@ export type { BatchClassificationPayload };
   providedIn: 'root',
 })
 export class BatchAnnotationService {
-  constructor(
-    private classificationService: ClassificationService,
-    private labelsService: LabelsService,
-  ) {}
+  private classificationService = inject(ClassificationService);
+  private labelsService = inject(LabelsService);
+
 
   /**
    * Apply multiclass classification choices to multiple frames.

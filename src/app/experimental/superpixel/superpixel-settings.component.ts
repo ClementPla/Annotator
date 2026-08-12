@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { SliderModule } from 'primeng/slider';
@@ -14,7 +14,8 @@ import { SuperpixelService } from './superpixel.service';
   templateUrl: './superpixel-settings.component.html',
 })
 export class SuperpixelSettingsComponent {
-  constructor(public superpixel: SuperpixelService) {}
+  superpixel = inject(SuperpixelService);
+
 
   /** Toggle the superpixel boundary overlay on/off. */
   onToggleOverlay() {

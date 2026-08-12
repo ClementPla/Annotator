@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { path } from '@tauri-apps/api';
 import { loadImageFile } from '../core/save_load';
@@ -23,7 +23,7 @@ export interface ThumbnailOptions {
 export class ThumbnailService {
   private static readonly DEFAULT_THUMBNAIL_SIZE = 256;
 
-  constructor(private projectService: ProjectService) {}
+  private readonly projectService = inject(ProjectService);
 
   /**
    * Get thumbnail for an image.

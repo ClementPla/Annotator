@@ -1,5 +1,5 @@
 // cli.service.ts
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { from, Subject } from 'rxjs';
 import { ImageFromCLI } from './interface'
 import { TauriEventBase } from './tauri-event-base';
@@ -12,7 +12,9 @@ export class CLIService extends TauriEventBase {
   public projectCreated$ = new Subject<ProjectConfig>();
   public imageLoaded$ = new Subject<ImageFromCLI>();
 
-  constructor(ngZone: NgZone) {
+  constructor() {
+    const ngZone = inject(NgZone);
+
     super(ngZone);
     this.initializeListeners();
   }

@@ -2,12 +2,11 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  EventEmitter,
-  Input,
-  Output,
   computed,
   inject,
   signal,
+  input,
+  output
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -91,24 +90,24 @@ export class RegistrationSidebarComponent {
     return s.registered
   });
 
-  @Output() public backClicked = new EventEmitter<void>();
-  @Input() public frameOptions: FrameOption[] = [];
+  public readonly backClicked = output<void>();
+  public readonly frameOptions = input<FrameOption[]>([]);
   public isPrefilling = signal(false);
-  @Output() public movingFrameChange = new EventEmitter<string>();
+  public readonly movingFrameChange = output<string>();
   public portDialogOpen = signal(false);
-  @Output() public referenceFrameChange = new EventEmitter<string>();
+  public readonly referenceFrameChange = output<string>();
   public selectedFunctionName = signal<string | null>(null);
 
   // ── Registration cases (multiple frame pairs per sequence) ────────────────
   public readonly cases = this.state.cases;
   public readonly activeCaseKey = this.state.activeCaseKey;
-  @Output() public caseSelected = new EventEmitter<RegistrationCase>();
-  @Output() public caseDeleted = new EventEmitter<RegistrationCase>();
-  @Output() public newCaseRequested = new EventEmitter<void>();
+  public readonly caseSelected = output<RegistrationCase>();
+  public readonly caseDeleted = output<RegistrationCase>();
+  public readonly newCaseRequested = output<void>();
 
   /** Human-readable frame label for a frame id, falling back to the id. */
   public frameLabel(id: string): string {
-    return this.frameOptions.find((f) => f.id === id)?.label ?? `Frame ${id}`;
+    return this.frameOptions().find((f) => f.id === id)?.label ?? `Frame ${id}`;
   }
 
   public isActiveCase(c: RegistrationCase): boolean {

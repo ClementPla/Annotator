@@ -1,10 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Point2D } from '../interface';
 import { EditorService } from '../../services/editor.service';
 import { ProjectScoped } from '../../../../core/project-scoped';
 
 @Injectable({ providedIn: 'root' })
 export class StateManagerService implements ProjectScoped {
+  private editorService = inject(EditorService);
+
   /** Image native dimensions (px). */
   public width = 0;
   public height = 0;
@@ -15,8 +17,6 @@ export class StateManagerService implements ProjectScoped {
   public minPoint: Point2D = { x: Number.MAX_VALUE, y: Number.MAX_VALUE };
   public maxPoint: Point2D = { x: 0, y: 0 };
   public recomputeCanvasSum = false;
-
-  constructor(private editorService: EditorService) {}
 
   setWidthAndHeight(width: number, height: number) {
     this.width = width;

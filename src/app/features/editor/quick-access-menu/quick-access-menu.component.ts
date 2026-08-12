@@ -1,10 +1,4 @@
-import {
-  ChangeDetectorRef,
-  Component,
-  ElementRef,
-  NgZone,
-  ViewChild,
-} from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, NgZone, inject, viewChild } from '@angular/core';
 import {
   WheelMenuComponent,
   MenuItem,
@@ -23,14 +17,12 @@ import { ConvertService } from '../drawable-canvas/service/convert.service';
     styleUrl: './quick-access-menu.component.scss'
 })
 export class QuickAccessMenuComponent {
-  @ViewChild('quickAccessMenu') quickAccessMenu!: WheelMenuComponent;
+  private cdr = inject(ChangeDetectorRef);
+  private editorService = inject(EditorService);
+  private vectorEditor = inject(VectorEditorService);
+  private convertService = inject(ConvertService);
 
-  constructor(
-    private cdr: ChangeDetectorRef,
-    private editorService: EditorService,
-    private vectorEditor: VectorEditorService,
-    private convertService: ConvertService
-  ) {}
+  readonly quickAccessMenu = viewChild.required<WheelMenuComponent>('quickAccessMenu');
 
   public radius = 200;
 
@@ -183,7 +175,7 @@ export class QuickAccessMenuComponent {
     this.isOpen = true;
     // Wait until Angular finishes DOM updates
     this.cdr.detectChanges(); // flush the change so the element is visible
-    this.quickAccessMenu.focus();
+    this.quickAccessMenu().focus();
   }
 
   close() {

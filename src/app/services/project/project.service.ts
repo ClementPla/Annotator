@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { api, ProjectConfig, ScanResult } from '../../lib/api';
 import { LabelsService } from '../labels/labels.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
@@ -36,6 +36,9 @@ export interface RecentProject {
 
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
+  private labelService = inject(LabelsService);
+  private lifecycle = inject(ProjectLifecycleService);
+
   // Private state
   private readonly STORAGE_KEY = 'didascalie_recent_projects';
   private readonly _config = signal<ProjectConfig>(DEFAULT_PROJECT_CONFIG);
@@ -73,15 +76,6 @@ export class ProjectService {
   readonly imagesEmbedded = computed(() => this._config().images_embedded);
   // For backward compatibility in templates
   readonly hasTextDescription = this.isTextDescriptionEnabled;
-
-  // ==========================================
-  // Config Updates (before project is created)
-  // ==========================================
-
-  constructor(
-    private labelService: LabelsService,
-    private lifecycle: ProjectLifecycleService,
-  ) {}
 
   updateConfig(partial: Partial<ProjectConfig>): void {
     this._config.update((current) => ({ ...current, ...partial }));

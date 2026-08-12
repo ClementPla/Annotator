@@ -1,5 +1,5 @@
 
-import { ChangeDetectionStrategy, Component, EventEmitter, inject, Output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -27,21 +27,25 @@ interface ModeOption {
 })
 export class RegistrationToolbarComponent {
   // registration-toolbar.component.ts — add
-  @Output() previousClicked = new EventEmitter<void>();
-  @Output() nextClicked = new EventEmitter<void>();
-  @Output() saveClicked = new EventEmitter<void>();
-  @Output() openCompositeClicked = new EventEmitter<void>();
+  readonly previousClicked = output<void>();
+  readonly nextClicked = output<void>();
+  readonly saveClicked = output<void>();
+  readonly openCompositeClicked = output<void>();
 
   onPrevious(): void {
+    // TODO: The 'emit' function requires a mandatory void argument
     this.previousClicked.emit();
   }
   onNext(): void {
+    // TODO: The 'emit' function requires a mandatory void argument
     this.nextClicked.emit();
   }
   onSave(): void {
+    // TODO: The 'emit' function requires a mandatory void argument
     this.saveClicked.emit();
   }
   onOpenComposite(): void {
+    // TODO: The 'emit' function requires a mandatory void argument
     this.openCompositeClicked.emit();
   }
   readonly state = inject(RegistrationStateService);

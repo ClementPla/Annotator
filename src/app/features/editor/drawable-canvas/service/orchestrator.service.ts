@@ -1,4 +1,4 @@
-import { Injectable, Injector } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { auditTime, BehaviorSubject, merge, Subject, animationFrameScheduler } from 'rxjs';
 import { notifyExperimentalImageLoaded } from '../../../../experimental/registry';
 
@@ -27,6 +27,17 @@ const PYRAMID_REBUILD_MS = 150;
 
 @Injectable({ providedIn: 'root' })
 export class OrchestratorService {
+  private state = inject(StateManagerService);
+  private imageProc = inject(ImageAdjustmentService);
+  private canvasManager = inject(CanvasManagerService);
+  private undoRedo = inject(UndoRedoService);
+  private postProcess = inject(PostProcessService);
+  private zoomPan = inject(ZoomPanService);
+  private drawService = inject(DrawService);
+  private editorService = inject(EditorService);
+  private pyramid = inject(PyramidService);
+  private injector = inject(Injector);
+
   private isReadySubject = new BehaviorSubject<boolean>(false);
   public isReady$ = this.isReadySubject.asObservable();
 
@@ -47,18 +58,7 @@ export class OrchestratorService {
   private pyramidVersion = 0;
   private pyramidRebuildTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    private state: StateManagerService,
-    private imageProc: ImageAdjustmentService,
-    private canvasManager: CanvasManagerService,
-    private undoRedo: UndoRedoService,
-    private postProcess: PostProcessService,
-    private zoomPan: ZoomPanService,
-    private drawService: DrawService,
-    private editorService: EditorService,
-    private pyramid: PyramidService,
-    private injector: Injector,
-  ) {
+  constructor() {
     this.initializeRedrawAggregation();
 
     // The processed image changed (frame load, brightness/gamma, …) — rebuild

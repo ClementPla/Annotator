@@ -1,4 +1,4 @@
-import { ErrorHandler, Injectable, Injector, NgZone } from '@angular/core';
+import { ErrorHandler, Injectable, Injector, NgZone, inject } from '@angular/core';
 import { NotificationService } from './notification.service';
 
 /**
@@ -12,10 +12,9 @@ import { NotificationService } from './notification.service';
  */
 @Injectable()
 export class GlobalErrorHandler implements ErrorHandler {
-  constructor(
-    private readonly injector: Injector,
-    private readonly zone: NgZone,
-  ) {}
+  private readonly injector = inject(Injector);
+  private readonly zone = inject(NgZone);
+
 
   handleError(error: unknown): void {
     // Always keep the full error in the console for developers.

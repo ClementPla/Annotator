@@ -1,10 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { Point2D, Rect, Viewbox } from '../interface';
 import { StateManagerService } from './state-manager.service';
 
 @Injectable({ providedIn: 'root' })
 export class ZoomPanService {
+  private stateService = inject(StateManagerService);
+
   // === View transform (CSS px space) ===
   /** CSS px per image px. */
   public scale = 1;
@@ -38,8 +40,6 @@ export class ZoomPanService {
   private canPan = true;
 
   public redrawRequest = new Subject<boolean>();
-
-  constructor(private stateService: StateManagerService) {}
 
   // ==========================================
   // Setup

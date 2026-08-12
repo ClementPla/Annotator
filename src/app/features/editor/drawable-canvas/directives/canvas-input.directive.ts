@@ -1,4 +1,4 @@
-import { Directive, EventEmitter, HostListener, Output } from '@angular/core';
+import { Directive, HostListener, inject, output } from '@angular/core';
 import { ZoomPanService } from '../service/zoom-pan.service';
 import { EditorService } from '../../services/editor.service';
 import { DrawService } from '../service/draw.service';
@@ -11,27 +11,25 @@ import { Point2D } from '../interface';
   standalone: true,
 })
 export class CanvasInputDirective {
-  @Output() canvasMove = new EventEmitter<{
+  private zoomPanService = inject(ZoomPanService);
+  private editorService = inject(EditorService);
+  private drawService = inject(DrawService);
+  private vectorEditor = inject(VectorEditorService);
+  private convertService = inject(ConvertService);
+
+  readonly canvasMove = output<{
     event: MouseEvent;
-    coords: Point2D;   // image space (px, clamped, integer)
-    cursor: Point2D;   // viewport space (CSS px)
-  }>();
-  @Output() canvasUp = new EventEmitter<MouseEvent>();
+    coords: Point2D; // image space (px, clamped, integer)
+    cursor: Point2D; // viewport space (CSS px)
+}>();
+  readonly canvasUp = output<MouseEvent>();
   /** Right-click on the canvas, for the label picker. */
-  @Output() contextMenu = new EventEmitter<MouseEvent>();
+  readonly contextMenu = output<MouseEvent>();
 
   // Two-finger pinch state
   private pinchActive = false;
   private lastPinchDist = 0;
   private lastPinchMid: Point2D = { x: 0, y: 0 };
-
-  constructor(
-    private zoomPanService: ZoomPanService,
-    private editorService: EditorService,
-    private drawService: DrawService,
-    private vectorEditor: VectorEditorService,
-    private convertService: ConvertService,
-  ) {}
 
   // ==========================================
   // Mouse
