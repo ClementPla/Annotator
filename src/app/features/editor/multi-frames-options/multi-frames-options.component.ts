@@ -1,4 +1,4 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
@@ -21,6 +21,7 @@ import { SequenceService } from '../../../services/sequence.service';
   standalone: true,
   templateUrl: './multi-frames-options.component.html',
   styleUrl: './multi-frames-options.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MultiFramesOptionsComponent {
   sequenceService = inject(SequenceService);

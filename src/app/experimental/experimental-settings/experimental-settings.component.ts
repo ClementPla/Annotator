@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
@@ -13,6 +13,7 @@ import { EXPERIMENTAL_FEATURES } from '../registry';
   standalone: true,
   imports: [ButtonModule, PopoverModule, TooltipModule, GenericsModule],
   templateUrl: './experimental-settings.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExperimentalSettingsComponent {
   flags = inject(FeatureFlagsService);

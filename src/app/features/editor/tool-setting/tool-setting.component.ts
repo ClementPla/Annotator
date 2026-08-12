@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { PanelModule } from 'primeng/panel';
 import { AccordionModule } from 'primeng/accordion';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
@@ -39,6 +39,7 @@ import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/
     templateUrl: './tool-setting.component.html',
     styleUrl: './tool-setting.component.scss',
     standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ToolSettingComponent {
   editorService = inject(EditorService);
