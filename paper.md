@@ -190,8 +190,9 @@ Development began in 2024, without generative AI.
 <!-- TODO: check the starting date and the model versions below. -->
 Since 2026, Claude Code (Anthropic), with the Claude Sonnet and Opus models
 available at the time, up to Claude Opus 5.5, has been used to implement features, write tests, fix defects and draft the documentation, from
-requirements and design decisions set by the author. It was also used to draft and
-edit this manuscript. The author chose the architecture and the project format,
+requirements and design decisions set by the author. It also assisted in writing this
+manuscript and revising its language; the author determined its content, structure
+and claims. The author chose the architecture and the project format,
 reviewed the generated code and text, and edited or rejected them where needed.
 Generated code was validated by the unit tests and continuous integration of the
 repository, and by use of the application on real data, by the author and by the
