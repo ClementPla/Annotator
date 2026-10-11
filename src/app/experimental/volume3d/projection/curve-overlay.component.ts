@@ -18,6 +18,7 @@ import { Point, splinePath } from './curve';
 import { CurveId, ProjectionService } from './projection.service';
 import { ProjectionPainterService } from './projection-painter.service';
 import { Volume3dSettingsService } from '../volume3d-settings.service';
+import { VolumeLayoutService } from '../volume-layout.service';
 
 /** Screen-space sizes, in CSS px. */
 const ANCHOR_RADIUS = 5;
@@ -61,13 +62,15 @@ export class CurveOverlayComponent {
   private readonly editor = inject(EditorService);
   private readonly painter = inject(ProjectionPainterService);
   private readonly settings = inject(Volume3dSettingsService).settings;
+  private readonly layout = inject(VolumeLayoutService);
 
   readonly colors = CURVE_COLORS;
   readonly viewBox = signal('0 0 1 1');
   /** Image px per screen px: keeps anchors and strokes a fixed screen size. */
   readonly unit = signal(1);
 
-  readonly visible = computed(() => this.volume.enabled());
+  /** A maximized view covers the canvas the curves are drawn on. */
+  readonly visible = computed(() => this.volume.enabled() && !this.layout.maximized());
   /** The overlay takes every click while placing or picking. */
   readonly capturing = computed(() => !!this.projection.placing() || !!this.projection.picking());
   readonly pathA = computed(() => splinePath(this.projection.curves().a));

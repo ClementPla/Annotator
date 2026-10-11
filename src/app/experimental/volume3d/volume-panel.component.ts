@@ -23,6 +23,8 @@ import { VolumeLayoutService, VolumeViewId } from './volume-layout.service';
 const WIDTH_KEY = 'didascalie.volume3d.paneWidth';
 const MIN_WIDTH = 240;
 const RAIL_WIDTH = 28;
+/** Height a view keeps when the other takes the rest: its header stays reachable. */
+const MIN_VIEW_HEIGHT = 40;
 
 const TITLES: Record<VolumeViewId, string> = {
   '3d': 'Didascalie · 3D view',
@@ -120,6 +122,8 @@ const TITLES: Record<VolumeViewId, string> = {
     '[class.relative]': '!layout.maximized()',
     '[class.hidden]': '!volume.enabled()',
     '[style.width.px]': 'hostWidth()',
+    // A stored width can exceed a window made smaller since.
+    style: 'max-width: 100%',
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -128,6 +132,7 @@ export class VolumePanelComponent implements OnDestroy {
   readonly layout = inject(VolumeLayoutService);
   private readonly settingsService = inject(Volume3dSettingsService);
   private readonly notifications = inject(NotificationService);
+  private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
   readonly settings = this.settingsService.settings;
 
   private readonly column = viewChild<ElementRef<HTMLDivElement>>('column');
@@ -253,10 +258,11 @@ export class VolumePanelComponent implements OnDestroy {
   startResize(event: PointerEvent): void {
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = this.width();
+    // The row shared with the editor canvas is the only upper bound.
+    const max = this.host.nativeElement.parentElement?.clientWidth ?? window.innerWidth;
+    const startWidth = Math.min(max, this.width());
     track(
       (e) => {
-        const max = window.innerWidth * 0.7;
         this.width.set(Math.round(Math.min(max, Math.max(MIN_WIDTH, startWidth + startX - e.clientX))));
       },
       () => writeWidth(this.width()),
@@ -268,9 +274,10 @@ export class VolumePanelComponent implements OnDestroy {
     const column = this.column();
     if (!column) return;
     const rect = column.nativeElement.getBoundingClientRect();
+    const min = Math.min(0.5, MIN_VIEW_HEIGHT / rect.height);
     track((e) => {
       const split = (e.clientY - rect.top) / rect.height;
-      this.settingsService.update({ split: Math.min(0.85, Math.max(0.15, split)) });
+      this.settingsService.update({ split: Math.min(1 - min, Math.max(min, split)) });
     });
   }
 }
