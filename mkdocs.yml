@@ -8,6 +8,8 @@ edit_uri: edit/release/docs/
 theme:
   name: material
   language: en
+  logo: assets/logo.svg
+  favicon: assets/favicon.png
   features:
     - navigation.instant
     - navigation.tracking

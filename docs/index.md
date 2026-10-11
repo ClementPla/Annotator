@@ -1,5 +1,7 @@
 # Didascalie
 
+![Didascalie logo](assets/logo.svg){ width="110" align=right }
+
 Didascalie is a desktop application for annotating medical and biomedical images.
 Drawing, image processing and model training all run on your own machine. Nothing
 is uploaded.

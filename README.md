@@ -1,3 +1,7 @@
+<p align="center">
+  <img alt="Didascalie logo" src="docs/assets/logo.svg" width="140">
+</p>
+
 <h1 align="center">Didascalie</h1>
 
 <p align="center">
