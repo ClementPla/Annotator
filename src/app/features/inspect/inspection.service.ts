@@ -135,6 +135,7 @@ export class InspectionService implements ProjectScoped {
     try {
       localStorage.setItem(SIDEBAR_WIDTH_KEY, String(this.sidebarWidth()));
     } catch {
+      // Not persisted.
     }
   }
 
@@ -155,6 +156,7 @@ function readSidebarWidth(): number {
     const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
     if (stored >= MIN_SIDEBAR_WIDTH) return stored;
   } catch {
+    // Storage unavailable: default width.
   }
   return DEFAULT_SIDEBAR_WIDTH;
 }

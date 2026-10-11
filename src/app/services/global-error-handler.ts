@@ -26,6 +26,7 @@ export class GlobalErrorHandler implements ErrorHandler {
           .get(NotificationService)
           .error('Something went wrong', detail);
       } catch {
+        // Notifications are not available yet.
       }
     });
   }

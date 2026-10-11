@@ -2,7 +2,6 @@
 import type { Role } from "./Role";
 
 /**
- * An account as the frontend sees it. The password never leaves the backend,
- * only whether there is one.
+ * An account as the frontend sees it: the password never leaves the backend.
  */
 export type UserInfo = { id: number, name: string, role: Role, hasPassword: boolean, };

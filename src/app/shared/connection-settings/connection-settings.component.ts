@@ -108,6 +108,7 @@ export class ConnectionSettingsComponent {
     try {
       await this.inference.connect(this.host().trim(), this.port());
     } catch {
+      // The status line already says the server is not there.
     }
   }
 

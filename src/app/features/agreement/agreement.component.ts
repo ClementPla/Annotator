@@ -276,6 +276,7 @@ export class AgreementComponent implements OnInit, OnDestroy {
     try {
       localStorage.setItem(STYLE_KEY, JSON.stringify(style));
     } catch {
+      // Not stored: applied for this visit only.
     }
     void this.loadView();
     void this.loadThumbs();

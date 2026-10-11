@@ -2,10 +2,8 @@
 import type { TaskKind } from "./TaskKind";
 
 /**
- * One change to the project's configuration.
- *
- * Labels are addressed by id, which never changes. Tasks, classes and text
- * fields have no id — their name is their identity in the stored annotations —
- * so they are addressed by their current name.
+ * One change to the project's configuration. Labels are addressed by id;
+ * tasks, classes and text fields by their current name, which is their
+ * identity in the stored annotations.
  */
 export type ProjectEdit = { "type": "renameProject", name: string, } | { "type": "addLabel", name: string, color: string, } | { "type": "renameLabel", id: number, name: string, } | { "type": "recolorLabel", id: number, color: string, } | { "type": "deleteLabel", id: number, } | { "type": "reorderLabels", ids: Array<number>, } | { "type": "setTaskEnabled", task: TaskKind, enabled: boolean, } | { "type": "addMulticlassTask", name: string, } | { "type": "addMultilabelTask", name: string, } | { "type": "renameTask", name: string, newName: string, } | { "type": "deleteTask", name: string, } | { "type": "addClass", task: string, name: string, } | { "type": "renameClass", task: string, name: string, newName: string, } | { "type": "deleteClass", task: string, name: string, } | { "type": "addTextField", name: string, } | { "type": "renameTextField", name: string, newName: string, } | { "type": "deleteTextField", name: string, };

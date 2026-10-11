@@ -31,6 +31,7 @@ function storedEndpoint(): InferenceEndpoint {
       return { host: parsed.host, port: parsed.port };
     }
   } catch {
+    // Unreadable preference: the default.
   }
   return DEFAULT_ENDPOINT;
 }

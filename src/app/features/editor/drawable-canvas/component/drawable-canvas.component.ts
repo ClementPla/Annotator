@@ -252,6 +252,7 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
         toggle: data.event.ctrlKey || data.event.metaKey,
       });
     } else if (this.editorService.isVectorizeTool()) {
+      // A click-only tool: nothing to draw on move.
     } else {
       this.drawService.draw(data.event);
     }

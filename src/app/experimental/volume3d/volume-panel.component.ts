@@ -291,6 +291,7 @@ function readWidth(): number {
     const stored = Number(localStorage.getItem(WIDTH_KEY));
     if (stored >= MIN_WIDTH) return stored;
   } catch {
+    // Storage unavailable: default width.
   }
   return Math.round(Math.min(560, window.innerWidth * 0.35));
 }
@@ -299,5 +300,6 @@ function writeWidth(width: number): void {
   try {
     localStorage.setItem(WIDTH_KEY, String(width));
   } catch {
+    // Not persisted.
   }
 }
