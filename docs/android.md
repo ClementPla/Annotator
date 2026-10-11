@@ -56,28 +56,72 @@ on that copy:
     - pen side button: a stroke with the button held erases, pans or opens the
       label picker. Hold the button before the pen touches the screen.
 
-## Building the APK
+## Building and installing
 
-You need what a desktop build needs (see [Installing](install.md#building-from-source)),
-plus Android Studio with the SDK and NDK, a JDK 17, and the Android Rust target:
+### Requirements
+
+What a desktop build needs (see [Installing](install.md#building-from-source)),
+plus:
+
+- Android Studio, with the SDK, its build tools and the NDK (**SDK Manager** →
+  **SDK Tools**);
+- a JDK 17;
+- the Android Rust target: `rustup target add aarch64-linux-android`.
+
+Three environment variables must be set:
+
+| Variable | Points to |
+| --- | --- |
+| `ANDROID_HOME` | the SDK folder |
+| `NDK_HOME` | one version folder under `$ANDROID_HOME/ndk/` |
+| `JAVA_HOME` | the JDK 17 |
+
+### Build
+
+From the repository:
 
 ```bash
-rustup target add aarch64-linux-android
+npm install
 npx tauri android build --apk --target aarch64
 ```
 
-`ANDROID_HOME`, `NDK_HOME` and `JAVA_HOME` must be set. The result is an
-unsigned APK under
-`src-tauri/gen/android/app/build/outputs/apk/universal/release/`.
+The first build takes a while. The result is an unsigned APK:
+`src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk`.
 
-Android only installs signed APKs. Sign it with a key of your own and install it
-over USB:
+### Sign
+
+Android only installs signed APKs. Create a key once:
 
 ```bash
-zipalign -p 4 app-universal-release-unsigned.apk didascalie.apk
+keytool -genkeypair -keystore my-key.jks -alias didascalie -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then align and sign the APK. `zipalign` and `apksigner` are in
+`$ANDROID_HOME/build-tools/<version>/`:
+
+```bash
+zipalign -f -p 4 app-universal-release-unsigned.apk didascalie.apk
 apksigner sign --ks my-key.jks didascalie.apk
-adb install -r didascalie.apk
 ```
 
 Keep the key: an update must be signed with the same one, or Android refuses it
-until the application is uninstalled.
+until the application is uninstalled, which deletes the projects stored on the
+tablet.
+
+### Install
+
+On the tablet, turn on the developer options (**Settings** → **About tablet** →
+**Software information**, tap **Build number** seven times), then **USB
+debugging** in **Developer options**. Plug the tablet in and accept the prompt
+it shows.
+
+```bash
+adb devices
+adb install -r didascalie.apk
+```
+
+`adb` is in `$ANDROID_HOME/platform-tools/`. `-r` replaces an installed version
+and keeps its projects. Without a cable, copy the APK to the tablet and open it
+from a file manager; Android asks to allow installing from that source.
+
+To update, pull the repository and repeat the build, sign and install steps.
