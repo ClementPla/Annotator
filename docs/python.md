@@ -41,9 +41,35 @@ analysis.
 
 ## Accounts
 
-The library does not know about [accounts](guide/multi-user.md) yet. A project it
-creates has none; the application adds one administrator account the first time
-it opens the file, and that account owns everything the library wrote.
+A project the library creates has no [accounts](guide/multi-user.md). The
+application adds one administrator account the first time it opens the file, and
+that account owns everything the library wrote.
+
+On a project that has accounts, the library reads and writes the annotations of
+one account at a time: the first administrator by default, or the one you name.
+
+```python
+from didascalie import DidascalieProject
+
+with DidascalieProject("study.dida", user="First observer") as project:
+    print([u.name for u in project.get_users()])
+    project.set_user("Second observer")   # switch account
+```
+
+`enable_user_accounts()` gives accounts to a project without them, as the
+application does, and `add_user()` adds one. This is how to keep a model's
+predictions next to the annotators' work instead of over it:
+
+```python
+with DidascalieProject("study.dida") as project:
+    project.add_user("unet-v2")
+    project.set_user("unet-v2")
+    project.add_annotation(frame_id, label_id, mask)
+```
+
+The model then appears as one more grader on the
+[inter-grader agreement](guide/multi-user.md) page, where it is compared with the
+annotators or with another model.
 
 ## The round trip
 
