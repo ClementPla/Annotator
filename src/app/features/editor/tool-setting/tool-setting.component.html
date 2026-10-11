@@ -77,41 +77,54 @@
                     ></p-toggleswitch>
                   </div>
 
-                  <div
-                    class="switch-row"
-                    pTooltip="Close small gaps and round ragged edges."
-                  >
-                    <label class="switch-row__label" for="pp-smooth"
-                      >Smooth</label
+                  @if (isOtsu()) {
+                    <div
+                      class="setting-row"
+                      pTooltip="Blur the image before thresholding it, so that pixel noise does not end up in the outline."
                     >
-                    <p-toggleswitch
-                      inputId="pp-smooth"
-                      [(ngModel)]="editorService.autoPostProcessOpening"
-                    ></p-toggleswitch>
-                  </div>
-                  @if (editorService.autoPostProcessOpening) {
-                    <div class="setting-row">
-                      <label class="setting-row__label" for="morpho-size"
-                        >Radius</label
-                      >
+                      <span class="setting-row__label">Denoise</span>
                       <p-slider
-                        [(ngModel)]="editorService.morphoSize"
-                        [min]="1"
-                        [max]="15"
-                        [step]="2"
+                        [(ngModel)]="editorService.denoise"
+                        [min]="0"
+                        [max]="4"
+                        [step]="0.5"
+                        ariaLabel="Denoise"
                       ></p-slider>
-                      <input
-                        id="morpho-size"
-                        type="number"
-                        pInputText
-                        class="setting-row__value"
-                        [(ngModel)]="editorService.morphoSize"
-                        min="1"
-                        max="15"
-                        step="2"
-                      />
+                      <span class="setting-row__value setting-row__value--readonly"
+                        >{{ editorService.denoise | number: '1.1-1' }} px</span
+                      >
                     </div>
                   }
+
+                  <div
+                    class="setting-row"
+                    pTooltip="Round the outline. Relative to the brush size: at 100 %, what is narrower than about half the brush is rounded off."
+                  >
+                    <span class="setting-row__label">Smooth</span>
+                    <p-slider
+                      [(ngModel)]="editorService.smoothing"
+                      [min]="0"
+                      [max]="100"
+                      [step]="5"
+                      ariaLabel="Smooth the outline"
+                    ></p-slider>
+                    <span class="setting-row__value setting-row__value--readonly"
+                      >{{ editorService.smoothing }} %</span
+                    >
+                  </div>
+
+                  <div
+                    class="switch-row"
+                    pTooltip="Fill the holes enclosed in the selection."
+                  >
+                    <label class="switch-row__label" for="pp-fill-holes"
+                      >Fill holes</label
+                    >
+                    <p-toggleswitch
+                      inputId="pp-fill-holes"
+                      [(ngModel)]="editorService.fillHoles"
+                    ></p-toggleswitch>
+                  </div>
 
                   <div
                     class="switch-row"

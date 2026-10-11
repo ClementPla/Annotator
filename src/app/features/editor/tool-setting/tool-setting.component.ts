@@ -57,6 +57,10 @@ export class ToolSettingComponent {
   ];
 
   /** The selected mode has the invert / smooth / connectivity options. */
+  isOtsu(): boolean {
+    return this.editorService.postProcessOption === PostProcessOption.OTSU;
+  }
+
   isRefinable(): boolean {
     return REFINABLE_POST_PROCESS.includes(this.editorService.postProcessOption);
   }

@@ -1,10 +1,7 @@
 use super::images::{convert_image_to_luma_u8_array, convert_image_to_mask_array};
-use image::{GrayImage, Luma};
-use imageproc::region_labelling::{connected_components, Connectivity};
-use itertools::Itertools;
+use super::refine::{denoise, refine, Refine};
 use ndarray::{Array2, Zip};
-use std::collections::HashMap;
-use tauri::{self, ipc::Response}; // for .into_par_iter()
+use tauri::{self, ipc::Response};
 
 fn otsu_level(pixels: &Vec<u8>) -> u8 {
     let mut histogram = [0u32; 256];
@@ -96,145 +93,14 @@ fn otsu_in_mask(
     Ok(refined_mask)
 }
 
-fn dilation(mask: &Array2<bool>, kernel_size: u8) -> Array2<bool> {
-    let (height, width) = mask.dim();
-    let mut result = Array2::from_elem((height, width), false);
-
-    let radius = kernel_size as i32 / 2;
-
-    let mut disk_offsets = Vec::new();
-    for dy in -radius..=radius {
-        for dx in -radius..=radius {
-            if (dx * dx + dy * dy) <= (radius * radius) {
-                disk_offsets.push((dx, dy));
-            }
-        }
-    }
-
-    for y in 0..height {
-        for x in 0..width {
-            let mut any_foreground = false;
-
-            for &(dx, dy) in &disk_offsets {
-                let nx = x as i32 + dx;
-                let ny = y as i32 + dy;
-
-                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                    if mask[[ny as usize, nx as usize]] {
-                        any_foreground = true;
-                        break;
-                    }
-                }
-            }
-
-            result[[y, x]] = any_foreground;
-        }
-    }
-
-    result
-}
-
-fn erosion(mask: &Array2<bool>, kernel_size: u8) -> Array2<bool> {
-    let (height, width) = mask.dim();
-    let mut result = Array2::from_elem((height, width), false);
-
-    let radius = kernel_size as i32 / 2;
-
-    let mut disk_offsets = Vec::new();
-    for dy in -radius..=radius {
-        for dx in -radius..=radius {
-            if (dx * dx + dy * dy) <= (radius * radius) {
-                disk_offsets.push((dx, dy));
-            }
-        }
-    }
-
-    for y in 0..height {
-        for x in 0..width {
-            let mut all_foreground = true;
-
-            for &(dx, dy) in &disk_offsets {
-                let nx = x as i32 + dx;
-                let ny = y as i32 + dy;
-
-                if nx < 0 || nx >= width as i32 || ny < 0 || ny >= height as i32 {
-                    all_foreground = false;
-                    break;
-                }
-
-                if !mask[[ny as usize, nx as usize]] {
-                    all_foreground = false;
-                    break;
-                }
-            }
-
-            result[[y, x]] = all_foreground;
-        }
-    }
-
-    result
-}
-
-/// Clean up a binary selection: optional morphological closing and optional
-/// largest-connected-component filter. Shared by Otsu and flood fill.
-pub(crate) fn morpho_mask(
-    mask: &Array2<bool>,
-    opening: bool,
-    enforce_connectedness: bool,
-    kernel_size: u8,
-) -> Array2<bool> {
-    let mask_image = mask.map(|&v| if v { 255u8 } else { 0u8 });
-    let (height, width) = mask_image.dim();
-    let (raw_vec, _) = mask_image.into_raw_vec_and_offset();
-    let mut morphed: GrayImage = GrayImage::from_raw(width as u32, height as u32, raw_vec).unwrap();
-
-    if opening {
-        let dilated = dilation(mask, 2 * kernel_size);
-        let closed = erosion(&dilated, 2 * kernel_size);
-        morphed = GrayImage::from_fn(width as u32, height as u32, |x, y| {
-            if closed[[y as usize, x as usize]] {
-                Luma([255])
-            } else {
-                Luma([0])
-            }
-        });
-    }
-    if enforce_connectedness {
-        let background = Luma([0]);
-        let cc = connected_components(&morphed, Connectivity::Eight, background);
-
-        let kmers = cc.iter().copied().collect::<Vec<u32>>();
-        let nodes: HashMap<u32, usize> = kmers.iter().copied().counts();
-        let largest_kmer = kmers
-            .iter()
-            .copied()
-            .filter(|&kmer| kmer != 0)
-            .max_by_key(|&kmer| nodes[&kmer]);
-
-        if let Some(largest_kmer) = largest_kmer {
-            morphed = GrayImage::from_fn(cc.width(), cc.height(), |x, y| {
-                if cc.get_pixel(x, y)[0] == largest_kmer && cc.get_pixel(x, y)[0] != 0 {
-                    Luma([255])
-                } else {
-                    Luma([0])
-                }
-            });
-        }
-    }
-
-    Array2::from_shape_fn(
-        (morphed.height() as usize, morphed.width() as usize),
-        |(y, x)| morphed.get_pixel(x as u32, y as u32)[0] > 0,
-    )
-}
-
 #[tauri::command]
 pub async fn otsu_segmentation(
     image: Vec<u8>,
     mask: Vec<u8>,
-    opening: bool,
     inverse: bool,
-    kernel_size: u8,
+    denoise_sigma: f32,
+    smooth: f32,
+    fill_holes: bool,
     connectedness: bool,
     width: usize,
     height: usize,
@@ -248,13 +114,15 @@ pub async fn otsu_segmentation(
         image::RgbaImage::from_raw(width as u32, height as u32, mask).unwrap(),
     );
 
-    let image = convert_image_to_luma_u8_array(&image);
+    // Thresholding a lightly blurred image gives an outline free of pixel
+    // noise that still follows the real edge.
+    let image = denoise(&convert_image_to_luma_u8_array(&image), denoise_sigma);
     let mask = convert_image_to_mask_array(&mask);
 
-    let mut refined_mask = otsu_in_mask(&image, &mask, inverse)?;
-
-    let morphed_mask = morpho_mask(&refined_mask, opening, connectedness, kernel_size);
-    refined_mask.assign(&morphed_mask);
+    let refined_mask = refine(
+        &otsu_in_mask(&image, &mask, inverse)?,
+        &Refine { fill_holes, smooth, largest_only: connectedness },
+    );
 
     // Single-channel presence mask (255 = foreground), row-major.
     let mut output = vec![0u8; width * height];

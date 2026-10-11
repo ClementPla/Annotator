@@ -3,6 +3,7 @@ pub mod superpixel;
 pub mod images;
 pub mod io;
 pub mod segmentation;
+pub mod refine;
 pub mod annotation;
 pub mod project;
 pub mod users;

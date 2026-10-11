@@ -1,4 +1,4 @@
-use crate::commands::segmentation::morpho_mask;
+use crate::commands::refine::{refine, Refine};
 use crate::utils::color::{ciede2000, rgb_to_lab};
 use ndarray::Array2;
 use std::collections::VecDeque;
@@ -16,8 +16,8 @@ pub fn flood_fill_mask(
     start_y: usize,
     tolerance: f32,
     inverse: bool,
-    opening: bool,
-    kernel_size: u8,
+    smooth: f32,
+    fill_holes: bool,
     connectedness: bool,
 ) -> Result<Response, String> {
     if start_x >= width || start_y >= height {
@@ -109,13 +109,14 @@ pub fn flood_fill_mask(
         elapsed.as_secs_f64() * 1000.0
     );
 
-    let mut selection = Array2::from_shape_fn((height, width), |(y, x)| {
+    let selection = Array2::from_shape_fn((height, width), |(y, x)| {
         let filled = output_mask[y * width + x];
         if inverse { !filled } else { filled }
     });
-    if opening || connectedness {
-        selection = morpho_mask(&selection, opening, connectedness, kernel_size);
-    }
+    let selection = refine(
+        &selection,
+        &Refine { fill_holes, smooth, largest_only: connectedness },
+    );
 
     // Single-channel presence mask (255 = selected), row-major.
     let output_data: Vec<u8> = selection

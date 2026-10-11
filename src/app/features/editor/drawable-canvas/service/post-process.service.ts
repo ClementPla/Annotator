@@ -40,6 +40,19 @@ export class PostProcessService {
       | null;
   }
 
+  /** The refinement options Otsu and flood fill share. */
+  private refinement() {
+    const { smoothing, lineWidth, useInverse, fillHoles, enforceConnectivity } =
+      this.editorService;
+    return {
+      inverse: useInverse,
+      // At 100 %, what is narrower than about half the brush is rounded off.
+      smooth: (smoothing / 100) * (lineWidth / 3),
+      fillHoles,
+      connectedness: enforceConnectivity,
+    };
+  }
+
   async otsu_post_process() {
     const w = this.stateService.width;
     const h = this.stateService.height;
@@ -54,10 +67,8 @@ export class PostProcessService {
     const result = await invoke<ArrayBufferLike>('otsu_segmentation', {
       mask: maskData.buffer,
       image: imageData.buffer,
-      opening: this.editorService.autoPostProcessOpening,
-      inverse: this.editorService.useInverse,
-      kernelSize: this.editorService.morphoSize,
-      connectedness: this.editorService.enforceConnectivity,
+      denoiseSigma: this.editorService.denoise,
+      ...this.refinement(),
       width: rect.width,
       height: rect.height,
     });
@@ -86,10 +97,7 @@ export class PostProcessService {
       startX: clickX,
       startY: clickY,
       tolerance: this.editorService.floodFillTolerance,
-      inverse: this.editorService.useInverse,
-      opening: this.editorService.autoPostProcessOpening,
-      kernelSize: this.editorService.morphoSize,
-      connectedness: this.editorService.enforceConnectivity,
+      ...this.refinement(),
     });
 
     const mask = this.canvasManagerService.getActiveMask();

@@ -16,10 +16,15 @@ changes pixels inside the area your stroke covered.
 | Superpixel selection | Snaps the mask to superpixel boundaries ([experimental](../experimental.md#superpixel-selection)) |
 | Connected-component erasure | Removes the connected region you click |
 
-Two options apply to several of them:
+Otsu and flood fill share three options:
 
-- **Morphological opening** removes speckle left by a threshold.
-- **Connectivity constraint** keeps only the component touching your stroke.
+- **Smooth** rounds the outline. Its strength is relative to the brush size:
+  at 100 %, what is narrower than about half the brush is rounded off.
+- **Fill holes** fills the holes enclosed in the selection.
+- **Force connectivity** keeps only the largest region.
+
+Otsu also has **Denoise**, which blurs the image before thresholding it, so
+that pixel noise does not end up in the outline.
 
 ![Assisted labelling with Otsu thresholding](../assets/screenshots/assisted_labelling.gif)
 ### Adjustments can feed the operators

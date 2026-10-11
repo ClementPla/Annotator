@@ -38,17 +38,25 @@ export class EditorService {
   get eraserPostProcess(): boolean { return this._eraserPostProcess(); }
   set eraserPostProcess(v: boolean) { this._eraserPostProcess.set(v); }
 
-  private readonly _autoPostProcessOpening = signal(false);
-  get autoPostProcessOpening(): boolean { return this._autoPostProcessOpening(); }
-  set autoPostProcessOpening(v: boolean) { this._autoPostProcessOpening.set(v); }
+  /** Outline smoothing of a refined stroke, 0..100: a share of the brush
+   *  size, so one setting suits small and large structures alike. */
+  private readonly _smoothing = signal(0);
+  get smoothing(): number { return this._smoothing(); }
+  set smoothing(v: number) { this._smoothing.set(v); }
+
+  private readonly _fillHoles = signal(false);
+  get fillHoles(): boolean { return this._fillHoles(); }
+  set fillHoles(v: boolean) { this._fillHoles.set(v); }
+
+  /** Blur applied to the image before Otsu thresholds it, in pixels. */
+  private readonly _denoise = signal(0);
+  get denoise(): number { return this._denoise(); }
+  set denoise(v: number) { this._denoise.set(v); }
 
   private readonly _postProcessOption = signal<PostProcessOption>(PostProcessOption.OTSU);
   get postProcessOption(): PostProcessOption { return this._postProcessOption(); }
   set postProcessOption(v: PostProcessOption) { this._postProcessOption.set(v); }
 
-  private readonly _morphoSize = signal(3);
-  get morphoSize(): number { return this._morphoSize(); }
-  set morphoSize(v: number) { this._morphoSize.set(v); }
 
   private readonly _edgesOnly = signal(false);
   get edgesOnly(): boolean { return this._edgesOnly(); }
