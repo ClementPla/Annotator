@@ -13,93 +13,305 @@
   doi     = {10.1038/s41592-019-0582-9}
 }
 
-@article{arzt2022labkit,
-  title   = {LABKIT: Labeling and Segmentation Toolkit for Big Image Data},
-  author  = {Arzt, Matthias and Deschamps, Joran and Schmied, Christopher and Pietzsch, Tobias and Schmidt, Deborah and Tomancak, Pavel and Haase, Robert and Jug, Florian},
-  journal = {Frontiers in Computer Science},
-  volume  = {4},
-  year    = {2022},
-  doi     = {10.3389/fcomp.2022.777728}
+
+
+@ARTICLE{arzt2022labkit,
+    
+AUTHOR={Arzt, Matthias  and Deschamps, Joran  and Schmied, Christopher  and Pietzsch, Tobias  and Schmidt, Deborah  and Tomancak, Pavel  and Haase, Robert  and Jug, Florian },
+           
+TITLE={LABKIT: Labeling and Segmentation Toolkit for Big Image Data},
+          
+JOURNAL={Frontiers in Computer Science},
+          
+VOLUME={Volume 4 - 2022},
+  
+YEAR={2022},
+  
+URL={https://www.frontiersin.org/journals/computer-science/articles/10.3389/fcomp.2022.777728},
+  
+DOI={10.3389/fcomp.2022.777728},
+  
+ISSN={2624-9898},
+  
+ABSTRACT={We present Labkit, a user-friendly Fiji plugin for the segmentation of microscopy image data. It offers easy to use manual and automated image segmentation routines that can be rapidly applied to single- and multi-channel images as well as to timelapse movies in 2D or 3D. Labkit is specifically designed to work efficiently on big image data and enables users of consumer laptops to conveniently work with multiple-terabyte images. This efficiency is achieved by using ImgLib2 and BigDataViewer as well as a memory efficient and fast implementation of the random forest based pixel classification algorithm as the foundation of our software. Optionally we harness the power of graphics processing units (GPU) to gain additional runtime performance. Labkit is easy to install on virtually all laptops and workstations. Additionally, Labkit is compatible with high performance computing (HPC) clusters for distributed processing of big image data. The ability to use pixel classifiers trained in Labkit via the ImageJ macro language enables our users to integrate this functionality as a processing step in automated image processing workflows. Finally, Labkit comes with rich online resources such as tutorials and examples that will help users to familiarize themselves with available features and how to best use Labkit in a number of practical real-world use-cases.
+}}
+
+
+
+@ARTICLE{bankhead2017qupath,
+  title     = "{QuPath}: Open source software for digital pathology image
+               analysis",
+  author    = "Bankhead, Peter and Loughrey, Maurice B and Fern{\'a}ndez,
+               Jos{\'e} A and Dombrowski, Yvonne and McArt, Darragh G and
+               Dunne, Philip D and McQuaid, Stephen and Gray, Ronan T and
+               Murray, Liam J and Coleman, Helen G and James, Jacqueline A and
+               Salto-Tellez, Manuel and Hamilton, Peter W",
+  abstract  = "QuPath is new bioimage analysis software designed to meet the
+               growing need for a user-friendly, extensible, open-source
+               solution for digital pathology and whole slide image analysis.
+               In addition to offering a comprehensive panel of tumor
+               identification and high-throughput biomarker evaluation tools,
+               QuPath provides researchers with powerful batch-processing and
+               scripting functionality, and an extensible platform with which
+               to develop and share new algorithms to analyze complex tissue
+               images. Furthermore, QuPath's flexible design makes it suitable
+               for a wide range of additional image analysis applications
+               across biomedical research.",
+  journal   = "Sci. Rep.",
+  publisher = "Springer Science and Business Media LLC",
+  volume    =  7,
+  number    =  1,
+  pages     = "16878",
+  month     =  dec,
+  year      =  2017,
+  copyright = "https://creativecommons.org/licenses/by/4.0",
+  language  = "en"
 }
 
-@article{bankhead2017qupath,
-  title   = {QuPath: Open source software for digital pathology image analysis},
-  author  = {Bankhead, Peter and Loughrey, Maurice B. and Fern{\'a}ndez, Jos{\'e} A. and Dombrowski, Yvonne and McArt, Darragh G. and Dunne, Philip D. and McQuaid, Stephen and Gray, Ronan T. and Murray, Liam J. and Coleman, Helen G. and James, Jacqueline A. and Salto-Tellez, Manuel and Hamilton, Peter W.},
-  journal = {Scientific Reports},
-  volume  = {7},
-  number  = {1},
-  pages   = {16878},
-  year    = {2017},
-  doi     = {10.1038/s41598-017-17204-5}
+
+@ARTICLE{fedorov2012slicer,
+  title     = "{3D} Slicer as an image computing platform for the Quantitative
+               Imaging Network",
+  author    = "Fedorov, Andriy and Beichel, Reinhard and Kalpathy-Cramer,
+               Jayashree and Finet, Julien and Fillion-Robin, Jean-Christophe
+               and Pujol, Sonia and Bauer, Christian and Jennings, Dominique
+               and Fennessy, Fiona and Sonka, Milan and Buatti, John and
+               Aylward, Stephen and Miller, James V and Pieper, Steve and
+               Kikinis, Ron",
+  abstract  = "Quantitative analysis has tremendous but mostly unrealized
+               potential in healthcare to support objective and accurate
+               interpretation of the clinical imaging. In 2008, the National
+               Cancer Institute began building the Quantitative Imaging Network
+               (QIN) initiative with the goal of advancing quantitative imaging
+               in the context of personalized therapy and evaluation of
+               treatment response. Computerized analysis is an important
+               component contributing to reproducibility and efficiency of the
+               quantitative imaging techniques. The success of quantitative
+               imaging is contingent on robust analysis methods and software
+               tools to bring these methods from bench to bedside. 3D Slicer is
+               a free open-source software application for medical image
+               computing. As a clinical research tool, 3D Slicer is similar to
+               a radiology workstation that supports versatile visualizations
+               but also provides advanced functionality such as automated
+               segmentation and registration for a variety of application
+               domains. Unlike a typical radiology workstation, 3D Slicer is
+               free and is not tied to specific hardware. As a programming
+               platform, 3D Slicer facilitates translation and evaluation of
+               the new quantitative methods by allowing the biomedical
+               researcher to focus on the implementation of the algorithm and
+               providing abstractions for the common tasks of data
+               communication, visualization and user interface development.
+               Compared to other tools that provide aspects of this
+               functionality, 3D Slicer is fully open source and can be readily
+               extended and redistributed. In addition, 3D Slicer is designed
+               to facilitate the development of new functionality in the form
+               of 3D Slicer extensions. In this paper, we present an overview
+               of 3D Slicer as a platform for prototyping, development and
+               evaluation of image analysis tools for clinical research
+               applications. To illustrate the utility of the platform in the
+               scope of QIN, we discuss several use cases of 3D Slicer by the
+               existing QIN teams, and we elaborate on the future directions
+               that can further facilitate development and validation of
+               imaging biomarkers using 3D Slicer.",
+  journal   = "Magn. Reson. Imaging",
+  publisher = "Elsevier BV",
+  volume    =  30,
+  number    =  9,
+  pages     = "1323--1341",
+  month     =  nov,
+  year      =  2012,
+  language  = "en"
 }
 
-@article{fedorov2012slicer,
-  title   = {3D Slicer as an image computing platform for the Quantitative Imaging Network},
-  author  = {Fedorov, Andriy and Beichel, Reinhard and Kalpathy-Cramer, Jayashree and Finet, Julien and Fillion-Robin, Jean-Christophe and Pujol, Sonia and Bauer, Christian and Jennings, Dominique and Fennessy, Fiona and Sonka, Milan and Buatti, John and Aylward, Stephen and Miller, James V. and Pieper, Steve and Kikinis, Ron},
-  journal = {Magnetic Resonance Imaging},
-  volume  = {30},
-  number  = {9},
-  pages   = {1323--1341},
-  year    = {2012},
-  doi     = {10.1016/j.mri.2012.05.001}
+@MISC{napari,
+  title     = "napari: a multi-dimensional image viewer for Python",
+  author    = "Sofroniew, Nicholas and Lambert, Talley and Bokota, Grzegorz and
+               Nunez-Iglesias, Juan and Sobolewski, Peter and Sweet, Andrew and
+               Gaifas, Lorenzo and Evans, Kira and Burt, Alister and Doncila
+               Pop, Draga and Yamauchi, Kevin and Weber Mendon{\c c}a, Melissa
+               and Rodr{\'\i}guez-Guerra, Jaime and Liu, Lucy and Buckley,
+               Genevieve and Vierdag, Wouter-Michiel and Anderson, Ashley and
+               Monko, Timothy and Willing, Carol and Rodr{\'\i}guez-Reza,
+               Carlos M and Royer, Loic and Can Solak, Ahmet and Harrington,
+               Kyle I S and Abramo, Jacopo and Ahlers, Jannis and Ajina, Sesan
+               and Althviz Mor{\'e}, Daniel and Ambroset, M{\'e}lodie and
+               Amsalem, Oren and And{\`o}, Edward and Annex, Andrew and Archit,
+               Anwai and Aronssohn, Constantin and Balzaretti, Filippo and
+               Boone, Peter and Bestak, Kresimir and Bragantini, Jord{\~a}o and
+               Bunten, David and Bussonnier, Matthias and Caporal, Cl{\'e}ment
+               and Chazotte, Margot and Coccimiglio, Ian and {\v C}o{\v
+               c}kov{\'a}, Zuzana and Defauw, Arne and Czasak, Sara and
+               Eglinger, Jan and Eisenbarth, Andreas and Freeman, Jeremy and
+               Fukai T., Yohsuke and Garnett, Arbor and Gohlke, Christoph and
+               Gunalan, Kabilar and Halchenko, Yaroslav Olegovich and Har-Gil,
+               Hagai and Harfouche, Mark and Hilsenstein, Volker and Huijben,
+               Teun A P M and Hutchings, Katherine and Kawai, Hiroki and Kozar,
+               Robert and Lauer, Jessy and Le Meur-Diebolt, Samuel and
+               Lefebvre, Austin E Y T and Lichtner, Gregor and Liu, Hanjin and
+               Liu, Ziyang and Lowe, Alan and Malin-Mayor, Caroline and
+               Marconato, Luca and Martin, Sean and McGovern, Abigail and
+               Migas, Lukasz and Miller, Nadalyn and Mi{\~n}ano, Sof{\'\i}a and
+               Mu{\~n}oz, Hector and M{\"u}ller, Jan-Hendrik and
+               Nauroth-Kre{\ss}, Christopher and Newstein, Peter and Obenhaus,
+               Horst A and Palecek, David and Pape, Constantin and Pellegrini,
+               Yann and Perlman, Eric and Theart, Rensu Petrus and Pevey, Kim
+               and Pe{\~n}a-Castellanos, Gonzalo and Phelps, Jasper and
+               Pierr{\'e}, Andrea and Pinto, David and Reksoatmodjo, Anthony
+               and Ross, David and Russell, Craig T and Ryan, James and Saveur,
+               Tom and Schabel, Matthias Christian and Selzer, Gabriel and
+               Sharma, Rupesh and Sheikh, Imad Uddin and Sirmpilatze, Nikoloz
+               and Smith, M B and Smith, Paul and Sofiiuk, Konstantin and
+               Soltwedel, Johannes and Stansby, David and Steuer, Michal and
+               Teo, Wulin and Vanaret, Jules and Wadhwa, Pam and Weigert,
+               Martin and Windhager, Jonas and Winston, Philip and Yu, Qin and
+               Zhang, Liudeng and Zhao, Rubin and Witz, Guillaume and Leomil
+               Zoccoler, Marcelo and Yadav, Aniket Singh and Hinderling, Lucien
+               and Kabde, Omkar and Roald-Arb{\o}l, Mikkel and Rochat, Giliane
+               and Castelli, Filippo Maria and Venugopal, Revathy and Coussoux,
+               Edouard and Seth, Mridul and Becht, Job and Creeten, Christophe
+               and Morais, S{\'e}bastien and Bloemsaat, Bas and Kania, Kamil
+               and Liaskas, Ioannis and Hada, Aroj and Nagineni, Venkateswarlu
+               and Nikam, Aditya and Naik, Suyash",
+  
+  publisher = "Zenodo",
+  year      =  2026
 }
 
-@software{napari,
-  title     = {napari: a multi-dimensional image viewer for Python},
-  author    = {{napari contributors}},
-  year      = {2019},
-  publisher = {Zenodo},
-  doi       = {10.5281/zenodo.3555620}
+@INPROCEEDINGS{kirillov2023sam,
+  title           = "Segment Anything",
+  booktitle       = "2023 {IEEE/CVF} International Conference on Computer
+                     Vision ({ICCV})",
+  author          = "Kirillov, Alexander and Mintun, Eric and Ravi, Nikhila and
+                     Mao, Hanzi and Rolland, Chloe and Gustafson, Laura and
+                     Xiao, Tete and Whitehead, Spencer and Berg, Alexander C
+                     and Lo, Wan-Yen and Doll{\'a}r, Piotr and Girshick, Ross",
+  publisher       = "IEEE",
+  pages           = "3992--4003",
+  month           =  oct,
+  year            =  2023,
+  conference      = "2023 IEEE/CVF International Conference on Computer Vision
+                     (ICCV)",
+  location        = "Paris, France"
 }
 
-@inproceedings{kirillov2023sam,
-  title     = {Segment Anything},
-  author    = {Kirillov, Alexander and Mintun, Eric and Ravi, Nikhila and Mao, Hanzi and Rolland, Chloe and Gustafson, Laura and Xiao, Tete and Whitehead, Spencer and Berg, Alexander C. and Lo, Wan-Yen and Doll{\'a}r, Piotr and Girshick, Ross},
-  booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
-  pages     = {4015--4026},
-  year      = {2023},
-  doi       = {10.1109/ICCV51070.2023.00371}
+
+@ARTICLE{diazpinto2024monailabel,
+  title     = "{MONAI} Label: A framework for {AI-assisted} interactive
+               labeling of {3D} medical images",
+  author    = "Diaz-Pinto, Andres and Alle, Sachidanand and Nath, Vishwesh and
+               Tang, Yucheng and Ihsani, Alvin and Asad, Muhammad and
+               P{\'e}rez-Garc{\'\i}a, Fernando and Mehta, Pritesh and Li, Wenqi
+               and Flores, Mona and Roth, Holger R and Vercauteren, Tom and Xu,
+               Daguang and Dogra, Prerna and Ourselin, Sebastien and Feng,
+               Andrew and Cardoso, M Jorge",
+  abstract  = "The lack of annotated datasets is a major bottleneck for
+               training new task-specific supervised machine learning models,
+               considering that manual annotation is extremely expensive and
+               time-consuming. To address this problem, we present MONAI Label,
+               a free and open-source framework that facilitates the
+               development of applications based on artificial intelligence
+               (AI) models that aim at reducing the time required to annotate
+               radiology datasets. Through MONAI Label, researchers can develop
+               AI annotation applications focusing on their domain of
+               expertise. It allows researchers to readily deploy their apps as
+               services, which can be made available to clinicians via their
+               preferred user interface. Currently, MONAI Label readily
+               supports locally installed (3D Slicer) and web-based (OHIF)
+               frontends and offers two active learning strategies to
+               facilitate and speed up the training of segmentation algorithms.
+               MONAI Label allows researchers to make incremental improvements
+               to their AI-based annotation application by making them
+               available to other researchers and clinicians alike.
+               Additionally, MONAI Label provides sample AI-based interactive
+               and non-interactive labeling applications, that can be used
+               directly off the shelf, as plug-and-play to any given dataset.
+               Significant reduced annotation times using the interactive model
+               can be observed on two public datasets.",
+  journal   = "Med. Image Anal.",
+  publisher = "Elsevier BV",
+  volume    =  95,
+  number    =  103207,
+  pages     = "103207",
+  month     =  jul,
+  year      =  2024,
+  keywords  = "3D medical imaging; Active learning; Deep learning; Interactive
+               3D image segmentation",
+  language  = "en"
 }
 
-@article{diazpinto2024monailabel,
-  title   = {MONAI Label: A framework for AI-assisted interactive labeling of 3D medical images},
-  author  = {Diaz-Pinto, Andres and Alle, Sachidanand and Nath, Vishwesh and Tang, Yucheng and Ihsani, Alvin and Asad, Muhammad and P{\'e}rez-Garc{\'\i}a, Fernando and Mehta, Pritesh and Li, Wenqi and Flores, Mona and Roth, Holger R. and Vercauteren, Tom and Xu, Daguang and Dogra, Prerna and Ourselin, S{\'e}bastien and Feng, Andrew and Cardoso, M. Jorge},
-  journal = {Medical Image Analysis},
-  volume  = {95},
-  pages   = {103207},
-  year    = {2024},
-  doi     = {10.1016/j.media.2024.103207}
+@misc{oquab2024dinov2,
+  title={DINOv2: Learning Robust Visual Features without Supervision},
+  author={Oquab, Maxime and Darcet, Timothée and Moutakanni, Theo and Vo, Huy V. and Szafraniec, Marc and Khalidov, Vasil and Fernandez, Pierre and Haziza, Daniel and Massa, Francisco and El-Nouby, Alaaeldin and Howes, Russell and Huang, Po-Yao and Xu, Hu and Sharma, Vasu and Li, Shang-Wen and Galuba, Wojciech and Rabbat, Mike and Assran, Mido and Ballas, Nicolas and Synnaeve, Gabriel and Misra, Ishan and Jegou, Herve and Mairal, Julien and Labatut, Patrick and Joulin, Armand and Bojanowski, Piotr},
+  journal={arXiv:2304.07193},
+  year={2023}
 }
 
-@article{oquab2024dinov2,
-  title   = {DINOv2: Learning Robust Visual Features without Supervision},
-  author  = {Oquab, Maxime and Darcet, Timoth{\'e}e and Moutakanni, Th{\'e}o and Vo, Huy V. and Szafraniec, Marc and Khalidov, Vasil and Fernandez, Pierre and Haziza, Daniel and Massa, Francisco and El-Nouby, Alaaeldin and Assran, Mahmoud and Ballas, Nicolas and Galuba, Wojciech and Howes, Russell and Huang, Po-Yao and Li, Shang-Wen and Misra, Ishan and Rabbat, Michael and Sharma, Vasu and Synnaeve, Gabriel and Xu, Hu and Jegou, Herv{\'e} and Mairal, Julien and Labatut, Patrick and Joulin, Armand and Bojanowski, Piotr},
-  journal = {Transactions on Machine Learning Research},
-  year    = {2024}
-}
+
 
 @misc{simeoni2025dinov3,
-  title        = {DINOv3},
-  author       = {Sim{\'e}oni, Oriane and others},
-  year         = {2025},
-  eprint       = {2508.10104},
-  archivePrefix= {arXiv},
-  primaryClass = {cs.CV}
+      title={DINOv3}, 
+      author={Oriane Siméoni and Huy V. Vo and Maximilian Seitzer and Federico Baldassarre and Maxime Oquab and Cijo Jose and Vasil Khalidov and Marc Szafraniec and Seungeun Yi and Michaël Ramamonjisoa and Francisco Massa and Daniel Haziza and Luca Wehrstedt and Jianyuan Wang and Timothée Darcet and Théo Moutakanni and Leonel Sentana and Claire Roberts and Andrea Vedaldi and Jamie Tolan and John Brandt and Camille Couprie and Julien Mairal and Hervé Jégou and Patrick Labatut and Piotr Bojanowski},
+      year={2025},
+      eprint={2508.10104},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2508.10104}, 
 }
 
-@misc{amir2021deepvit,
+
+@article{amir2021deepvit,
+  author       = {Shir Amir and
+                  Yossi Gandelsman and
+                  Shai Bagon and
+                  Tali Dekel},
   title        = {Deep ViT Features as Dense Visual Descriptors},
-  author       = {Amir, Shir and Gandelsman, Yossi and Bagon, Shai and Dekel, Tali},
+  journal      = {CoRR},
+  volume       = {abs/2112.05814},
   year         = {2021},
+  url          = {https://doi.org/10.48550/arXiv.2112.05814},
+  doi          = {10.48550/ARXIV.2112.05814},
+  eprinttype   = {arXiv},
   eprint       = {2112.05814},
-  archivePrefix= {arXiv},
-  primaryClass = {cs.CV}
+  timestamp    = {Thu, 01 Oct 2026 10:49:10 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2112-05814.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
-% TODO: replace with the real DNAi study reference.
-@misc{TODO_dnai_study,
-  title  = {TODO: DNAi study},
-  author = {TODO},
-  year   = {2026},
-  note   = {Placeholder — replace with the published reference, or remove the citation from paper.md.}
+@article{playout2026dnai,
+  title   = {{DNAi}: an open-source {AI} tool for unbiased {DNA} fiber analysis},
+  author  = {Playout, Cl{\'e}ment and Mehrjoo, Yosra and Duval, Renaud and Boucher, Marie Carole and Costantino, Santiago and Wurtele, Hugo},
+  journal = {Nucleic Acids Research},
+  volume  = {54},
+  number  = {7},
+  pages   = {gkag335},
+  year    = {2026},
+  doi     = {10.1093/nar/gkag335}
+}
+
+@misc{odmac_toolkit,
+  title        = {fundus-odmac-toolkit: optic disc and macula segmentation in fundus images},
+  author       = {Playout, Cl{\'e}ment},
+  howpublished = {\url{https://github.com/ClementPla/fundus-odmac-toolkit}},
+  year         = {2024}
+}
+
+@software{cvat,
+  author       = {CVAT.ai Corporation},
+  title        = {Computer Vision Annotation Tool (CVAT)},
+  doi          = {10.5281/zenodo.4009388},
+  url          = {https://github.com/cvat-ai/cvat},
+  year         = {2023}
+}
+
+
+@misc{labelstudio,
+  title={{Label Studio}: Data labeling software},
+  url={https://github.com/HumanSignal/label-studio},
+  note={Open source software available from https://github.com/HumanSignal/label-studio},
+  author={
+    Maxim Tkachenko and
+    Mikhail Malyuk and
+    Andrey Holmanyuk and
+    Nikolai Liubimov},
+  year={2020-2025},
 }
