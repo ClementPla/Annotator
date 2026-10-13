@@ -79,6 +79,7 @@ nav:
       - The gallery and review: guide/gallery.md
       - Several annotators: guide/multi-user.md
       - Inspecting sequences: guide/inspect.md
+      - Annotating in 3D: guide/3D.md
       - Frame registration: guide/registration.md
       - Import and export: guide/import-export.md
       - Keyboard shortcuts: guide/shortcuts.md

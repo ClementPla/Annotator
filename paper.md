@@ -16,7 +16,7 @@ authors:
 affiliations:
   - name: Centre de recherche de l'Hôpital Maisonneuve-Rosemont, Montréal, Canada
     index: 1
-date: 11 October 2026
+date: 13 October 2026
 bibliography: paper.bib
 ---
 
@@ -26,16 +26,14 @@ Didascalie is a desktop application for annotating biomedical images, comparing
 the people or models that labelled them, and registering pairs of images. A
 researcher or clinician installs it like any other program, opens a project file
 and starts drawing: there is no server to set up and no programming environment to
-maintain, and no image leaves the computer.
+maintain. Importantly, no image leaves the computer.
 
-The same editor is used for a single image, a video and a 3D volume, so the tools
-learned on one carry over to the others. Structures are outlined with a brush, a
-lasso or vector shapes, and a rough stroke can be refined automatically into the
-outline of the structure underneath (\autoref{fig:editor}). Frames can also be classified, annotated with
-keypoints and aligned with one another. Several annotators can work on the same
+The same editor and its tools are used for a single image, a video and a 3D volume. Structures are outlined with a brush, a lasso or vector shapes, and a rough stroke can be refined automatically into the outline of the structure underneath (\autoref{fig:editor}). Frames can also be classified, annotated with
+keypoints and registered with one another. Several annotators can work on the same
 project, each in their own account, and the application measures how well they
-agree. Didascalie runs on Windows, macOS and Linux; an Android tablet build offers
-the manual tools with finger and pen input, and an iOS build is in progress.
+agree. 
+Didascalie runs on Windows, macOS and Linux; an Android tablet build offers
+touchscreen support.
 
 ![The editor: three structures segmented on an echocardiography frame, with the labels and the sequences of the project on the left.\label{fig:editor}](docs/assets/screenshots/editor.jpg)
 
@@ -50,7 +48,7 @@ data-governance and ethics rules prohibit it. The annotators are rarely engineer
 asking a clinician to deploy a container or maintain a Python environment is a real
 obstacle, and in the author's experience many still annotate in presentation or
 drawing software. And a single
-study commonly mixes data types and tasks, such as photographs, gigapixel
+study commonly mixes data types and tasks, such as multimodal images, gigapixel
 microscopy, videos and volumes, to be segmented, classified or registered.
 
 Didascalie is aimed at this situation. It is a single installed binary in which a
@@ -70,79 +68,104 @@ agreement and kappa for each classification task, and the frames where two grade
 differ most (\autoref{fig:agreement}). The same mechanism serves to inspect
 models. The companion library `pydidascalie` writes a model's predictions under an
 account of its own, next to the annotators' work and not over it, so that several
-models, or a model and its ground truth, are compared like any two graders and
-browsed frame by frame.
-
-![The agreement page: scores for a pair of graders, and the frames where they differ, drawn with what only one of them marked.\label{fig:agreement}](docs/assets/screenshots/intergrader.png)
+models, or a model and its ground truth, are compared like any two graders.
 
 # State of the field
 
 CVAT [@cvat] and Label Studio [@labelstudio] are capable, actively maintained
-annotation platforms. Both
-are web applications: they can be self-hosted on the annotator's own machine, but
-doing so means deploying and maintaining a server, a task for an engineer more than
-for the clinician who annotates. Desktop tools carry other constraints. ilastik
-[@berg2019ilastik] and LABKIT [@arzt2022labkit] are built to segment images, not to
-curate a labelled dataset: the user scribbles on a few regions, a pixel classifier
-is trained, and the result is that classifier's prediction. They work on one image
-or one analysis at a time, and offer no review tracking, per-image classification
-or comparison between annotators. napari [@napari] is a viewer with annotation
-layers that requires the annotator to maintain a Python environment. QuPath [@bankhead2017qupath] is specialised for digital pathology. 3D
-Slicer [@fedorov2012slicer] addresses clinical image computing, and dataset
-labelling is not its focus. Model-based assistance, whether a prompted model such as SAM [@kirillov2023sam]
-or MONAI Label [@diazpinto2024monailabel], which serves such models to clinical
-viewers, assumes a GPU server or a substantial local inference stack.
+annotation platforms, but both are web applications. Running either locally
+means operating a server, either a Docker Compose stack (CVAT) or a Python
+package served to a browser (Label Studio). That is a modest task for an
+engineer but an obstacle for a clinician annotating on a hospital workstation.
+Among desktop tools, ilastik [@berg2019ilastik] and LABKIT [@arzt2022labkit]
+centre on interactive segmentation. The user scribbles on a few regions and
+trains a pixel classifier, and the classifier's output, optionally corrected,
+becomes the segmentation. Neither tracks review status, records per-image
+classification labels or compares annotators. napari [@napari] is a general
+n-dimensional viewer with annotation layers, available as a standalone
+installer, but dataset-level curation is left to plugins or scripts. QuPath
+[@bankhead2017qupath] is specialised for digital pathology. 3D Slicer
+[@fedorov2012slicer] is a general clinical image-computing platform whose
+segmentation tools work on one volume at a time, without dataset-level review
+or multi-annotator tracking. Desktop labelling tools descended from LabelMe
+[@Russell2008LabelMe], notably X-AnyLabeling [@X-AnyLabeling], come closest to curating a
+dataset offline. They include local inference with lightweight Segment Anything
+variants [@kirillov2023sam]. However, they target general computer-vision
+formats and tasks, and they do not track review status or compare annotators.
+Model-assisted labelling for clinical viewers, as provided by MONAI Label
+[@diazpinto2024monailabel], relies on a separate inference server.
 
-Didascalie was built as a new tool, not as an extension of one of these, because
-its requirements are architectural. A plugin for napari or 3D Slicer inherits the
-installation and the interface of its host, which are the two obstacles for the
-intended users. A project that is one file with per-annotator accounts, raster and
-vector annotations sharing one document and one undo history, and an editor that
-stays responsive on gigapixel images could not be added to an existing platform
-without replacing its storage and rendering layers.
+Didascalie is a new tool rather than an extension of an existing one because
+its requirements concern architecture, not features. A plugin for napari or
+3D Slicer inherits its host's interface, which is a general-purpose viewer that
+exposes far more than an annotation task needs. It also inherits the host's
+distribution: a Python runtime and a plugin system that the annotator must keep
+working across updates. Extending a LabelMe-style tool such as X-AnyLabeling
+avoids the first problem but not the second, and its storage of one annotation
+file per image does not fit Didascalie's design. Didascalie keeps a whole
+project in a single file with per-annotator accounts. Raster and vector
+annotations share one document and one undo history, and the editor stays
+responsive on gigapixel images. Adding these to any of the platforms above
+would mean replacing its storage and rendering layers, which amounts to
+writing a new application inside an existing one.
 
 # Software design
 
-**One file, no server.** A project is a SQLite database holding the images
-(embedded or referenced), the annotations, the labels and the accounts. Sending a
-task to a collaborator means sending a file, the format is readable from any
-language, and `pydidascalie` reads and writes projects
-without the application running. Referenced images are located per machine, so one
-file moves between operating systems.
+## Project format
 
-**Compiled core, web interface.** Image decoding, mask encoding and database access
-are implemented in Rust, behind a web frontend packaged with Tauri. The frontend
-gives one interface on every platform; the compiled core keeps it responsive where
-a browser or an interpreted layer stalls, including on a mobile device. Masks are
-composited on the GPU with WebGPU and fall back to the CPU. Very large images are served from a
-resolution pyramid: the view draws the coarsest level that still oversamples the
-viewport and composites native-resolution tiles over the region under inspection,
-so an image too large for a browser to decode remains editable at full resolution.
+A Didascalie project is a single SQLite database. It stores the annotations,
+the label definitions and the annotator accounts, and it either embeds the
+images or references them on disk. Each machine resolves referenced paths
+separately, so the same project opens on Windows, macOS and Linux. Sharing a
+task with a collaborator means sending this file. SQLite can be read from
+almost any language, and the `pydidascalie` package reads and writes projects
+from Python without the application running.
 
-**Assistance without a model.** The annotator paints roughly over a structure, and
-an operator refines that stroke into the structure's outline: the stroke says where
-to look, and the operator, confined to the pixels it covers, decides which of them
-belong. Dynamic Otsu thresholding, flood fill and superpixel selection are
-available, with optional smoothing, hole filling and a connectivity constraint.
-These operators were preferred to a learned model as the default because they need
-no setup, no training data and no GPU, answer at once, and give results that are
-easy to predict and to correct. Display adjustments (contrast, gamma, tone curves)
-can be routed into them, so that an operator reads the enhanced image the annotator
-is looking at. A learned alternative, a small head trained from scribbles over
-features of a frozen self-supervised encoder [@amir2021deepvit; @oquab2024dinov2;
-@simeoni2025dinov3], is in development; its benefit over the operators has not yet
-been evaluated.
+## Architecture
 
-**Registration as an annotation task.** The annotator places corresponding
-keypoints on two frames, such as two visits of a patient or two modalities, and a
-homography is re-estimated each time a point is placed. Overlay and checkerboard views show the
-alignment while it is being built.
+The application is built with Tauri. A Rust core handles image decoding, mask
+encoding and database access, and a web frontend provides the interface, so the
+interface is the same on every platform. Doing this work in compiled code rather
+than in the browser or an interpreted language keeps editing responsive on large
+images, including on mobile devices. Masks are composited on the GPU through
+WebGPU, with a CPU fallback where WebGPU is unavailable.
 
-**The user's own model, in the user's own code.** Importing models into the
-application would require a common exchange format, and export to ONNX often fails
-on research architectures. Didascalie instead calls the user's Python process. An
-ordinary function, which receives the image as an array and returns one mask per
-label, is decorated and served from the user's script:
+Images too large for a browser to decode are stored as a resolution pyramid.
+The viewer draws the lowest-resolution level that still has more pixels than
+the screen area it fills, and loads full-resolution tiles only for the region
+being inspected. Editing always happens at the image's native resolution.
+
+## Annotation assistance
+
+Instead of tracing a structure's outline, the annotator can paint a rough
+stroke over it. An operator then decides which pixels under the stroke belong
+to the structure. Three operators are available: Otsu thresholding computed
+within the stroke, flood fill, and superpixel selection. Their output can be
+smoothed, have its holes filled, or be constrained to a single connected
+region. Contrast, gamma and tone-curve adjustments can be applied before the
+operator runs, so it sees the same enhanced image as the annotator.
+
+These operators are the default because they work
+immediately on a CPU without training data. Their behaviour is also
+predictable: when one gives a poor result, the annotator can usually see why
+and fix it by hand. A learned option is in development. It trains a small
+classifier on the annotator's scribbles, using features from a frozen
+self-supervised encoder [@amir2021deepvit; @oquab2024dinov2;
+@simeoni2025dinov3]. Whether it improves on the operators has not yet been
+measured.
+
+## Registration
+
+Registration between two images is done by placing pairs of keypoints; Didascalie re-estimates a homography after each new point.
+Overlay and checkerboard views show the current alignment as points are added.
+
+## Running user models
+
+Importing models into the application would require a shared format such as
+ONNX, and research architectures often fail to export to it. Didascalie instead
+calls a Python process that the user runs. The user writes a function that
+takes the image as an array and returns one mask per label, adds a decorator,
+and runs the script:
 
 ```python
 from didascalie.com import register_seg, serve
@@ -156,15 +179,9 @@ serve()
 
 The function then appears in the editor and runs on the open frame or on its whole
 sequence; a second kind proposes keypoint correspondences for registration.
-Didascalie places no requirement on what the function does. It runs in the user's
-environment, so it can call a PyTorch model with its original preprocessing and
-weights, or a classical image-processing pipeline. The exchange goes both ways: the
-function can ask for the masks already drawn and use them as a prompt, and what it
-returns is drawn in the editor, where it can be corrected.
+Didascalie places no requirement on what the function does and it runs in the user's
+own Python environment.
 
-Mask encoding, geometry, skeletonisation, volume assembly and dataset conversion
-are covered by unit tests run in continuous integration. Volume mode and the Python
-functions are the most recent parts and are marked experimental in the application.
 
 # Research impact statement
 
@@ -175,7 +192,7 @@ first under the name LabelMed.
   with it [@playout2026dnai].
 - It was used to annotate retinal neovascularisation in high-resolution
   ultra-widefield fundus images, a task that relies on full-resolution editing of
-  large images.
+  large images and required to register angiography with regular fundus.
 - It was used to create the optic disc and macula annotations behind the models of
   the fundus-odmac-toolkit [@odmac_toolkit].
 - Several studies in preparation rely on it for their annotations, mostly in
@@ -187,14 +204,11 @@ user documentation at <https://didascalie.readthedocs.io>.
 # AI usage disclosure
 
 Development began in 2024, without generative AI.
-<!-- TODO: check the starting date and the model versions below. -->
 Since 2026, Claude Code (Anthropic), with the Claude Sonnet and Opus models
 available at the time, up to Claude Opus 5.5, has been used to implement features, write tests, fix defects and draft the documentation, from
 requirements and design decisions set by the author. It also assisted in writing this
-manuscript and revising its language; the author determined its content, structure
-and claims. The author chose the architecture and the project format,
-reviewed the generated code and text, and edited or rejected them where needed.
-Generated code was validated by the unit tests and continuous integration of the
+manuscript and revising its language. The author reviewed the generated code and text, and edited or rejected them where needed.
+In addiition, generated code was validated by the unit tests and continuous integration of the
 repository, and by use of the application on real data, by the author and by the
 clinicians who annotate with it. The author takes responsibility for all of the
 software and of this paper.

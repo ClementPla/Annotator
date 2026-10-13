@@ -44,7 +44,15 @@ that row to run it on the open frame.
 ## A complete example
 
 Two pretrained fundus models: one segments lesions, the other the optic disc and
-the macula.
+the macula. In the video, `fundus_odmac_toolkit` is run on the open frame and
+fills the **OD** and **Macula** labels.
+
+<video src="../../assets/screenshots/python_functions.webm" poster="../../assets/screenshots/python_functions_poster.jpg"
+       autoplay loop muted playsinline controls preload="metadata" style="width: 100%"
+       aria-label="The Python functions panel in the editor: a registered function is run on a fundus image and draws the optic disc and the macula."></video>
+
+The code is also available as a notebook:
+[`examples/registering_python_functions.ipynb`](https://github.com/ClementPla/Didascalie/blob/release/examples/registering_python_functions.ipynb).
 
 ```python
 import cv2
@@ -58,11 +66,18 @@ from fundus_odmac_toolkit.models.segmentation import segment as segment_odmac
 @register_seg("fundus_lesions_toolkit")
 def lesion_segment(image):
     h, w, c = image.shape
+    image = cv2.resize(image, (1024, 1024), interpolation=cv2.INTER_AREA)
     # One map per class; the first is the background.
-    segmentation = segment(image)[1:].cpu().numpy()
+    segmentation = (
+        segment(image, autofit_resolution=False, reverse_autofit=False)[1:]
+        .cpu()
+        .numpy()
+    )
     # Back to the frame's resolution.
     segmentations = [
-        cv2.resize(segmentation[i].astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
+        cv2.resize(
+            segmentation[i].astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST
+        )
         for i in range(len(segmentation))
     ]
     return {lesion: mask for lesion, mask in zip(LESIONS[1:], segmentations)}
@@ -70,8 +85,21 @@ def lesion_segment(image):
 
 @register_seg("fundus_odmac_toolkit")
 def odmac_segment(image):
-    segmentation = segment_odmac(image)
-    return {"OD": segmentation[1], "Macula": segmentation[2]}
+    h, w, c = image.shape
+    image = cv2.resize(image, (512, 512), interpolation=cv2.INTER_AREA)
+    segmentation = (
+        segment_odmac(image, autofit_resolution=False, reverse_autofit=False)
+        .cpu()
+        .argmax(0)
+        .numpy()
+    )
+
+    # Back to the frame's resolution.
+    segmentation = cv2.resize(
+        segmentation.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST
+    )
+
+    return {"OD": segmentation == 1, "Macula": segmentation == 2}
 
 
 serve()
@@ -82,8 +110,9 @@ serve()
 - Dictionary keys are label names of the project: here those in `LESIONS`, and
   `OD` and `Macula`. Keys that match no label are ignored. Labels not returned
   are left as they are.
-- Masks must have the frame's size. A model that predicts at another resolution
-  has to resize its output, with nearest-neighbour interpolation.
+- Masks must have the frame's size. Both models predict at a fixed resolution,
+  so each function resizes the frame going in and the result coming out, with
+  nearest-neighbour interpolation for the masks.
 
 ## Segmentation functions
 
