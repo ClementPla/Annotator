@@ -83,7 +83,19 @@ pub fn export_project_file(app: AppHandle, db: State<DbState>, location: String)
     let snapshot = data_dir(&app)?.join("export.part");
     let _ = fs::remove_file(&snapshot);
     db.with_conn(|conn| {
-        conn.execute("VACUUM INTO ?1", [snapshot.to_string_lossy().as_ref()])?;
+        // Not through `conn`: its per-user TEMP views shadow the tables, and
+        // VACUUM INTO then fails rebuilding their indexes ("views may not be
+        // indexed"). A plain connection to the same file sees the tables, and
+        // the WAL too. Holding `conn`'s lock keeps writes out meanwhile.
+        let path = conn
+            .path()
+            .filter(|p| !p.is_empty())
+            .ok_or_else(|| AppError::Other("The project has no file to export.".into()))?;
+        let plain = rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        plain.execute("VACUUM INTO ?1", [snapshot.to_string_lossy().as_ref()])?;
         Ok(())
     })?;
 
