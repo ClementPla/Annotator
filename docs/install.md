@@ -13,8 +13,16 @@ platform from the [Releases page](https://github.com/ClementPla/Didascalie/relea
 === "macOS"
 
     Download the `.dmg` for your architecture (Apple Silicon or Intel) and drag
-    the app to Applications. The build is not notarised, so open it the first
-    time with **right-click → Open**.
+    the app to Applications. The build is not signed or notarised by Apple yet,
+    so macOS quarantines it and refuses to open it the first time. Either remove
+    it from quarantine from a terminal:
+
+    ```bash
+    xattr -dr com.apple.quarantine /Applications/Didascalie.app
+    ```
+
+    or try to open the app once, then go to **System Settings → Privacy &
+    Security** and click **Open Anyway**.
 
 === "Linux"
 

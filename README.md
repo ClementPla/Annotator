@@ -129,6 +129,15 @@ It requires `numpy` and `Pillow`, plus `pyzmq` and `msgpack` for the Python brid
 
 Download the installer for your platform from the [Releases page](https://github.com/ClementPla/Didascalie/releases). The application updates itself afterwards.
 
+> [!NOTE]
+> **macOS users:** the application is not signed yet. To distribute an app that macOS doesn't quarantine, a developer must register with Apple and have the app signed and notarized. This is a safety measure. Until then, macOS will refuse to open Didascalie the first time. You can either remove it from quarantine from a terminal:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Didascalie.app
+> ```
+>
+> or try to open the app once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
 Training works on the CPU. Using an NVIDIA GPU needs the CUDA Toolkit: see [Installing](https://didascalie.readthedocs.io/install/).
 
 ### Android tablets
