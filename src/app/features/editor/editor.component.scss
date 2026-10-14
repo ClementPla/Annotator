@@ -75,3 +75,38 @@
     color: #fff;
   }
 }
+
+/* Portrait: the same stepper, down the left edge of the canvas. */
+.frame-scrubber--vertical {
+  flex: 0 0 auto;
+  flex-direction: column;
+  max-width: none;
+  width: 3rem;
+  padding: 0.5rem 0;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+
+  .frame-scrubber__slider {
+    display: flex;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  ::ng-deep .p-slider-vertical {
+    height: 100%;
+    min-height: 4rem;
+  }
+
+  &__count {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+  }
+}
+
+.propagate-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 18rem;
+}

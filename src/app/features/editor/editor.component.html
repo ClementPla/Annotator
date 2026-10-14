@@ -74,6 +74,46 @@
     }
 
     <div class="flex flex-1 min-h-0 min-w-0">
+      <!-- Portrait tablet: the frame bar runs down the left edge, first frame
+           at the top. A vertical slider has its minimum at the bottom, hence
+           the reversed value. -->
+      @if (isAndroid && narrowPortrait() && totalFrames > 1) {
+        <div class="frame-scrubber frame-scrubber--vertical">
+          <button
+            pButton
+            type="button"
+            icon="pi pi-chevron-up"
+            severity="secondary"
+            [text]="true"
+            size="small"
+            aria-label="Previous frame"
+            (click)="stepFrame(-1)"
+          ></button>
+          <p-slider
+            class="frame-scrubber__slider"
+            orientation="vertical"
+            [ngModel]="totalFrames - 1 - currentFrameIndex"
+            (ngModelChange)="scrubToFrame(totalFrames - 1 - $event)"
+            [min]="0"
+            [max]="totalFrames - 1"
+            [step]="1"
+            ariaLabel="Frame"
+          />
+          <button
+            pButton
+            type="button"
+            icon="pi pi-chevron-down"
+            severity="secondary"
+            [text]="true"
+            size="small"
+            aria-label="Next frame"
+            (click)="stepFrame(1)"
+          ></button>
+          <span class="frame-scrubber__count">
+            {{ currentFrameIndex + 1 }}/{{ totalFrames }}
+          </span>
+        </div>
+      }
       <app-drawable-canvas
         class="block flex-1 min-h-0 min-w-0 overflow-hidden"
       ></app-drawable-canvas>
@@ -89,7 +129,7 @@
           {{ currentSequenceName }}
         </span>
         <!-- A tablet has no arrow keys. -->
-        @if (isAndroid && totalFrames > 1) {
+        @if (isAndroid && !narrowPortrait() && totalFrames > 1) {
           <div class="frame-scrubber">
             <button
               pButton
@@ -245,7 +285,7 @@
           [pTooltip]="propagateTooltip"
           tooltipPosition="left"
           aria-label="Propagate labels"
-          (click)="propagateLabels()"
+          (click)="propagateConfirm.toggle($event)"
         ></button>
         <button
           pButton
@@ -445,6 +485,27 @@
 
 <!-- Overlays are outside the row above: inside it, each is a zero-width flex
      item with the row's gap around it. -->
+
+<!-- The copy button sits among others and is easy to hit by mistake. -->
+<p-popover #propagateConfirm>
+  <div class="propagate-confirm">
+    <p class="m-0">{{ propagateTooltip }}?</p>
+    <div class="flex gap-2 justify-end">
+      <p-button
+        label="Cancel"
+        severity="secondary"
+        [text]="true"
+        (click)="propagateConfirm.hide()"
+      />
+      <p-button
+        label="Copy"
+        icon="pi pi-copy"
+        (click)="propagateConfirm.hide(); propagateLabels()"
+      />
+    </div>
+  </div>
+</p-popover>
+
 <p-popover #frameNavPopover>
   <app-multi-frames-options
     (changeOfFrame)="changedOfFrame($event)"
