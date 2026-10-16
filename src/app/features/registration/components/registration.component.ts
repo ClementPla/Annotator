@@ -299,7 +299,6 @@ export class RegistrationComponent implements OnInit, AfterViewInit, OnDestroy {
         list.map((c) => ({
           referenceFrameId: String(c.referenceFrameId),
           movingFrameId: String(c.movingFrameId),
-          transformType: c.transformType,
           hasHomography: c.hasHomography,
           pairCount: c.pairCount,
         })),

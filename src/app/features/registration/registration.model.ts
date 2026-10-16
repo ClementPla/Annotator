@@ -30,26 +30,10 @@ export interface HomographyTransform {
            number, number, number];
 }
 
-/** Reserved; not implemented in this build. */
-export interface TPSTransform {
-  type: 'tps';
-  controlPoints: CorrespondencePair[];
-  lambda: number;
-}
+export type Transform2D = IdentityTransform | HomographyTransform;
 
-/** Reserved; not implemented in this build. */
-export interface BSplineGridTransform {
-  type: 'bspline-grid';
-  gridW: number;
-  gridH: number;
-  displacements: Float32Array;
-}
-
-export type Transform2D =
-  | IdentityTransform
-  | HomographyTransform
-  | TPSTransform
-  | BSplineGridTransform;
+/** Correspondences needed to fit a homography (8 degrees of freedom). */
+export const MIN_HOMOGRAPHY_PAIRS = 4;
 
 export const IDENTITY: IdentityTransform = { type: 'identity' };
 // ── Registration state (per moving frame) ──────────────────────────────────
@@ -66,7 +50,7 @@ export function makeRegistration(referenceFrameId: string, movingFrameId: string
 }
 
 export function fitHomography(pairs: CorrespondencePair[]): HomographyTransform | null {
-  if (pairs.length < 4) return null;
+  if (pairs.length < MIN_HOMOGRAPHY_PAIRS) return null;
 
   const refPts    = pairs.map(p => p.ref);
   const movingPts = pairs.map(p => p.moving);

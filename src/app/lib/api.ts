@@ -232,7 +232,7 @@ export interface RegistrationData {
   homography:
     | [number, number, number, number, number, number, number, number, number]
     | null;
-  transformType: 'homography' | 'tps' | 'bspline-grid';
+  transformType: 'homography';
   pairs: KeypointPair[];
 }
 

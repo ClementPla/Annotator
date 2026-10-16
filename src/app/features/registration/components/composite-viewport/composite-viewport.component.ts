@@ -17,6 +17,7 @@ import { CommonModule } from '@angular/common';
 
 import { Pyramid, PyramidService } from '../../../../services/pyramid.service';
 import { ViewportController } from '../../viewport-controller';
+import { MIN_HOMOGRAPHY_PAIRS } from '../../registration.model';
 import {
   RegistrationStateService,
   colorForIndex,
@@ -60,11 +61,11 @@ export class CompositeViewportComponent
   >(() => {
     const t = this.state.transform();
     if (t.type === 'identity') {
-      const needed = Math.max(0, 4 - this.pairs().length);
+      const needed = Math.max(0, MIN_HOMOGRAPHY_PAIRS - this.pairs().length);
       return { kind: 'needs-pairs', needed };
     }
-    if (t.type === 'homography' && this.pairs().length < 4) {
-      return { kind: 'unwarped', needed: 4 - this.pairs().length };
+    if (t.type === 'homography' && this.pairs().length < MIN_HOMOGRAPHY_PAIRS) {
+      return { kind: 'unwarped', needed: MIN_HOMOGRAPHY_PAIRS - this.pairs().length };
     }
     const reason = diagnoseHomography(t);
     if (reason) return { kind: 'bad-fit', reason };

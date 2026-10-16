@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 
 import { InferenceClientService } from '../../../../services/inference-client.service';
+import { MIN_HOMOGRAPHY_PAIRS } from '../../registration.model';
 import {
   RegistrationStateService,
   RegistrationCase,
@@ -59,9 +60,9 @@ export class RegistrationSidebarComponent {
 
   public readonly pairs = this.state.pairs;
 
-  // Pairs still needed to reach the affine minimum (3).
+  // Pairs still needed to fit a homography.
   public readonly pairsNeeded = computed(() =>
-    Math.max(0, 4 - this.pairCount()),
+    Math.max(0, MIN_HOMOGRAPHY_PAIRS - this.pairCount()),
   );
   public readonly prefillTooltip = computed(() => {
     if (!this.inference.isReady())

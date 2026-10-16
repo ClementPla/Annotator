@@ -9,6 +9,7 @@ import {
   makePair,
   makeRegistration,
   IDENTITY,
+  MIN_HOMOGRAPHY_PAIRS,
   Point2D,
 } from './registration.model';
 import { KeypointPair } from '../../lib/api';
@@ -46,14 +47,9 @@ export type PlacementState =
 export interface RegistrationCase {
   referenceFrameId: string;
   movingFrameId: string;
-  transformType: string;
   hasHomography: boolean;
   pairCount: number;
 }
-
-// ── Transform type selection ───────────────────────────────────────────────
-
-export type TransformType = 'affine' | 'homography' | 'tps' | 'bspline-grid';
 
 // ── Pair color palette ─────────────────────────────────────────────────────
 
@@ -131,28 +127,13 @@ export class RegistrationStateService implements ProjectScoped {
     () => this._registration()?.transform ?? IDENTITY,
   );
 
-  // ── Transform type ───────────────────────────────────────────────────────
-  private _transformType = signal<TransformType>('affine');
-  readonly transformType = this._transformType.asReadonly();
-
   // ── Fit summary ──────────────────────────────────────────────────────────
   private _fitSummary = signal<FitSummary | null>(null);
   readonly fitSummary = this._fitSummary.asReadonly();
 
   readonly pairCount = computed(() => this.pairs().length);
 
-  readonly canFit = computed(() => {
-    const n = this.pairCount();
-    switch (this._transformType()) {
-      case 'affine':
-      case 'homography':
-        return n >= 4;
-      case 'tps':
-        return n >= 6;
-      case 'bspline-grid':
-        return n >= 4;
-    }
-  });
+  readonly canFit = computed(() => this.pairCount() >= MIN_HOMOGRAPHY_PAIRS);
 
   // ── Placement state machine ──────────────────────────────────────────────
   private _placement = signal<PlacementState>({ phase: 'idle' });
@@ -298,19 +279,7 @@ export class RegistrationStateService implements ProjectScoped {
   // ── Solver ───────────────────────────────────────────────────────────────
 
   private refit(reg: FrameRegistration): void {
-    let transform: Transform2D = IDENTITY;
-
-    switch (this._transformType()) {
-      case 'affine':
-      case 'homography': // accept either name
-      case 'tps':
-      case 'bspline-grid': {
-        // Affine and homography both go through the homography solver.
-        const result = fitHomography(reg.pairs);
-        if (result) transform = result;
-        break;
-      }
-    }
+    const transform: Transform2D = fitHomography(reg.pairs) ?? IDENTITY;
 
     const updated: FrameRegistration = { ...reg, transform };
     this._registration.set(updated);
