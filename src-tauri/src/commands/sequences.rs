@@ -2,34 +2,27 @@ use std::collections::HashMap;
 
 use rusqlite::params;
 use serde::Serialize;
+use ts_rs::TS;
 use tauri::State;
 
-use crate::storage::DbState;
+use crate::commands::frame::Frame;
+use crate::storage::{queries, DbState};
 use crate::utils::error::{AppError, Result};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct Sequence {
+    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
+    #[ts(type = "number")]
     pub frame_count: i64,
     pub sort_order: i32,
 }
 
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Frame {
-    pub id: i64,
-    pub sequence_id: i64,
-    pub frame_index: i32,
-    pub relative_path: Option<String>,
-    pub width: i32,
-    pub height: i32,
-    pub reviewed: bool,
-    pub is_embedded: bool,
-}
 
 // ── Commands ───────────────────────────────────────────────────────────────
 
@@ -65,16 +58,23 @@ pub fn list_sequences(db: State<DbState>) -> Result<Vec<Sequence>> {
     })
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct GallerySequence {
+    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
+    #[ts(type = "number")]
     pub sort_order: i64,
+    #[ts(type = "number")]
     pub frame_count: i64,
+    #[ts(type = "number")]
     pub reviewed_count: i64,
     /// Frames with at least one annotation (raster mask or vector shape).
+    #[ts(type = "number")]
     pub annotated_count: i64,
+    #[ts(type = "number | null")]
     pub first_frame_id: Option<i64>,
     /// Any registration of this sequence has at least one keypoint pair.
     pub has_keypoints: bool,
@@ -83,7 +83,7 @@ pub struct GallerySequence {
 #[tauri::command]
 pub fn get_gallery_sequences(db: State<DbState>) -> Result<Vec<GallerySequence>> {
     db.with_conn(|conn| {
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare(&format!(
             "SELECT 
                 s.id,
                 s.name,
@@ -93,8 +93,7 @@ pub fn get_gallery_sequences(db: State<DbState>) -> Result<Vec<GallerySequence>>
                     WHEN EXISTS (SELECT 1 FROM frame_reviews fr WHERE fr.frame_id = f.id)
                     THEN f.id END) as reviewed_count,
                 COUNT(DISTINCT CASE
-                    WHEN EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id)
-                      OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id)
+                    WHEN {}
                     THEN f.id END) as annotated_count,
                 MIN(f.id) as first_frame_id,
                 EXISTS (
@@ -106,8 +105,9 @@ pub fn get_gallery_sequences(db: State<DbState>) -> Result<Vec<GallerySequence>>
              FROM sequences s
              LEFT JOIN frames f ON f.sequence_id = s.id
              GROUP BY s.id
-             ORDER BY s.sort_order"
-        ).map_err(|e| AppError::Database(e))?;
+             ORDER BY s.sort_order",
+            queries::FRAME_HAS_ANNOTATION
+        )).map_err(|e| AppError::Database(e))?;
         
         let rows = stmt.query_map([], |row| {
             Ok(GallerySequence {

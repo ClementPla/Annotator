@@ -19,6 +19,7 @@ import { CommonModule } from '@angular/common';
 import { applyTransform, invertHomography, Point2D } from '../../registration.model';
 import { Pyramid, PyramidService } from '../../../../services/pyramid.service';
 import { ViewportController } from '../../viewport-controller';
+import { PyramidView } from '../../pyramid-view';
 import {
   RegistrationStateService,
   colorForIndex,
@@ -52,11 +53,11 @@ export class ViewportPaneComponent
   readonly svgEl = viewChild.required<ElementRef<SVGSVGElement>>('svg');
   readonly movingImageUrl = input<string | null>(null);
   private readonly state = inject(RegistrationStateService);
-  private readonly pyramidSvc = inject(PyramidService);
-
-  private dpr = Math.max(1, window.devicePixelRatio || 1);
-  private resizeObs?: ResizeObserver;
-  private lastSize = { w: 0, h: 0 };
+  private readonly view = new PyramidView(
+    inject(PyramidService),
+    () => this.controller(),
+    () => this.pyramid(),
+  );
 
   /** Drag state for an existing pair point on this pane. */
   private draggingPairId: string | null = null;
@@ -118,51 +119,24 @@ export class ViewportPaneComponent
         this.state.vis().showMovingWarped,
         this.hoveredPairId(),
       ];
-      this.redraw();
+      this.view.redraw();
     });
   }
 
   ngAfterViewInit(): void {
-    this.controller().onRedrawNeeded = () => {
-      this.redraw();
-      this.updateSvgViewBox();
-    };
-
-    this.resizeObs = new ResizeObserver((entries) => {
-      const r = entries[0].contentRect;
-      const w = Math.round(r.width);
-      const h = Math.round(r.height);
-      if (w === 0 || h === 0) return;
-      if (w === this.lastSize.w && h === this.lastSize.h) return;
-      this.lastSize = { w, h };
-
-      this.controller().setSize(w, h);
-      this.resizeCanvas(w, h);
-      this.redraw();
-      this.updateSvgViewBox();
+    this.view.attach({
+      host: this.hostEl().nativeElement,
+      canvas: this.canvasEl().nativeElement,
+      svg: this.svgEl().nativeElement,
     });
-    this.resizeObs.observe(this.hostEl().nativeElement);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    const pyramid = this.pyramid();
-    if (changes['pyramid'] && pyramid) {
-      const { nativeWidth: w, nativeHeight: h } = pyramid;
-      const controller = this.controller();
-      controller.smooth = Math.max(w, h) < 4096;
-      // Fit only once the controller has a size.
-      const size = controller.size();
-      if (size.width > 0 && size.height > 0) {
-        controller.fitImage(w, h, false);
-      }
-      this.redraw();
-      this.updateSvgViewBox();
-    }
+    if (changes['pyramid']) this.view.pyramidChanged();
   }
 
   ngOnDestroy(): void {
-    this.resizeObs?.disconnect();
-    this.controller().onRedrawNeeded = undefined;
+    this.view.detach();
   }
   readonly shouldShowWarped = computed(
     () =>
@@ -192,52 +166,6 @@ export class ViewportPaneComponent
       this.movingImageUrl() !== null,
   );
 
-  private redraw(): void {
-    const canvas = this.canvasEl()?.nativeElement;
-    const pyramid = this.pyramid();
-    if (!canvas || !pyramid) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
-
-    const level = this.pyramidSvc.getLevelForViewport(
-      pyramid,
-      this.controller().scale(),
-      this.controller().size().width,
-      this.controller().size().height,
-    );
-
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    this.controller().applyToContextForLevel(ctx, this.dpr, level);
-    ctx.imageSmoothingEnabled = this.controller().scale() < 1;
-    ctx.drawImage(level.canvas, 0, 0);
-    ctx.restore();
-  }
-
-  private updateSvgViewBox(): void {
-    const pyramid = this.pyramid();
-    const svgEl = this.svgEl();
-    if (!svgEl || !pyramid) return;
-    svgEl.nativeElement.setAttribute(
-      'viewBox',
-      this.controller().getSVGViewBox(
-        pyramid.nativeWidth,
-        pyramid.nativeHeight,
-      ),
-    );
-  }
-
-  private resizeCanvas(w: number, h: number): void {
-    const canvas = this.canvasEl()?.nativeElement;
-    if (!canvas) return;
-    canvas.width = Math.round(w * this.dpr);
-    canvas.height = Math.round(h * this.dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-  }
-
   // ── Mouse handling ───────────────────────────────────────────────────────
 
   // Pointer events, for mouse, pen and finger. A finger places a point when it
@@ -265,7 +193,7 @@ export class ViewportPaneComponent
 
     // No placement on the moving pane while the warp overlay shows.
     if (this.shouldShowWarped()) return;
-    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+    const rect = this.view.canvasRect();
     const native = this.controller().clientToNative(
       event.clientX,
       event.clientY,
@@ -297,15 +225,7 @@ export class ViewportPaneComponent
     const controller = this.controller();
     const step = this.gesture.move(event);
     if (this.gesture.multi) {
-      if (step) {
-        const rect = this.canvasEl().nativeElement.getBoundingClientRect();
-        controller.pinch(
-          controller.clientToViewport(step.pivot.x, step.pivot.y, rect),
-          step.factor,
-          step.dx,
-          step.dy,
-        );
-      }
+      if (step) this.view.pinch(step);
       return;
     }
     if (this.pendingTap) {
@@ -323,7 +243,7 @@ export class ViewportPaneComponent
       return;
     }
     if (this.draggingPairId) {
-      const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+      const rect = this.view.canvasRect();
       const native = controller.clientToNative(
         event.clientX,
         event.clientY,
@@ -337,7 +257,7 @@ export class ViewportPaneComponent
       return;
     }
 
-    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
+    const rect = this.view.canvasRect();
     const native = controller.clientToNative(
       event.clientX,
       event.clientY,
@@ -365,8 +285,7 @@ export class ViewportPaneComponent
   }
 
   onWheel(event: WheelEvent): void {
-    const rect = this.canvasEl().nativeElement.getBoundingClientRect();
-    this.controller().wheel(event, rect);
+    this.view.wheel(event);
   }
   readonly shadowCursor = computed<Point2D | null>(() => {
     if (!this.state.vis().showShadowCursor) return null;

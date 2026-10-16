@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
+import { api } from '../../lib/api';
 import { applyResultMask } from '../../core/misc/label-ops';
 import { CanvasManagerService } from '../../features/editor/drawable-canvas/service/canvas-manager.service';
 import { StateManagerService } from '../../features/editor/drawable-canvas/service/state-manager.service';
@@ -54,7 +54,7 @@ export class SuperpixelService {
       | null)!.getImageData(rect.x, rect.y, rect.width, rect.height).data;
 
     // The map is computed on the first stroke of an image.
-    const result = await invoke<ArrayBufferLike>('superpixel_refine', {
+    const result = await api.superpixelRefine({
       image: this.mapComputed ? [] : imgData.buffer,
       brush: maskData.buffer,
       width: rect.width,
@@ -104,7 +104,7 @@ export class SuperpixelService {
       | OffscreenCanvasRenderingContext2D
       | null)!.getImageData(0, 0, width, height).data;
 
-    const overlay = await invoke<Uint8ClampedArray>('superpixel_overlay', {
+    const overlay = await api.superpixelOverlay({
       image: this.mapComputed ? [] : imgData.buffer,
       width,
       height,

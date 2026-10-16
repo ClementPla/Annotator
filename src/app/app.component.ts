@@ -6,7 +6,7 @@ import { Router, RouterOutlet, RouterModule } from '@angular/router';
 import { save } from '@tauri-apps/plugin-dialog';
 import { api } from './lib/api';
 import { EditorService } from './features/editor/services/editor.service';
-import { AppInitializationService } from './services/app-initialization.service';
+import { TauriEventService } from './services/tauri-event';
 import { ThemeService } from './services/theme.service';
 import { Button } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
@@ -53,7 +53,7 @@ export class AppComponent implements OnInit, OnDestroy {
   uiStateService = inject(UIStateService);
   editorService = inject(EditorService);
   notificationService = inject(NotificationService);
-  private appInitialization = inject(AppInitializationService);
+  private tauriEvents = inject(TauriEventService);
   private themeService = inject(ThemeService);
   private messageService = inject(MessageService);
   private ioService = inject(IOService);
@@ -99,7 +99,7 @@ export class AppComponent implements OnInit, OnDestroy {
     await this.setupCloseGuard();
 
     try {
-      await this.appInitialization.initialize();
+      await this.tauriEvents.initialize();
     } catch (error) {
       console.error('Application initialization failed:', error);
       const detail = error instanceof Error ? error.message : String(error);
@@ -173,7 +173,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.unlistenClose?.();
     this.destroy$.next();
     this.destroy$.complete();
-    this.appInitialization.cleanup();
+    void api.closeProject();
   }
 
   public reload(): void {

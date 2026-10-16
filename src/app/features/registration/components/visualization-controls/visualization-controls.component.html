@@ -1,0 +1,50 @@
+<div class="mode-buttons" role="tablist" aria-label="Visualization mode">
+  @for (opt of options(); track opt.value) {
+    <p-button
+      [label]="opt.label"
+      [icon]="opt.icon"
+      size="small"
+      [severity]="mode() === opt.value ? 'primary' : 'secondary'"
+      (click)="setMode(opt.value)"
+      [attr.aria-selected]="mode() === opt.value"
+      role="tab"
+    ></p-button>
+  }
+  <ng-content />
+</div>
+
+<div class="mode-controls">
+  @if (mode() === "overlay") {
+    <div class="slider-control">
+      <label for="vis-opacity-slider">Opacity</label>
+      <p-slider
+        id="vis-opacity-slider"
+        [ngModel]="vis().overlayOpacity"
+        (ngModelChange)="setOverlayOpacity($event)"
+        [min]="0"
+        [max]="1"
+        [step]="0.01"
+        style="width: 140px"
+      ></p-slider>
+      <span class="slider-val"
+        >{{ vis().overlayOpacity * 100 | number: "1.0-0" }}%</span
+      >
+    </div>
+  }
+
+  @if (mode() === "checkerboard") {
+    <div class="slider-control">
+      <label for="vis-tile-slider">Tile size</label>
+      <p-slider
+        id="vis-tile-slider"
+        [ngModel]="vis().checkerTileSize"
+        (ngModelChange)="setCheckerTileSize($event)"
+        [min]="16"
+        [max]="256"
+        [step]="8"
+        style="width: 140px"
+      ></p-slider>
+      <span class="slider-val">{{ vis().checkerTileSize }} px</span>
+    </div>
+  }
+</div>

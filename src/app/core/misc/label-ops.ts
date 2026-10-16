@@ -147,33 +147,13 @@ export function componentsUnderStroke(
   const visited = new Uint8Array(presence.length);
   const out: number[] = [];
   const stack: number[] = [];
-
-  const flood = (start: number) => {
-    stack.push(start);
-    visited[start] = 1;
-    while (stack.length) {
-      const idx = stack.pop()!;
-      out.push(idx);
-      const px = idx % maskW;
-      const py = (idx / maskW) | 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = px + dx;
-          const ny = py + dy;
-          if (nx < 0 || ny < 0 || nx >= maskW || ny >= maskH) continue;
-          const ni = ny * maskW + nx;
-          if (!visited[ni] && presence[ni] !== 0) {
-            visited[ni] = 1;
-            stack.push(ni);
-          }
-        }
-      }
-    }
-  };
+  const accept = (i: number) => presence[i] !== 0;
+  const visit = (i: number) => out.push(i);
 
   forEachCovered(region, rect, maskW, (idx) => {
-    if (presence[idx] !== 0 && !visited[idx]) flood(idx);
+    if (presence[idx] !== 0 && !visited[idx]) {
+      flood8(maskW, maskH, idx, visited, accept, visit, stack);
+    }
   });
   return out;
 }
@@ -195,31 +175,8 @@ export function clearValueComponentAt(
   const value = mask[start];
   if (value === 0) return false;
 
-  const stack = [start];
-  const seen = new Uint8Array(mask.length);
-  seen[start] = 1;
-  let cleared = false;
-  while (stack.length) {
-    const idx = stack.pop()!;
-    mask[idx] = 0;
-    cleared = true;
-    const px = idx % w;
-    const py = (idx / w) | 0;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = px + dx;
-        const ny = py + dy;
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        const ni = ny * w + nx;
-        if (!seen[ni] && mask[ni] === value) {
-          seen[ni] = 1;
-          stack.push(ni);
-        }
-      }
-    }
-  }
-  return cleared;
+  flood8(w, h, start, new Uint8Array(mask.length), (i) => mask[i] === value, (i) => (mask[i] = 0));
+  return true;
 }
 
 /** Zero the connected component of `mask` containing pixel (x, y). */
@@ -230,34 +187,10 @@ export function clearComponentAt(
   x: number,
   y: number
 ): boolean {
-  const start = y * w + x;
-  if (x < 0 || y < 0 || x >= w || y >= h || mask[start] === 0) return false;
+  if (x < 0 || y < 0 || x >= w || y >= h || mask[y * w + x] === 0) return false;
 
-  const stack = [start];
-  const seen = new Uint8Array(mask.length);
-  seen[start] = 1;
-  let cleared = false;
-  while (stack.length) {
-    const idx = stack.pop()!;
-    mask[idx] = 0;
-    cleared = true;
-    const px = idx % w;
-    const py = (idx / w) | 0;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = px + dx;
-        const ny = py + dy;
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        const ni = ny * w + nx;
-        if (!seen[ni] && mask[ni] !== 0) {
-          seen[ni] = 1;
-          stack.push(ni);
-        }
-      }
-    }
-  }
-  return cleared;
+  flood8(w, h, y * w + x, new Uint8Array(mask.length), (i) => mask[i] !== 0, (i) => (mask[i] = 0));
+  return true;
 }
 
 /**
@@ -311,36 +244,60 @@ export function connectedComponentBoxes(mask: Uint8Array, w: number, h: number):
   const visited = new Uint8Array(mask.length);
   const boxes: Rect[] = [];
   const stack: number[] = [];
+  const accept = (i: number) => mask[i] !== 0;
+  let minX = 0, minY = 0, maxX = 0, maxY = 0;
+  const visit = (idx: number) => {
+    const px = idx % w;
+    const py = (idx / w) | 0;
+    if (px < minX) minX = px;
+    if (py < minY) minY = py;
+    if (px > maxX) maxX = px;
+    if (py > maxY) maxY = py;
+  };
 
   for (let i = 0; i < mask.length; i++) {
     if (mask[i] === 0 || visited[i]) continue;
-
-    let minX = w, minY = h, maxX = 0, maxY = 0;
-    stack.push(i);
-    visited[i] = 1;
-    while (stack.length) {
-      const idx = stack.pop()!;
-      const px = idx % w;
-      const py = (idx / w) | 0;
-      if (px < minX) minX = px;
-      if (py < minY) minY = py;
-      if (px > maxX) maxX = px;
-      if (py > maxY) maxY = py;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = px + dx;
-          const ny = py + dy;
-          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-          const ni = ny * w + nx;
-          if (!visited[ni] && mask[ni] !== 0) {
-            visited[ni] = 1;
-            stack.push(ni);
-          }
-        }
-      }
-    }
+    minX = w; minY = h; maxX = 0; maxY = 0;
+    flood8(w, h, i, visited, accept, visit, stack);
     boxes.push({ x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 });
   }
   return boxes;
+}
+
+/**
+ * Visit the 8-connected region around `start` whose pixels pass `accept`
+ * (`start` itself is not tested). `seen` marks visited pixels and can be
+ * shared across calls so regions are visited once; `stack` can be reused.
+ */
+function flood8(
+  w: number,
+  h: number,
+  start: number,
+  seen: Uint8Array,
+  accept: (i: number) => boolean,
+  visit: (i: number) => void,
+  stack: number[] = []
+): void {
+  stack.push(start);
+  seen[start] = 1;
+  while (stack.length) {
+    const idx = stack.pop()!;
+    visit(idx);
+    const px = idx % w;
+    const py = (idx / w) | 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      const ny = py + dy;
+      if (ny < 0 || ny >= h) continue;
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = px + dx;
+        if (nx < 0 || nx >= w) continue;
+        const ni = ny * w + nx;
+        if (!seen[ni] && accept(ni)) {
+          seen[ni] = 1;
+          stack.push(ni);
+        }
+      }
+    }
+  }
 }

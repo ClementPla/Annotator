@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
+import { api } from '../../lib/api';
 import { binarizeArray } from '../../core/misc/binarize';
 import { applyResultMask } from '../../core/misc/label-ops';
 import { CanvasManagerService } from '../../features/editor/drawable-canvas/service/canvas-manager.service';
@@ -48,7 +48,7 @@ export class MedsamService {
     const imgData = imgCtx.getImageData(0, 0, w, h).data;
 
     // Encoder features are extracted on the first stroke of an image.
-    const result = await invoke<ArrayBufferLike>('mask_sam_segment', {
+    const result = await api.maskSamSegment({
       coarseMask,
       image: this.featuresExtracted ? [] : imgData.buffer,
       threshold: this.threshold,

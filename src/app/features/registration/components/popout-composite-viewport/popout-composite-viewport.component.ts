@@ -9,19 +9,11 @@ import { CommonModule } from '@angular/common';
 import { listen, emitTo, UnlistenFn } from '@tauri-apps/api/event';
 import { CompositeViewportComponent } from '../composite-viewport/composite-viewport.component';
 import { ViewportController } from '../../viewport-controller';
-import {
-  RegistrationStateService,
-  VisualizationMode,
-} from '../../registration-state.service';
+import { RegistrationStateService } from '../../registration-state.service';
 import { Pyramid, PyramidService } from '../../../../services/pyramid.service';
 import { FrameLoaderService } from '../../frame-loader.service';
 import { ButtonModule } from 'primeng/button';
 import { PopoutToolbarComponent } from './popout-toolbar/popout-toolbar.component';
-interface ModeOption {
-  label: string;
-  value: VisualizationMode;
-  icon: string;
-}
 
 @Component({
   selector: 'app-composite-popout',
@@ -50,12 +42,6 @@ export class CompositePopoutComponent implements OnInit, OnDestroy {
   private readonly frameLoader = inject(FrameLoaderService);
   private syncStateRequestId = 0;
  
-  readonly modeOptions: ModeOption[] = [
-    { label: 'Side by side', value: 'side-by-side', icon: 'pi pi-table' },
-    { label: 'Overlay', value: 'overlay', icon: 'pi pi-clone' },
-    { label: 'Checkerboard', value: 'checkerboard', icon: 'pi pi-th-large' },
-  ];
-
   async ngOnInit() {
     const initUnlisten = await listen<any>(
       'init-viewport-data',

@@ -12,6 +12,21 @@ export function makeNode(x: number, y: number, smooth = false): VectorNode {
   return { x, y, inX: x, inY: y, outX: x, outY: y, smooth };
 }
 
+/**
+ * A traced pixel contour as a shape: closed and filled for a region outline,
+ * open and unfilled for a centreline. Corner nodes, since tangents would imply
+ * a precision a pixel trace lacks.
+ */
+export function tracedShape(points: number[][], labelId: number, closed: boolean): VectorShape {
+  return {
+    id: crypto.randomUUID(),
+    labelId,
+    closed,
+    filled: closed,
+    nodes: points.map(([x, y]) => makeNode(x, y)),
+  };
+}
+
 /** The handle sits on its anchor (the end of a straight segment). */
 export function isFlatHandle(
   ax: number,

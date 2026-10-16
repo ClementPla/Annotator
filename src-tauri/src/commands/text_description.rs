@@ -56,19 +56,3 @@ pub fn save_text_description(
         Ok(())
     })
 }
-
-#[tauri::command]
-pub fn delete_text_description(
-    db: State<DbState>,
-    frame_id: i64,
-    field_name: String,
-) -> Result<()> {
-    db.with_conn(|conn| {
-        conn.execute(
-            "DELETE FROM main.text_descriptions
-             WHERE frame_id = ?1 AND label_name = ?2 AND user_id = ?3",
-            params![frame_id, field_name, queries::current_user_id(conn)?],
-        )?;
-        Ok(())
-    })
-}

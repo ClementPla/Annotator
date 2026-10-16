@@ -2486,7 +2486,6 @@ dependencies = [
  "imageproc",
  "itertools 0.14.0",
  "jpeg-decoder",
- "lazy_static",
  "log",
  "ndarray 0.16.1",
  "ndarray-image",

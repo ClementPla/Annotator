@@ -159,8 +159,7 @@ export class DrawService implements OnDestroy {
 
   public swapMarkers(): void {
     const w = this.stateService.width;
-    const h = this.stateService.height;
-    const rect = intRect(this.stateService.getBoundingBox(), w, h);
+    const rect = this.stateService.strokeRect();
     if (!rect) return;
 
     const region = this.canvasManagerService.readBufferRegion(rect);

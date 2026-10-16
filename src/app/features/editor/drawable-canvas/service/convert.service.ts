@@ -19,7 +19,7 @@ import {
   Pt,
   VectorShape,
   buildPathData,
-  makeNode,
+  tracedShape,
   shapeBounds,
 } from '../vector/vector.model';
 
@@ -163,62 +163,23 @@ export class ConvertService {
     return max;
   }
 
-  // ── Vectorize (raster → vector) ─────────────────────────────────────────────
+  // ── Trace (raster → vector) ─────────────────────────────────────────────────
 
   /** Trace the component of the active label under `pixel` into a closed
    *  filled shape, then clear its pixels. */
-  async vectorizeAt(pixel: Pt): Promise<void> {
-    const w = this.state.width;
-    const h = this.state.height;
-    const x = Math.floor(pixel.x);
-    const y = Math.floor(pixel.y);
-    if (x < 0 || y < 0 || x >= w || y >= h) return;
-
-    const li = this.canvasManager.getActiveIndex();
-    const mask = this.canvasManager.getAllMasks()[li];
-    const label = this.labels.listSegmentationLabels[li];
-    if (!mask || !label || mask[y * w + x] === 0) return;
-
-    let polygons: number[][][];
-    try {
-      polygons = await api.vectorizeComponent(mask, w, h, x, y);
-    } catch (error) {
-      console.error('vectorize failed:', error);
-      return;
-    }
-    // The mask may have changed while awaiting.
-    if (polygons.length === 0 || mask[y * w + x] === 0) return;
-
-    const shapes = polygons
-      .filter((poly) => poly.length >= 3)
-      .map((poly) => this.polygonToShape(poly, label.id));
-    if (shapes.length === 0) return;
-
-    clearValueComponentAt(mask, w, h, x, y);
-
-    this.undoRedo.beginGroup();
-    this.undoRedo.snapshotLayers([li]); // raster snapshot (pixels cleared)
-    this.vectorEditor.addShapes(shapes); // vector commit
-    this.undoRedo.endGroup();
-
-    this.refresh();
+  vectorizeAt(pixel: Pt): Promise<void> {
+    return this.traceAt(pixel, true);
   }
-
-  private polygonToShape(poly: number[][], labelId: number): VectorShape {
-    return {
-      id: crypto.randomUUID(),
-      labelId,
-      closed: true,
-      filled: true,
-      nodes: poly.map(([px, py]) => makeNode(px, py, false)),
-    };
-  }
-
-  // ── Skeletonize (raster → open centerline paths) ────────────────────────────
 
   /** Thin the component of the active label under `pixel` to its skeleton, add
    *  each branch as an open path, then clear its pixels. */
-  async skeletonizeAt(pixel: Pt): Promise<void> {
+  skeletonizeAt(pixel: Pt): Promise<void> {
+    return this.traceAt(pixel, false);
+  }
+
+  /** `closed`: the outline as polygons; otherwise the centreline as
+   *  polylines. One undo step covers the cleared pixels and the new shapes. */
+  private async traceAt(pixel: Pt, closed: boolean): Promise<void> {
     const w = this.state.width;
     const h = this.state.height;
     const x = Math.floor(pixel.x);
@@ -230,19 +191,22 @@ export class ConvertService {
     const label = this.labels.listSegmentationLabels[li];
     if (!mask || !label || mask[y * w + x] === 0) return;
 
-    let polylines: number[][][];
+    let traces: number[][][];
     try {
-      polylines = await api.skeletonizeComponent(mask, w, h, x, y);
+      traces = closed
+        ? await api.vectorizeComponent(mask, w, h, x, y)
+        : await api.skeletonizeComponent(mask, w, h, x, y);
     } catch (error) {
-      console.error('skeletonize failed:', error);
+      console.error(closed ? 'vectorize failed:' : 'skeletonize failed:', error);
       return;
     }
     // The mask may have changed while awaiting.
-    if (polylines.length === 0 || mask[y * w + x] === 0) return;
+    if (traces.length === 0 || mask[y * w + x] === 0) return;
 
-    const shapes = polylines
-      .filter((poly) => poly.length >= 2)
-      .map((poly) => this.polylineToShape(poly, label.id));
+    const minPoints = closed ? 3 : 2;
+    const shapes = traces
+      .filter((t) => t.length >= minPoints)
+      .map((t) => tracedShape(t, label.id, closed));
     if (shapes.length === 0) return;
 
     clearValueComponentAt(mask, w, h, x, y);
@@ -253,16 +217,6 @@ export class ConvertService {
     this.undoRedo.endGroup();
 
     this.refresh();
-  }
-
-  private polylineToShape(poly: number[][], labelId: number): VectorShape {
-    return {
-      id: crypto.randomUUID(),
-      labelId,
-      closed: false,
-      filled: false,
-      nodes: poly.map(([px, py]) => makeNode(px, py, false)),
-    };
   }
 
   // ── Shared ──────────────────────────────────────────────────────────────────

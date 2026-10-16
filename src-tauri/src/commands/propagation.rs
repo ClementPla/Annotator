@@ -10,6 +10,7 @@
 
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use tauri::State;
 use uuid::Uuid;
 
@@ -17,8 +18,9 @@ use crate::storage::{DbState, queries};
 use crate::utils::error::Result;
 
 /// How source annotations combine with what the target already has.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub enum PropagationMode {
     /// The target's annotations for every label in scope become exactly the
     /// source's, absent ones included.
@@ -27,8 +29,9 @@ pub enum PropagationMode {
 }
 
 /// Why a requested target was left untouched.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub enum SkipReason {
     /// The target's dimensions differ from the source's: masks and vector nodes
     /// are in image pixels.
@@ -36,17 +39,21 @@ pub enum SkipReason {
     NotFound,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct SkippedFrame {
+    #[ts(type = "number")]
     pub frame_id: i64,
     pub reason: SkipReason,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct PropagationReport {
     /// Frames actually written, in the order requested.
+    #[ts(type = "number[]")]
     pub applied: Vec<i64>,
     pub skipped: Vec<SkippedFrame>,
 }

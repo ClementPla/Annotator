@@ -1,6 +1,7 @@
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use serde::{Serialize, Deserialize};
+use ts_rs::TS;
 use std::collections::HashMap;
 use tauri::State;
 use crate::utils::error::Result;
@@ -109,9 +110,11 @@ pub fn list_labels(db: State<DbState>) -> Result<Vec<LabelId>> {
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct LabelInfo {
+    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
     pub color: String,

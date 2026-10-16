@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 
 import { api } from '../../../../lib/api';
-import { RGBLUT } from './image-adjustment/image-processing.model';
+import { RGBLUT, applyRGBLUT } from './image-adjustment/image-processing.model';
 import { ProjectScoped } from '../../../../core/project-scoped';
 
 /** A native tile ready to draw, positioned at (x, y) in image space. */
@@ -124,14 +124,7 @@ export class TiledImageService implements ProjectScoped {
     const canvas = new OffscreenCanvas(raw.width, raw.height);
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
     ctx.drawImage(raw, 0, 0);
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d = image.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = lut.r[d[i]];
-      d[i + 1] = lut.g[d[i + 1]];
-      d[i + 2] = lut.b[d[i + 2]];
-    }
-    ctx.putImageData(image, 0, 0);
+    applyRGBLUT(ctx, canvas.width, canvas.height, lut);
 
     this.processedCache.set(key, canvas);
     this.processedOrder.push(key);

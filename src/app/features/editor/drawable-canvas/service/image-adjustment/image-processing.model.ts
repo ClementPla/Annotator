@@ -131,6 +131,23 @@ export function composeRGBLUT(state: AdjustmentState): RGBLUT {
   return out;
 }
 
+/** Map every pixel of `ctx` through the LUTs, in place (CPU path). */
+export function applyRGBLUT(
+  ctx: OffscreenCanvasRenderingContext2D,
+  width: number,
+  height: number,
+  lut: RGBLUT,
+): void {
+  const image = ctx.getImageData(0, 0, width, height);
+  const d = image.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = lut.r[d[i]];
+    d[i + 1] = lut.g[d[i + 1]];
+    d[i + 2] = lut.b[d[i + 2]];
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
 /** Pack the LUTs into 256*4 bytes: `[r0,g0,b0,255, r1,g1,b1,255, ...]`. */
 export function packRGBLUT(lut: RGBLUT): Uint8Array {
   const packed = new Uint8Array(256 * 4);

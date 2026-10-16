@@ -550,8 +550,7 @@ fn store_model(
 }
 
 /// Restore the head stored in the open project, if any. A model this build
-/// cannot read is not an error.
-#[tauri::command]
+/// cannot read is not an error. Called when a project opens.
 pub fn ml_load_saved_model(db: State<DbState>, state: State<MlState>) -> Option<TrainSummary> {
     let stored = db.with_conn(|conn| queries::load_ml_model(conn)).ok()??;
     let (json, weights) = stored;

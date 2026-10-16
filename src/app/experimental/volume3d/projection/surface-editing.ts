@@ -1,7 +1,7 @@
 import { Injectable, Provider, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { commitStroke, intRect } from '../../../core/misc/label-ops';
+import { commitStroke } from '../../../core/misc/label-ops';
 import { PostProcessOption } from '../../../core/tools';
 import { LabelsService } from '../../../services/labels/labels.service';
 import { MaskVolumeService } from '../../../services/mask-volume.service';
@@ -114,8 +114,8 @@ export class SurfacePostProcess extends PostProcessService {
     if (option === PostProcessOption.OTSU || option === PostProcessOption.FLOODFILL) {
       return super.getPostProcessFunction();
     }
-    const { width, height } = this.state;
-    const rect = intRect(this.state.getBoundingBox(), width, height);
+    const { width } = this.state;
+    const rect = this.state.strokeRect();
     const mask = this.canvas.getActiveMask();
     if (!rect || !mask) return;
     commitStroke(

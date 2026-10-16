@@ -8,13 +8,14 @@ import { NotificationService } from '../../../../services/notification.service';
 import { CanvasManagerService } from './canvas-manager.service';
 import { UndoRedoService } from './undo-redo.service';
 
-import { api, ScribbleInput, VectorShape, VectorNode } from '../../../../lib/api';
+import { api, ScribbleInput, VectorShape } from '../../../../lib/api';
 
 /** Upper bound on traced shapes. */
 const MAX_TRACED_SHAPES = 64;
 import { VectorEditorService } from './vector-editor.service';
 import { OrchestratorService } from './orchestrator.service';
 import { base64ToUint8 } from '../../../../core/misc/base64';
+import { tracedShape } from '../vector/vector.model';
 
 /**
  * Applies the trained segmentation head to the frame open in the editor. A
@@ -83,32 +84,6 @@ export class PredictionService {
     return { positive, negative };
   }
 
-  /** A traced polygon as an editable path, with corner nodes: the points come
-   *  from a pixel contour, and tangents would imply a precision it lacks. */
-  private polygonToShape(
-    poly: number[][],
-    labelId: number,
-    closed: boolean,
-  ): VectorShape {
-    const nodes: VectorNode[] = poly.map(([x, y]) => ({
-      x,
-      y,
-      inX: x,
-      inY: y,
-      outX: x,
-      outY: y,
-      smooth: false,
-    }));
-    return {
-      id: crypto.randomUUID(),
-      labelId,
-      closed,
-      // An open centreline is not filled.
-      filled: closed,
-      nodes,
-    };
-  }
-
   /**
    * Apply a prediction as vector shapes: the predicted mask is vectorized.
    * `regions` traces each blob's outline into a closed, filled shape;
@@ -149,7 +124,7 @@ export class PredictionService {
                 MAX_TRACED_SHAPES,
               );
         for (const p of traced) {
-          shapes.push(this.polygonToShape(p, m.labelId, mode === 'regions'));
+          shapes.push(tracedShape(p, m.labelId, mode === 'regions'));
         }
       }
 

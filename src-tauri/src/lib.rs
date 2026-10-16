@@ -115,19 +115,11 @@ pub fn run() {
         .manage(commands::frame::ThumbnailCache::default())
         .manage(commands::ml::predict::MlState::default())
         .setup(|app| {
-            #[cfg(not(target_os = "android"))]
-            {
-                let port = connection::settings::load_listen_port(app.handle());
-                app.manage(connection::settings::ActiveListenPort(port));
-                connection::coms::setup_zmq_receiver(app.handle().clone(), port)?;
-            }
             create_main_window(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::segmentation::otsu_segmentation,
-            #[cfg(not(target_os = "android"))]
-            connection::connection::event_processed,
             commands::flood_fill::flood_fill_mask,
             commands::superpixel::superpixel_refine,
             commands::superpixel::superpixel_overlay,
@@ -195,7 +187,6 @@ pub fn run() {
             commands::classification::save_sequence_classification,
             commands::text_description::save_text_description,
             commands::text_description::load_text_descriptions,
-            commands::text_description::delete_text_description,
             commands::dataset_io::list_dataset_formats,
             commands::dataset_io::export_dataset,
             commands::dataset_io::import_dataset,
@@ -203,10 +194,6 @@ pub fn run() {
             commands::registration::load_registration,
             commands::registration::list_registrations,
             commands::registration::delete_registration,
-            #[cfg(not(target_os = "android"))]
-            connection::settings::get_listen_port,
-            #[cfg(not(target_os = "android"))]
-            connection::settings::set_listen_port,
             #[cfg(not(target_os = "android"))]
             commands::python::inference_connect,
             #[cfg(not(target_os = "android"))]
@@ -225,8 +212,6 @@ pub fn run() {
             commands::ml::commands::ml_train_model,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_model_status,
-            #[cfg(not(target_os = "android"))]
-            commands::ml::commands::ml_load_saved_model,
             #[cfg(not(target_os = "android"))]
             commands::ml::commands::ml_forget_model,
             #[cfg(not(target_os = "android"))]

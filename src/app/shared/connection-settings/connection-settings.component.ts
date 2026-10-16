@@ -12,13 +12,9 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
 
-import { api } from '../../lib/api';
 import { InferenceClientService } from '../../services/inference-client.service';
 
-const LOCAL_HOSTS = ['127.0.0.1', 'localhost', '::1'];
-
-/** The two network settings: where the user's Python server is, and the port
- *  the application listens on. */
+/** Where the user's Python functions server is. */
 @Component({
   selector: 'app-connection-settings',
   standalone: true,
@@ -40,13 +36,6 @@ export class ConnectionSettingsComponent {
   // Drafts, committed by the buttons.
   readonly host = signal('');
   readonly port = signal(0);
-  readonly listenPort = signal(0);
-
-  /** The port the running application is bound to. */
-  readonly activeListenPort = signal<number | null>(null);
-  /** The port it will bind to at the next launch. */
-  readonly configuredListenPort = signal<number | null>(null);
-  readonly listenError = signal<string | null>(null);
 
   readonly pythonStatus = computed(() => {
     const status = this.inference.status();
@@ -70,34 +59,12 @@ export class ConnectionSettingsComponent {
     }
   });
 
-  readonly restartNeeded = computed(() => {
-    const active = this.activeListenPort();
-    const configured = this.configuredListenPort();
-    return active !== null && configured !== null && active !== configured;
-  });
-
-  /** Both ends cannot use one local port. */
-  readonly clash = computed(
-    () =>
-      LOCAL_HOSTS.includes(this.host().trim()) &&
-      this.port() === this.listenPort(),
-  );
-
-  async onShow(): Promise<void> {
+  onShow(): void {
     // Keeps the status line live while the popover is open.
     this.inference.startDiscovery();
     const { host, port } = this.inference.endpoint();
     this.host.set(host);
     this.port.set(port);
-    this.listenError.set(null);
-    try {
-      const { active, configured } = await api.getListenPort();
-      this.activeListenPort.set(active);
-      this.configuredListenPort.set(configured);
-      this.listenPort.set(configured);
-    } catch (error) {
-      this.listenError.set(String(error));
-    }
   }
 
   onHide(): void {
@@ -109,16 +76,6 @@ export class ConnectionSettingsComponent {
       await this.inference.connect(this.host().trim(), this.port());
     } catch {
       // The status line already says the server is not there.
-    }
-  }
-
-  async applyListenPort(): Promise<void> {
-    this.listenError.set(null);
-    try {
-      await api.setListenPort(this.listenPort());
-      this.configuredListenPort.set(this.listenPort());
-    } catch (error) {
-      this.listenError.set(String(error));
     }
   }
 }

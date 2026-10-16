@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Point2D } from '../interface';
 import { EditorService } from '../../services/editor.service';
 import { ProjectScoped } from '../../../../core/project-scoped';
+import { Rect, intRect } from '../../../../core/misc/label-ops';
 
 @Injectable({ providedIn: 'root' })
 export class StateManagerService implements ProjectScoped {
@@ -51,6 +52,12 @@ export class StateManagerService implements ProjectScoped {
       x: Math.min(this.width,  Math.max(this.maxPoint.x, point.x + offset)),
       y: Math.min(this.height, Math.max(this.maxPoint.y, point.y + offset)),
     };
+  }
+
+  /** The stroke's bounding box as an integer rect clamped to the image, or
+   *  null when the stroke is empty. */
+  strokeRect(): Rect | null {
+    return intRect(this.getBoundingBox(), this.width, this.height);
   }
 
   getBoundingBox() {

@@ -19,6 +19,19 @@ import type { TaskAgreement } from './generated/TaskAgreement';
 import type { UserChange } from './generated/UserChange';
 import type { UserFootprint } from './generated/UserFootprint';
 import type { UserInfo } from './generated/UserInfo';
+import type { Frame } from './generated/Frame';
+import type { GallerySequence } from './generated/GallerySequence';
+import type { KeypointPair as KeypointPairWire } from './generated/KeypointPair';
+import type { LabelInfo } from './generated/LabelInfo';
+import type { PropagationMode } from './generated/PropagationMode';
+import type { PropagationReport } from './generated/PropagationReport';
+import type { RegistrationData } from './generated/RegistrationData';
+import type { RegistrationSummary } from './generated/RegistrationSummary';
+import type { Sequence } from './generated/Sequence';
+import type { SkipReason } from './generated/SkipReason';
+import type { SkippedFrame } from './generated/SkippedFrame';
+import type { VectorNode } from './generated/VectorNode';
+import type { VectorShape } from './generated/VectorShape';
 
 export type {
   ScanOptions,
@@ -38,25 +51,19 @@ export type {
   UserChange,
   UserFootprint,
   UserInfo,
+  Frame,
+  GallerySequence,
+  LabelInfo,
+  PropagationMode,
+  PropagationReport,
+  RegistrationData,
+  RegistrationSummary,
+  Sequence,
+  SkipReason,
+  SkippedFrame,
+  VectorNode,
+  VectorShape,
 };
-export interface Sequence {
-  id: number;
-  name: string;
-  frameCount: number;
-  sortOrder: number;
-}
-
-export interface Frame {
-  id: number;
-  sequenceId: number;
-  frameIndex: number;
-  relativePath: string | null;
-  width: number;
-  height: number;
-  reviewed: boolean;
-  isEmbedded: boolean;
-}
-
 export interface FrameImage {
   frame: Frame;
   imageBase64: string; // data URL: "data:image/png;base64,..."
@@ -155,14 +162,6 @@ export interface LabelId {
   name: string;
 }
 
-export interface LabelInfo {
-  id: number;
-  name: string;
-  color: string;
-  isInstance: boolean;
-  sortOrder: number;
-}
-
 export interface ExportResult {
   totalExported: number;
   errors: string[];
@@ -205,44 +204,10 @@ export interface ImportResult {
   errors: string[];
 }
 
-export interface GallerySequence {
-  id: number;
-  name: string;
-  sortOrder: number;
-  frameCount: number;
-  reviewedCount: number;
-  annotatedCount: number;
-  firstFrameId: number | null;
-  hasKeypoints: boolean;
-}
 export type KeypointSource = 'user' | 'prefilled';
-export interface KeypointPair {
-  clientUuid: string;
-  refX: number;
-  refY: number;
-  movingX: number;
-  movingY: number;
-  source?: KeypointSource;
-}
-
-export interface RegistrationData {
-  referenceFrameId: number;
-  movingFrameId: number;
-  /** 9 floats for a 3x3 homography (row-major), or null if no fit yet. */
-  homography:
-    | [number, number, number, number, number, number, number, number, number]
-    | null;
-  transformType: 'homography';
-  pairs: KeypointPair[];
-}
-
-export interface RegistrationSummary {
-  referenceFrameId: number;
-  movingFrameId: number;
-  transformType: string;
-  hasHomography: boolean;
-  pairCount: number;
-}
+/** A pair as the frontend holds it: the wire type, plus where it came from
+ *  (not stored). */
+export type KeypointPair = KeypointPairWire & { source?: KeypointSource };
 
 // ── Python bridge ───────────────────────────────────────────────────────────
 
@@ -300,38 +265,9 @@ type WirePair = [[number, number], [number, number]];
 // ── Vector annotations ──────────────────────────────────────────────────────
 // Handles are absolute image-space coordinates; a straight segment is a node
 // whose handles equal its anchor.
-export interface VectorNode {
-  x: number;
-  y: number;
-  inX: number;
-  inY: number;
-  outX: number;
-  outY: number;
-  /** The two handles stay collinear when edited. */
-  smooth: boolean;
-}
-
-export interface VectorShape {
-  id: string;
-  labelId: number;
-  closed: boolean;
-  /** Only meaningful when `closed`. */
-  filled: boolean;
-  nodes: VectorNode[];
-}
-
 export interface VectorAnnotationsWire {
   labelId: number;
   shapes: VectorShape[];
-}
-
-export type PropagationMode = 'replace';
-
-export type PropagationSkipReason = 'sizeMismatch' | 'notFound';
-
-export interface PropagationReport {
-  applied: number[];
-  skipped: { frameId: number; reason: PropagationSkipReason }[];
 }
 
 // ── Segmentation-head lab ────────────────────────────────────────────────────
@@ -446,6 +382,14 @@ export interface PredictedFrame {
 export interface ScribbleInput {
   positive: number[];
   negative: number[];
+}
+
+/** The refinement options Otsu and flood fill share. */
+export interface RefineOptions {
+  inverse: boolean;
+  smooth: number;
+  fillHoles: boolean;
+  connectedness: boolean;
 }
 
 export const api = {
@@ -584,6 +528,64 @@ export const api = {
       minArea,
       maxShapes,
     }),
+
+  // ── Stroke post-processing: RGBA bytes in, a mask region out ──────────────
+
+  /** Otsu threshold of the image under the stroke's mask. */
+  otsuSegmentation: (
+    args: {
+      mask: ArrayBufferLike;
+      image: ArrayBufferLike;
+      denoiseSigma: number;
+      width: number;
+      height: number;
+    } & RefineOptions,
+  ) => invoke<ArrayBufferLike>('otsu_segmentation', { ...args }),
+
+  /** Flood fill by colour from (startX, startY), within `tolerance`. */
+  floodFillMask: (
+    args: {
+      image: ArrayBufferLike;
+      width: number;
+      height: number;
+      startX: number;
+      startY: number;
+      tolerance: number;
+    } & RefineOptions,
+  ) => invoke<ArrayBufferLike>('flood_fill_mask', { ...args }),
+
+  /** Keep the superpixels a stroke covers. `image` may be empty once the map
+   *  for this image is computed (`computeMap: false`). */
+  superpixelRefine: (args: {
+    image: ArrayBufferLike | number[];
+    brush: ArrayBufferLike;
+    width: number;
+    height: number;
+    computeMap: boolean;
+    targetCount: number;
+    similarityThreshold: number;
+    minOverlapFraction: number;
+  }) => invoke<ArrayBufferLike>('superpixel_refine', args),
+
+  /** The superpixel boundaries as an RGBA overlay. */
+  superpixelOverlay: (args: {
+    image: ArrayBufferLike | number[];
+    width: number;
+    height: number;
+    computeMap: boolean;
+    targetCount: number;
+  }) => invoke<Uint8ClampedArray>('superpixel_overlay', args),
+
+  /** SAM-style refinement of a coarse mask. `image` may be empty once the
+   *  encoder features are extracted (`extractFeatures: false`). */
+  maskSamSegment: (args: {
+    coarseMask: boolean[] | Uint8Array;
+    image: ArrayBufferLike | number[];
+    threshold: number;
+    width: number;
+    height: number;
+    extractFeatures: boolean;
+  }) => invoke<ArrayBufferLike>('mask_sam_segment', args),
 
   vectorizeComponent: (
     mask: Uint8Array,
@@ -763,8 +765,6 @@ export const api = {
 
   saveTextDescription: (frameId: number, fieldName: string, content: string) =>
     invoke<void>('save_text_description', { frameId, fieldName, content }),
-  deleteTextDescription: (frameId: number, fieldName: string) =>
-    invoke<void>('delete_text_description', { frameId, fieldName }),
 
   getSequenceClassification: (sequenceId: number) =>
     invoke<SequenceClassification>('get_sequence_classification', {
@@ -846,13 +846,6 @@ export const api = {
 
   exportProjectFile: (location: string) =>
     invoke<void>('export_project_file', { location }),
-
-  /** The remote-control port: the one in use, and the one set for next launch. */
-  getListenPort: () =>
-    invoke<{ active: number; configured: number }>('get_listen_port'),
-
-  /** Takes effect the next time the application starts. */
-  setListenPort: (port: number) => invoke<void>('set_listen_port', { port }),
 
   /** Ping the Python server and make it the bridge's endpoint. `probe` is the
    *  background discovery poll. */

@@ -1,6 +1,7 @@
 use base64::{ engine::general_purpose::STANDARD as BASE64, Engine };
 use rusqlite::params;
 use serde::{ Serialize };
+use ts_rs::TS;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -12,10 +13,13 @@ use crate::utils::error::{ AppError, Result };
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct Frame {
+  #[ts(type = "number")]
   pub id: i64,
+  #[ts(type = "number")]
   pub sequence_id: i64,
   pub frame_index: i32,
   pub relative_path: Option<String>,

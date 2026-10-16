@@ -1,14 +1,13 @@
 import { Injectable, Injector, inject } from '@angular/core';
+import { api, RefineOptions } from '../../../../lib/api';
 import { EditorService } from '../../services/editor.service';
 import { CanvasManagerService } from './canvas-manager.service';
 import { StateManagerService } from './state-manager.service';
 import { ImageAdjustmentService } from './image-adjustment/image-adjustment.service';
-import { invoke } from '@tauri-apps/api/core';
 import {
   applyRegionResult,
   componentsUnderStroke,
   unionPresence,
-  intRect,
 } from '../../../../core/misc/label-ops';
 import { PostProcessOption } from '../../../../core/tools';
 import { LabelsService } from '../../../../services/labels/labels.service';
@@ -41,7 +40,7 @@ export class PostProcessService {
   }
 
   /** The refinement options Otsu and flood fill share. */
-  private refinement() {
+  private refinement(): RefineOptions {
     const { smoothing, lineWidth, useInverse, fillHoles, enforceConnectivity } =
       this.editorService;
     return {
@@ -55,8 +54,7 @@ export class PostProcessService {
 
   async otsu_post_process() {
     const w = this.stateService.width;
-    const h = this.stateService.height;
-    const rect = intRect(this.stateService.getBoundingBox(), w, h);
+    const rect = this.stateService.strokeRect();
     if (!rect) return;
 
     const imgCtx = this.imageContext();
@@ -64,7 +62,7 @@ export class PostProcessService {
     const imageData = imgCtx.getImageData(rect.x, rect.y, rect.width, rect.height).data;
     const maskData = this.canvasManagerService.readBufferRegion(rect);
 
-    const result = await invoke<ArrayBufferLike>('otsu_segmentation', {
+    const result = await api.otsuSegmentation({
       mask: maskData.buffer,
       image: imageData.buffer,
       denoiseSigma: this.editorService.denoise,
@@ -79,8 +77,7 @@ export class PostProcessService {
 
   async flood_fill_post_process() {
     const w = this.stateService.width;
-    const h = this.stateService.height;
-    const rect = intRect(this.stateService.getBoundingBox(), w, h);
+    const rect = this.stateService.strokeRect();
     if (!rect) return;
 
     const imgCtx = this.imageContext();
@@ -90,7 +87,7 @@ export class PostProcessService {
     const clickX = Math.floor(this.zoomPanService.currentPixel.x - rect.x);
     const clickY = Math.floor(this.zoomPanService.currentPixel.y - rect.y);
 
-    const result = await invoke<ArrayBufferLike>('flood_fill_mask', {
+    const result = await api.floodFillMask({
       image: imageData.buffer,
       width: rect.width,
       height: rect.height,
@@ -109,7 +106,7 @@ export class PostProcessService {
   async eraseConnectedComponents_post_process() {
     const w = this.stateService.width;
     const h = this.stateService.height;
-    const rect = intRect(this.stateService.getBoundingBox(), w, h);
+    const rect = this.stateService.strokeRect();
     if (!rect) return;
 
     const region = this.canvasManagerService.readBufferRegion(rect);

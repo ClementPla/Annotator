@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use tauri::State;
 
 use crate::storage::{queries, DbState};
@@ -37,14 +38,7 @@ pub fn save_vector_annotations(
         let shapes_json = serde_json::to_string(&shapes)
             .map_err(|e| AppError::Generic(format!("Failed to serialize shapes: {}", e)))?;
 
-        conn.execute(
-            "INSERT INTO main.vector_annotations (frame_id, label_id, user_id, shapes, modified_at)
-             VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)
-             ON CONFLICT(frame_id, label_id, user_id)
-             DO UPDATE SET shapes = excluded.shapes, modified_at = CURRENT_TIMESTAMP",
-            (frame_id, label_id, user, &shapes_json),
-        )?;
-        Ok(())
+        queries::upsert_vector_shapes(conn, frame_id, label_id, user, &shapes_json)
     })
 }
 
@@ -77,8 +71,9 @@ pub fn load_vector_annotations(
 
 // ── Geometry + rasterization (used by export) ──────────────────────────────
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct VectorNode {
     pub x: f64,
     pub y: f64,
@@ -86,15 +81,19 @@ pub struct VectorNode {
     pub in_y: f64,
     pub out_x: f64,
     pub out_y: f64,
+    /// The two handles stay collinear when edited.
     pub smooth: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct VectorShape {
     pub id: String,
+    #[ts(type = "number")]
     pub label_id: i64,
     pub closed: bool,
+    /// Only meaningful when `closed`.
     pub filled: bool,
     pub nodes: Vec<VectorNode>,
 }

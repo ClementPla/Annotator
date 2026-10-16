@@ -1,11 +1,13 @@
 use serde::{Serialize, Deserialize};
+use ts_rs::TS;
 use tauri::State;
 use crate::storage::DbState;
 use crate::utils::error::Result;
 use crate::utils::AppError;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct KeypointPair {
     /// Stable UUID assigned by the frontend.
     pub client_uuid: String,
@@ -15,26 +17,35 @@ pub struct KeypointPair {
     pub moving_y: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct RegistrationData {
+    #[ts(type = "number")]
     pub reference_frame_id: i64,
+    #[ts(type = "number")]
     pub moving_frame_id: i64,
     /// 9 floats for a 3x3 homography (row-major), or null if no fit yet.
     pub homography: Option<[f64; 9]>,
+    /// Always "homography": the only transform the app fits.
+    #[ts(type = "\"homography\"")]
     pub transform_type: String,
     pub pairs: Vec<KeypointPair>,
 }
 
 /// One registration case in a sequence: a (reference, moving) frame pair. A
 /// frame may appear in several.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct RegistrationSummary {
+    #[ts(type = "number")]
     pub reference_frame_id: i64,
+    #[ts(type = "number")]
     pub moving_frame_id: i64,
     pub transform_type: String,
     pub has_homography: bool,
+    #[ts(type = "number")]
     pub pair_count: i64,
 }
 

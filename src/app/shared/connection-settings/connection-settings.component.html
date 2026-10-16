@@ -3,7 +3,7 @@
   [rounded]="true"
   [text]="true"
   [raised]="true"
-  pTooltip="Connections: Python server and remote-control port"
+  pTooltip="Connection to your Python functions server"
   tooltipPosition="bottom"
   ariaLabel="Connection settings"
   (onClick)="popover.toggle($event)"
@@ -52,51 +52,5 @@
         >{{ pythonStatus().text }}</small
       >
     </section>
-
-    <section class="connections__section">
-      <h4 class="connections__title">Remote-control port</h4>
-      <small class="connections__hint">
-        The port Didascalie itself listens on, for scripts that drive it.
-      </small>
-      <div class="connections__row">
-        <label class="connections__field">
-          <span>Port</span>
-          <p-inputNumber
-            [ngModel]="listenPort()"
-            (ngModelChange)="listenPort.set($event ?? 0)"
-            [useGrouping]="false"
-            [min]="1024"
-            [max]="65535"
-            inputStyleClass="connections__port"
-          />
-        </label>
-        <p-button
-          label="Save"
-          size="small"
-          [disabled]="!listenPort() || listenPort() === configuredListenPort()"
-          (onClick)="applyListenPort()"
-        />
-      </div>
-      @if (listenError(); as error) {
-        <small class="connections__status connections__status--warn">{{
-          error
-        }}</small>
-      } @else if (restartNeeded()) {
-        <small class="connections__status connections__status--warn">
-          Listening on {{ activeListenPort() }} until Didascalie is restarted.
-        </small>
-      } @else if (activeListenPort() !== null) {
-        <small class="connections__status"
-          >Listening on {{ activeListenPort() }}</small
-        >
-      }
-    </section>
-
-    @if (clash()) {
-      <small class="connections__status connections__status--warn">
-        Both use port {{ port() }} on this machine: whichever starts second
-        cannot open it.
-      </small>
-    }
   </div>
 </p-popover>

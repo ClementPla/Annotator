@@ -8,6 +8,7 @@ import {
   CurvePoints,
   Histogram,
   RGBLUT,
+  applyRGBLUT,
   autoStretchAdjustment,
   composeRGBLUT,
   computeHistogram,
@@ -96,15 +97,7 @@ export class ImageAdjustmentService implements OnDestroy {
       | null;
     if (!ctx) return;
 
-    const lut = composeRGBLUT(this.state);
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d = image.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = lut.r[d[i]];
-      d[i + 1] = lut.g[d[i + 1]];
-      d[i + 2] = lut.b[d[i + 2]];
-    }
-    ctx.putImageData(image, 0, 0);
+    applyRGBLUT(ctx, canvas.width, canvas.height, composeRGBLUT(this.state));
   }
 
   // ── Adjustment API ───────────────────────────────────────────────────────

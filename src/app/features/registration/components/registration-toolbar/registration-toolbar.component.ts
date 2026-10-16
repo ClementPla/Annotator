@@ -1,27 +1,16 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-
 import { ButtonModule } from 'primeng/button';
-import { SliderModule } from 'primeng/slider';
+import { TooltipModule } from 'primeng/tooltip';
 import { IS_MOBILE } from '../../../../core/platform';
 
-import {
-  RegistrationStateService,
-  VisualizationMode,
-} from '../../registration-state.service';
-
-interface ModeOption {
-  label: string;
-  value: VisualizationMode;
-  icon: string;
-}
+import { RegistrationStateService } from '../../registration-state.service';
+import { VisualizationControlsComponent } from '../visualization-controls/visualization-controls.component';
 
 @Component({
   selector: 'app-registration-toolbar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, ButtonModule, SliderModule],
+  imports: [ButtonModule, TooltipModule, VisualizationControlsComponent],
   templateUrl: './registration-toolbar.component.html',
   styleUrl: './registration-toolbar.component.scss',
 })
@@ -46,32 +35,8 @@ export class RegistrationToolbarComponent {
   }
   readonly state = inject(RegistrationStateService);
 
-  readonly modeOptions: ModeOption[] = [
-    { label: 'Side by side', value: 'side-by-side', icon: 'pi pi-table' },
-    { label: 'Overlay', value: 'overlay', icon: 'pi pi-clone' },
-    { label: 'Checkerboard', value: 'checkerboard', icon: 'pi pi-th-large' },
-  ];
-
   readonly mode = this.state.mode;
   readonly vis = this.state.vis;
-
-  setMode(mode: VisualizationMode): void {
-    this.state.setMode(mode);
-  }
-
-  get overlayOpacity(): number {
-    return this.vis().overlayOpacity;
-  }
-  set overlayOpacity(v: number) {
-    this.state.setOverlayOpacity(v);
-  }
-
-  get checkerTileSize(): number {
-    return this.vis().checkerTileSize;
-  }
-  set checkerTileSize(v: number) {
-    this.state.setCheckerTileSize(v);
-  }
 
   get syncPanZoom(): boolean {
     return this.vis().syncPanZoom;

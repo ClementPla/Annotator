@@ -227,10 +227,6 @@ The application looks at `127.0.0.1:5556`. To change it, click **Connections**
 (:material-link-variant:) at the right of the top toolbar and set the host and
 port under **Python functions server**.
 
-The same popover sets the **Remote-control port**, the one Didascalie itself
-listens on (5555 by default). It applies after a restart, and must differ from
-the server's port when both run on the same machine.
-
 <!-- SCREENSHOT: the Connections popover, connected to a server. -->
 
 ## Troubleshooting

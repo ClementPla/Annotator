@@ -2,7 +2,6 @@ import { ToolContext } from '../interface';
 import {
   commitStroke,
   eraseStrokeFromMasks,
-  intRect,
   Rect,
 } from '../../../../core/misc/label-ops';
 
@@ -12,9 +11,7 @@ export abstract class BaseTool {
   protected readStrokeRegion(
     context: ToolContext
   ): { region: Uint8ClampedArray; rect: Rect } | null {
-    const w = context.stateService.width;
-    const h = context.stateService.height;
-    const rect = intRect(context.stateService.getBoundingBox(), w, h);
+    const rect = context.stateService.strokeRect();
     if (!rect) return null;
 
     const region = context.canvasManager.readBufferRegion(rect);

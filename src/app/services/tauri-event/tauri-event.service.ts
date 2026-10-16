@@ -1,13 +1,16 @@
-import { Injectable, NgZone, inject } from '@angular/core';
+import { Injectable, NgZone, OnDestroy, inject } from '@angular/core';
 import { Subject } from 'rxjs';
-import { TauriEventBase } from './tauri-event-base';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { DownloadProgress } from './interface';
 
+/** Tauri events, re-emitted as observables inside NgZone. */
 @Injectable({
   providedIn: 'root'
 })
-export class TauriEventService extends TauriEventBase {
+export class TauriEventService implements OnDestroy {
+  private ngZone = inject(NgZone);
   private initialized = false;
+  private unlistenFunctions: UnlistenFn[] = [];
 
   private downloadProgressSubject = new Subject<DownloadProgress>();
   private segmentationStartedSubject = new Subject<void>();
@@ -16,12 +19,6 @@ export class TauriEventService extends TauriEventBase {
   public downloadProgress$ = this.downloadProgressSubject.asObservable();
   public segmentationStarted$ = this.segmentationStartedSubject.asObservable();
   public segmentationCompleted$ = this.segmentationCompletedSubject.asObservable();
-
-  constructor() {
-    const ngZone = inject(NgZone);
-
-    super(ngZone);
-  }
 
   public async initialize(): Promise<void> {
     if (this.initialized) {
@@ -59,14 +56,24 @@ export class TauriEventService extends TauriEventBase {
     }
   }
 
-  public isInitialized(): boolean {
-    return this.initialized;
+  /** Register a listener whose handler runs in NgZone. */
+  private async registerListener<T>(
+    eventName: string,
+    handler: (payload: T) => void | Promise<void>
+  ): Promise<void> {
+    const unlisten = await listen<T>(eventName, async (event) => {
+      await this.ngZone.run(async () => {
+        await handler(event.payload);
+      });
+    });
+    this.unlistenFunctions.push(unlisten);
   }
 
-  override ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.downloadProgressSubject.complete();
     this.segmentationStartedSubject.complete();
     this.segmentationCompletedSubject.complete();
-    super.ngOnDestroy();
+    this.unlistenFunctions.forEach((unlisten) => unlisten());
+    this.unlistenFunctions = [];
   }
 }
