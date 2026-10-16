@@ -223,9 +223,10 @@ serve(port=5556, host="tcp://*")
 
 `serve` blocks. Register every function before calling it.
 
-The application looks at `127.0.0.1:5556`. To change it, click **Connections**
-(:material-link-variant:) at the right of the top toolbar and set the host and
-port under **Python functions server**.
+The application looks at `127.0.0.1:5556`. To change it, click the connection
+button (:material-link-variant:) at the right of the top toolbar and set the host
+and port under **Python functions server**. The registration sidebar has the same
+setting under **Change port**.
 
 <!-- SCREENSHOT: the Connections popover, connected to a server. -->
 
@@ -233,7 +234,7 @@ port under **Python functions server**.
 
 | Symptom | Cause |
 | --- | --- |
-| The panel does not appear | The script is not running, serves no segmentation function, or the host and port in **Connections** do not match. |
+| The panel does not appear | The script is not running, serves no segmentation function, or the host and port under **Python functions server** do not match. |
 | No **Whole sequence** group | The open sequence has a single frame. |
 | "Nothing applied" | The function returned no mask, or only keys that are not label names. |
 | A shape error | A mask is not the size of the frame. |

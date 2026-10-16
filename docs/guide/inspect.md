@@ -12,7 +12,7 @@ The inspector does not edit labels. It can mark a sequence as reviewed.
 - From the **gallery**: the video button on a sequence.
 - From the **editor**: the **Inspect sequence** button, which opens the sequence
   you are working on.
-- From the left toolbar: the video icon.
+- From the top bar: the video icon.
 
 <video src="../../assets/screenshots/inspect.webm" poster="../../assets/screenshots/inspect_poster.jpg"
        autoplay loop muted playsinline controls preload="metadata" style="width: 100%"

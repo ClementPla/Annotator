@@ -39,8 +39,8 @@ Options next to the tools:
 
 - **Swap labels**: the stroke replaces any other label under it.
 - **All labels** (eraser): erases every label, not only the active one.
-- The eraser can also remove the whole connected region it touches, which is
-  quicker than rubbing out a region pixel by pixel.
+- **Connected regions** (eraser): removes every connected region the stroke
+  touches, which is quicker than rubbing out a region pixel by pixel.
 
 A stroke does not have to follow the boundary. With **Auto-segment** (++d++), an
 operator refines each stroke when you release it. See
@@ -72,7 +72,8 @@ and ++ctrl++ draws it from its center. Both are ordinary shapes once drawn, so
 
 A selected shape shows a pivot at its center with a knob above it. Drag the
 pivot to move the shape and the knob to rotate it; hold ++shift++ to rotate in
-15° steps. With several shapes selected they move and rotate together. The
+15° steps. With several shapes selected they move and rotate together.
+
 A box or an ellipse selected on its own also shows a grip on each side: drag one
 to move that side in or out, the opposite side staying where it is. This works
 at any rotation. The pivot also appears on a shape just drawn with **Box** or **Ellipse**, and
@@ -83,7 +84,27 @@ clicking another shape with those tools moves it there.
 - **Trace outline** (++v++): click a painted region to get its border as a shape.
 - **Trace centerline** (++k++): click a painted region to get its centreline as a
   line. Use it for vessels, ducts and other elongated structures.
-- **Rasterize**: paints every shape into the mask of its label.
+- **Rasterize** (the paint-roller button next to the vector tools): paints every
+  shape back into the mask of its label.
+
+## Display options
+
+The menu on the right of the editor has a few more switches:
+
+- **Apply image adjustments** (++q++): brightness, contrast, gamma and tone
+  curves, set in the settings panel. The stored image is never modified, but the
+  [operators](assistance.md#adjustments-feed-the-operators) see the adjusted one.
+- **Show only edges** (++ctrl+e++): masks as outlines.
+- **Show bounding boxes**: a box around each connected region of each label.
+  **Merge boxes across labels** boxes the regions of all visible labels
+  together. **Erase an object by clicking its bounding box** makes a click on a
+  box, with the eraser active, remove that region, or delete that shape.
+- **Fit to view after navigation** (on by default): the image is refitted when
+  you change frame. Turn it off to keep the same zoom and position while
+  comparing frames.
+- **GPU rendering** (on by default): draws the labels on the GPU, which is
+  faster on large images. The application falls back to the CPU by itself when
+  the GPU is unavailable; turn it off if the labels display incorrectly.
 
 ## Moving around
 
@@ -105,9 +126,10 @@ The history belongs to the frame. It is reset when you open another frame.
 
 For a sequence with several frames, the **Navigation** panel adds:
 
-- **Propagate labels**: copies the labels of the current frame to the following
+- **Propagate labels…**: copies the labels of the current frame to the following
   frames, or to all the other frames. You can copy all labels or only the active
-  one. The copied labels replace what the target frames had.
+  one. The copied labels replace what the target frames had. The copy button in
+  the editor menu repeats the last choice, after asking for confirmation.
 - **Clear sequence**: removes the labels of every frame.
 - **Inspect sequence**: plays the sequence with its labels. See
   [Inspecting sequences](inspect.md).

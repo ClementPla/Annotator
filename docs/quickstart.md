@@ -41,12 +41,14 @@ frames, so a frame you have not marked is ignored in the next step.
 
 ## 4. Train on a few scribbles
 
-Open the model panel and train once you have a handful of reviewed frames. The
-first run is slow because it downloads the encoder and computes features for each
-image. The features are then cached, and retraining is fast.
+Once you have a few reviewed frames (at least two), open **Segmentation head
+lab** from the top bar and click **Train model**. The built-in features need no
+download; a pretrained encoder can be downloaded from the same page for better
+results.
 
-Apply the model to unlabelled frames and correct its predictions. Details are in
-[Assisted labelling](guide/assistance.md).
+Back in the editor, the **Model** button predicts the open frame. Correct the
+prediction, mark the frame reviewed, and train again. Details are in
+[Assisted labelling](guide/assistance.md#training-a-model-on-your-own-data).
 
 ## 5. Get the data out
 
@@ -56,10 +58,10 @@ project directly from Python:
 ```python
 from didascalie import DidascalieProject
 
-with DidascalieProject.open("dataset.dida") as project:
-    for frame in project.frames():
-        masks = project.masks(frame)
-        ...
+with DidascalieProject("dataset.dida") as project:
+    for sequence, frame in project.iter_frames():
+        for label, mask in project.get_annotations_for_frame(frame.id):
+            ...  # mask: a NumPy array the size of the frame
 ```
 
 See [Python library](python.md).

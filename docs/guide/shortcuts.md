@@ -12,6 +12,8 @@ These work in the editor. They are ignored while you type in a text field.
 | Lasso eraser | ++ctrl+shift+e++ or ++4++ |
 | Line | ++l++ |
 | Draw shape | ++b++ |
+| Box | ++r++ |
+| Ellipse | ++o++ |
 | Edit points | ++n++ |
 | Select | ++s++ |
 | Trace outline | ++v++ |
@@ -60,6 +62,6 @@ and when you leave a frame.
 
 ## Other views
 
-The [inspector](inspect.md#playback) and
+The [inspector](inspect.md#playback), [registration](registration.md#keys) and
 [3D mode](../experimental.md#3d-volume-mode) have their own shortcuts, listed on
 their pages.

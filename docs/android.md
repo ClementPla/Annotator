@@ -48,8 +48,8 @@ on that copy:
 
 ## Tablet controls
 
-- **Frames.** On a sequence, the strip under the canvas has previous and next
-  buttons and a slider.
+- **Frames.** On a sequence, a strip with previous and next buttons and a slider
+  runs under the canvas, or down its left edge when the tablet is upright.
 - **Touch & pen** options, opened from the **Touch** button of the tool rail:
     - pressure sensitivity: pressing harder draws a wider stroke;
     - draw with the pen only: a finger then pans the image;

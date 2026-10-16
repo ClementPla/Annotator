@@ -82,10 +82,10 @@ analysis pipeline. Didascalie is an installer and a project file.
 
 | Type | Notes |
 | --- | --- |
-| Segmentation masks | Brush, polygon, line, point, flood fill |
-| Vector shapes | Polygons, lines and keypoints, convertible to and from masks |
+| Segmentation masks | Pen, line and lasso, refined by Otsu or flood fill; semantic or instance |
+| Vector shapes | Outlines, lines, boxes and ellipses, convertible to and from masks |
 | Classification | Multiclass and multilabel, several tasks per project |
-| Keypoints | Including correspondences between frames for registration |
+| Keypoints | Correspondences between two frames, for registration |
 | Text notes | Per frame, attached to a configurable text task |
 
 Raster and vector annotations are drawn on the same image and share one undo

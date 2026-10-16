@@ -27,8 +27,12 @@ frontend (the WebView) talking to a **Rust** backend over Tauri's IPC.
   and CPU-heavy algorithms (contours, skeleton, superpixel, CRF, tiling). It is
   **stateless per call** except for a few caches (decoded-frame, thumbnails).
 - **The boundary** is `src/app/lib/api.ts` (one typed wrapper per Tauri command)
-  ↔ `src-tauri/src/lib.rs` `invoke_handler![…]` (~60 commands, grouped by module
-  under `src-tauri/src/commands/`). If you add a command, it goes in both places.
+  ↔ `src-tauri/src/lib.rs` `invoke_handler![…]` (~90 commands, grouped by module
+  under `src-tauri/src/commands/`). If you add a command, it goes in both places;
+  nothing else calls `invoke`. The payload types are not written twice: Rust
+  structs derive `ts_rs::TS` and `cargo test --lib export_bindings` writes them
+  to `src/app/lib/generated/`, which `api.ts` re-exports (`i64` fields need
+  `#[ts(type = "number")]`).
 - **Editing an open project** goes through one command, `apply_project_edit`
   (`commands/project_edit.rs`), taking a typed `ProjectEdit`. It changes the
   config JSON *and* the rows that refer to it by name or id in one transaction;
@@ -129,7 +133,7 @@ The source of truth for painted masks. Each label is a `width*height`
 composite time from a per-label palette. This cuts memory ~4× vs the old
 RGBA-canvas-per-label model and makes recolour/opacity/visibility free.
 
-- Pixel ops are plain typed-array loops in `src/app/Core/misc/label-ops.ts`
+- Pixel ops are plain typed-array loops in `src/app/core/misc/label-ops.ts`
   (commit stroke, swap-under-stroke, erase component, downsampled bbox scan) —
   synchronous, no IPC.
 - Persistence: value-aware run-length encoding (`rle8`) in
@@ -143,7 +147,7 @@ Bezier paths / polygons / polylines, edited with the Select/Path/Box/Ellipse/Nod
 A `VectorShape` is `{ id, labelId, closed, filled, nodes: VectorNode[] }`; a node
 carries its anchor + two bezier handles. Pure geometry (flatten, hit-test,
 bounds, path `d` string, split, translate) lives in
-`src/app/Components/pages/editor/drawable-canvas/vector/vector.model.ts`. Stored
+`src/app/features/editor/drawable-canvas/vector/vector.model.ts`. Stored
 verbatim as JSON in `vector_annotations`.
 
 ### Converting between them (`convert.service.ts`)
@@ -172,7 +176,7 @@ Three rules keep raster and vector behaving as one thing:
 - **Mismatched frame sizes are skipped**, not written: masks are flat
   `width*height` arrays and vector nodes are image-pixel coords.
 
-The frontend side (`Services/Labels/propagation.service.ts`) flushes pending
+The frontend side (`services/labels/propagation.service.ts`) flushes pending
 edits first — the backend copies what's *in the database* — resolves targets from
 `SequenceService`, and emits `propagated$` so views over frames that aren't
 displayed (navigator status dots, gallery) refresh. There is deliberately **no
@@ -181,7 +185,7 @@ affected frame count instead.
 
 ## The editor (the complexity hotspot)
 
-`src/app/Components/pages/editor/drawable-canvas` is where most of the code and
+`src/app/features/editor/drawable-canvas` is where most of the code and
 subtlety is. It's decomposed into single-responsibility services:
 
 | Service | Responsibility |
@@ -195,7 +199,7 @@ subtlety is. It's decomposed into single-responsibility services:
 | `convert.service` | rasterize / vectorize / skeletonize bridges |
 | `post-process.service` | Otsu / flood-fill, plus the experimental modes (MedSAM, superpixel) through the registry (call Rust, write result into active mask) |
 | `undo-redo.service` | unified raster+vector timeline (per-layer snapshot stacks + compound groups) |
-| `image-adjustment/*` | on-the-fly brightness/gamma/invert (view-only LUT) |
+| `image-adjustment/*` | brightness/contrast/gamma/curves as a LUT; the stored image is untouched, but post-processing reads the adjusted canvas |
 | `tiled-image.service` | native-resolution tiles fetched on zoom for very large images |
 | `state-manager` / `bbox-manager` | shared editor flags; bbox overlay data |
 
@@ -208,7 +212,7 @@ events, `io.service` subscribes* (never the reverse).
 `io.service.save()` only re-sends **raster** masks whose label is in `dirtyLabels`
 (populated by `markLabelDirty`), because a full mask is ~136 MB at 8k×17k.
 Pure-vector edits go through `markDirty()` only, so they never re-ship a raster
-mask. See [the save note in `io.service.ts`](src/app/Services/io.service.ts).
+mask. See [the save note in `io.service.ts`](src/app/services/io.service.ts).
 
 ### Large images
 Anything with a side > 4096 px (WebKit's canvas cap) uses: a server-side
@@ -282,7 +286,7 @@ and a format registry, all in `src-tauri/src/commands/formats/`:
 - `geometry.rs` derives polygons/boxes/skeletons the object formats need.
 
 Add a format by implementing the traits and registering it — the generic
-import/export UI (`Components/pages/export`, launcher import dialog) is
+import/export UI (`features/export`, launcher import dialog) is
 schema-driven and needs no per-format UI code.
 
 ## Experimental features
@@ -297,13 +301,13 @@ line between "stable, daily-usable" and "not yet" is deliberate.
 Pushing to the `release` branch triggers the GitHub Actions `publish` workflow
 (`.github/workflows/main.yml`): a signed, 4-platform Tauri build published as a
 GitHub release. Installed apps auto-update via the Tauri updater plugin
-(`src/app/Services/update.service.ts`, launcher banner + toolbar version badge).
+(`src/app/services/update.service.ts`, launcher banner + toolbar version badge).
 `ci.yml` is the quality gate (frontend build + `cargo test`/`clippy`/`fmt`).
 
 ## Where to start reading
 
 1. `src/app/lib/api.ts` — the whole backend surface at a glance.
 2. `src-tauri/src/storage/schema.rs` — the data model.
-3. `src/app/Core/misc/label-ops.ts` — the raster model in ~200 readable lines.
+3. `src/app/core/misc/label-ops.ts` — the raster model in ~300 readable lines.
 4. `…/drawable-canvas/vector/vector.model.ts` — the vector model.
 5. `…/drawable-canvas/service/orchestrator.service.ts` — how a frame is drawn.

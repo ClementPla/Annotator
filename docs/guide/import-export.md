@@ -11,13 +11,19 @@ added later. Options at import time:
 - **embed or reference** the image data
   ([which to pick](projects.md#embedded-or-referenced-images)).
 
-Existing masks can be imported with the images, so you can continue a partially
-labelled dataset.
+Videos are imported too, each as one sequence; see
+[Videos](projects.md#videos).
+
+To continue a partially labelled dataset, import its annotations in **COCO** or
+**YOLO** layout with **Import annotations…** on the start page. Frames are
+matched to the project's images by filename, and labels the project does not
+have are created.
 
 ## Exporting
 
-Annotations can be exported as mask images, or in **COCO** or **YOLO** layout.
-COCO and YOLO datasets can also be imported.
+**Export** (:material-file-export: in the top bar) writes the annotations as mask
+images (**Didascalie masks**), or in **COCO** or **YOLO** layout, for every frame
+or only reviewed ones.
 
 ## With several accounts
 

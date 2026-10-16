@@ -24,6 +24,17 @@ supported. Convert them first: apply the intensity window you want and export
 
 A 3D volume is imported as a sequence with one image per slice.
 
+### Videos
+
+MP4, M4V, MOV, MKV, WebM and AVI files are imported too, each as one sequence.
+**Video frame step** keeps one frame out of N: 1 keeps every frame, 10 one out of
+ten. A video always stays on disk, even in an embedded project, and its frames are
+decoded when they are shown.
+
+Decoding needs [`ffmpeg`](https://ffmpeg.org/download.html), which is not
+installed with Didascalie: install it so that it is on your `PATH`, or set the
+`DIDASCALIE_FFMPEG` environment variable to the executable.
+
 ## Embedded or referenced images
 
 At import, images are either **embedded** in the project file or **referenced**
@@ -38,8 +49,11 @@ on disk.
 Embedded images are stored losslessly.
 
 Referenced images are found through the input folder chosen at creation and
-their path inside it. If you move or rename that folder, the project can no
-longer load them.
+their path inside it. If the folder is not found when the project opens (it was
+moved, or this computer reaches a network share by another path), you are asked
+to locate it. You can also do it later with **Locate…** under **Image folder** in
+the project settings. The project remembers every path it has been given, so the
+same file still opens on the other computers.
 
 Even in a referenced project, files under 100 KB are embedded.
 

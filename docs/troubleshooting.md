@@ -2,7 +2,8 @@
 
 ## GPU training falls back to the CPU
 
-The status line under the training panel reports the device. If it reads
+The **Segmentation head lab** page reports the device under the progress bar
+while training, and next to **Trained on** afterwards. If it reads
 `CPU (burn ndarray)` on a machine with an NVIDIA GPU, the **CUDA Toolkit** is
 probably missing. The backend compiles kernels at runtime through NVRTC, which
 the driver does not include.
@@ -57,6 +58,25 @@ If it stays slow, the cause is usually the platform's web view. The same file
 performs differently on Windows, macOS and Linux. Turn on the performance overlay
 (top toolbar) to see whether the frame rate is low, which points to rendering, or
 normal, which points to loading.
+
+## Videos are not imported
+
+Videos are decoded by `ffmpeg`, which is not installed with Didascalie. When it
+is missing, the import reports "Video support needs ffmpeg, which was not
+found". Install [ffmpeg](https://ffmpeg.org/download.html) so that it is on your
+`PATH`, or set `DIDASCALIE_FFMPEG` to the executable, then start Didascalie
+again. See [Videos](guide/projects.md#videos).
+
+MPEG-TS and MPEG-PS files (`.ts`, `.mpg`) are left out, because their frames
+cannot be addressed exactly. Remux them to MP4 or MKV first.
+
+## Images do not load: "Image folder not found"
+
+The project references its images in a folder this computer does not have at
+the recorded path: it was moved, or a network share is mounted elsewhere. Locate
+the folder when asked, or later with **Locate…** under **Image folder** in the
+project settings. The project keeps every path it has been given, so it still
+opens on the other computers.
 
 ## Annotations from a previous project appear in a new one
 

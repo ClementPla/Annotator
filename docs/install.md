@@ -49,7 +49,7 @@ To train on an NVIDIA GPU you need the **CUDA Toolkit** in addition to the drive
     NVRTC and falls back to the CPU. Training then runs slowly and no error is
     shown.
 
-    The status line under the training panel reports which device was selected. If
+    The **Segmentation head lab** page reports which device was selected. If
     it reads `CPU (burn ndarray)` while you expected a GPU, see
     [Troubleshooting](troubleshooting.md#gpu-training-falls-back-to-the-cpu).
 
