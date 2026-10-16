@@ -62,17 +62,4 @@ export class GalleryService implements ProjectScoped {
     return 0;
   }
 
-  getTotalFrames(): number {
-    return this.sequenceService.frameCount();
-  }
-
-  getCurrentPage(): number {
-    return Math.floor(
-      this.sequenceService.currentFrameIndex() / this.itemPerPage(),
-    );
-  }
-
-  getTotalPages(): number {
-    return Math.ceil(this.getTotalFrames() / this.itemPerPage());
-  }
 }

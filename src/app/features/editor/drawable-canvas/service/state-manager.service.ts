@@ -26,17 +26,6 @@ export class StateManagerService implements ProjectScoped {
   updatePreviousPoint(point: Point2D) { this.previousPoint = point; }
   updateCurrentPoint(point: Point2D) { this.currentPoint = point; }
 
-  hasMoved(): boolean {
-    return (
-      this.currentPoint.x !== this.previousPoint.x ||
-      this.currentPoint.y !== this.previousPoint.y
-    );
-  }
-
-  isFirstStroke(): boolean {
-    return this.previousPoint.x === -1 && this.previousPoint.y === -1;
-  }
-
   resetMinMaxPoints() {
     this.minPoint = { x: Number.MAX_VALUE, y: Number.MAX_VALUE };
     this.maxPoint = { x: 0, y: 0 };
@@ -80,19 +69,6 @@ export class StateManagerService implements ProjectScoped {
     const radius =
       (this.editorService.lineWidth * this.editorService.brushPressureScale()) / 2;
     return radius + 2;
-  }
-
-  getStateSnapshot() {
-    return {
-      width: this.width,
-      height: this.height,
-      isDrawing: this.isDrawing,
-      currentPoint: this.currentPoint,
-      previousPoint: this.previousPoint,
-      minPoint: this.minPoint,
-      maxPoint: this.maxPoint,
-      recomputeCanvasSum: this.recomputeCanvasSum,
-    };
   }
 
   /** @see ProjectScoped */

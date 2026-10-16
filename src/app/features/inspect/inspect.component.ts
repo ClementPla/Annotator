@@ -554,10 +554,6 @@ export class InspectComponent implements OnInit, OnDestroy {
     for (const pane of this.panes()) pane.fit();
   }
 
-  isLabelHidden(id: number): boolean {
-    return this.hiddenLabels().has(id);
-  }
-
   toggleLabel(id: number): void {
     this.hiddenLabels.update((hidden) => {
       const next = new Set(hidden);

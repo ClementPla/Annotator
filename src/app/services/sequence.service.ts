@@ -27,8 +27,6 @@ export class SequenceService implements ProjectScoped {
 
   readonly frameCount = computed(() => this._frames().length);
 
-  readonly sequenceCount = computed(() => this._sequences().length);
-
   readonly sequenceProgress = computed(() => {
     const index = this._currentFrameIndex();
     const total = this._frames().length;
@@ -40,18 +38,6 @@ export class SequenceService implements ProjectScoped {
     const current = this._currentSequence();
     if (!current) return -1;
     return sequences.findIndex(s => s.id === current.id);
-  });
-
-  readonly isFirstFrame = computed(() => {
-    return this._currentFrameIndex() === 0 && this.currentSequenceIndex() === 0;
-  });
-
-  readonly isLastFrame = computed(() => {
-    const seqIdx = this.currentSequenceIndex();
-    const frameIdx = this._currentFrameIndex();
-    const sequences = this._sequences();
-    const frames = this._frames();
-    return seqIdx === sequences.length - 1 && frameIdx === frames.length - 1;
   });
 
   readonly isCurrentSequenceReviewed = computed(() => {
@@ -83,13 +69,6 @@ export class SequenceService implements ProjectScoped {
     }
   }
 
-  async selectSequenceByIndex(index: number): Promise<void> {
-    const sequences = this._sequences();
-    if (index >= 0 && index < sequences.length) {
-      await this.selectSequence(sequences[index]);
-    }
-  }
-
   // ── Frame Navigation ─────────────────────────────────────────────────────
 
   async selectFrame(index: number): Promise<void> {
@@ -98,34 +77,6 @@ export class SequenceService implements ProjectScoped {
       this._currentFrameIndex.set(index);
       await this.loadCurrentFrameImage();
     }
-  }
-
-  /** Returns true if moved. */
-  async nextFrame(): Promise<boolean> {
-    const index = this._currentFrameIndex();
-    const frames = this._frames();
-
-    if (index < frames.length - 1) {
-      this._currentFrameIndex.set(index + 1);
-      await this.loadCurrentFrameImage();
-      return true;
-    }
-
-    return this.nextSequence();
-  }
-
-  /** Returns true if moved. */
-  async prevFrame(): Promise<boolean> {
-    const index = this._currentFrameIndex();
-
-    if (index > 0) {
-      this._currentFrameIndex.set(index - 1);
-      await this.loadCurrentFrameImage();
-      return true;
-    }
-
-    // The last frame of the previous sequence.
-    return this.prevSequence(true);
   }
 
   /** Returns true if moved. */
@@ -142,19 +93,12 @@ export class SequenceService implements ProjectScoped {
   }
 
   /** Returns true if moved. */
-  async prevSequence(goToLastFrame = false): Promise<boolean> {
+  async prevSequence(): Promise<boolean> {
     const sequences = this._sequences();
     const currentIdx = this.currentSequenceIndex();
 
     if (currentIdx > 0) {
       await this.selectSequence(sequences[currentIdx - 1]);
-      
-      if (goToLastFrame) {
-        const frames = this._frames();
-        this._currentFrameIndex.set(frames.length - 1);
-        await this.loadCurrentFrameImage();
-      }
-      
       return true;
     }
 
@@ -228,14 +172,6 @@ export class SequenceService implements ProjectScoped {
   async getProgress(): Promise<{ reviewed: number; total: number }> {
     const [reviewed, total] = await api.getProgress();
     return { reviewed, total };
-  }
-
-  getFrameById(frameId: number): Frame | null {
-    return this._frames().find(f => f.id === frameId) ?? null;
-  }
-
-  getSequenceById(sequenceId: number): Sequence | null {
-    return this._sequences().find(s => s.id === sequenceId) ?? null;
   }
 
   isCurrentFrameReviewed(): boolean {

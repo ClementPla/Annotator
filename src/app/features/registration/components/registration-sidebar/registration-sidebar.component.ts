@@ -72,10 +72,6 @@ export class RegistrationSidebarComponent {
     const s = this.inference.status();
     return s.kind === 'error' ? s.message : '';
   });
-  public readonly statusReply = computed(() => {
-    const s = this.inference.status();
-    return s.kind === 'connected' ? s : { registered: [], protocolVersion: 0 };
-  });
   public readonly inferenceStatus = this.inference.status;
   public readonly inferenceReady = this.inference.isReady;
 

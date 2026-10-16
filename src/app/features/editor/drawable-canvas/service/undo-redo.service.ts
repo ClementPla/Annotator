@@ -275,16 +275,6 @@ export class UndoRedoService implements ProjectScoped {
     this.groupBuffer = [];
   }
 
-  emptyLayer(layerIndex: number) {
-    if (this.layerUndoStacks.has(layerIndex)) {
-      this.layerUndoStacks.get(layerIndex)!.empty();
-    }
-  }
-
-  removeLayer(layerIndex: number) {
-    this.layerUndoStacks.delete(layerIndex);
-  }
-
   /** The layers a raster action snapshots: the active one, or all of them for
    *  erase-all and swap. */
   private affectedLayers(): number[] {
@@ -320,30 +310,11 @@ export class UndoRedoService implements ProjectScoped {
     return this.redoOrder.length > 0;
   }
 
-  getDebugInfo(): any {
-    return {
-      actions: this.actionOrder.length,
-      redos: this.redoOrder.length,
-      layerStacks: Array.from(this.layerUndoStacks.entries()).map(
-        ([index, stack]) => ({ layerIndex: index, stackSize: stack.size() })
-      ),
-    };
-  }
-
   /** Give every layer stack a baseline, so the first action on it can be
    *  undone. Call after loading masks. */
   public async captureInitialStates(): Promise<void> {
     this.canvasManagerService.getAllMasks().forEach((mask, index) => {
       this.getLayerUndoRedo(index).push({ data: new Uint8Array(mask) });
     });
-  }
-
-  public async captureInitialState(layerIndex: number): Promise<void> {
-    const mask = this.canvasManagerService.getAllMasks()[layerIndex];
-    if (!mask) {
-      console.error(`Mask at index ${layerIndex} not found`);
-      return;
-    }
-    this.getLayerUndoRedo(layerIndex).push({ data: new Uint8Array(mask) });
   }
 }

@@ -518,9 +518,6 @@ export class CanvasManagerService implements ProjectScoped {
       rect.height,
     ).data;
   }
-  getCombinedCtx() {
-    return this.combinedCtx;
-  }
   getCombinedCanvas() {
     return this.combinedCanvas;
   }

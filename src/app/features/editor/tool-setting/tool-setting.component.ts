@@ -6,7 +6,6 @@ import { EditorService, PenButtonAction } from '../services/editor.service';
 import { FormsModule } from '@angular/forms';
 import { SliderModule } from 'primeng/slider';
 import { ProjectService } from '../../../services/project/project.service';
-import { ImageAdjustmentService } from '../drawable-canvas/service/image-adjustment/image-adjustment.service';
 import { SelectButtonModule } from 'primeng/selectbutton';
 import {
   PostProcessOption,
@@ -44,7 +43,6 @@ import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/
 export class ToolSettingComponent {
   editorService = inject(EditorService);
   projectService = inject(ProjectService);
-  imageProcess = inject(ImageAdjustmentService);
   flags = inject(FeatureFlagsService);
 
   ppOption = PostProcessOption;

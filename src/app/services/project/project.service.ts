@@ -80,7 +80,6 @@ export class ProjectService {
     () => this._config().folders_as_sequences,
   );
   readonly imagesEmbedded = computed(() => this._config().images_embedded);
-  readonly hasTextDescription = this.isTextDescriptionEnabled;
 
   updateConfig(partial: Partial<ProjectConfig>): void {
     this._config.update((current) => ({ ...current, ...partial }));
@@ -132,10 +131,6 @@ export class ProjectService {
 
   setImagesEmbedded(embedded: boolean): void {
     this.updateConfig({ images_embedded: embedded });
-  }
-
-  setTextDescriptionEnabled(enabled: boolean): void {
-    this.updateConfig({ text_description_enabled: enabled });
   }
 
   // ── Project Lifecycle ────────────────────────────────────────────────────
@@ -347,7 +342,4 @@ export class ProjectService {
     this._sequencesCount.set(0);
   }
 
-  get maxInstances(): number {
-    return 100; // Placeholder value; replace with actual logic if needed
-  }
 }

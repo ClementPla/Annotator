@@ -79,12 +79,6 @@ export class LabelsService implements ProjectScoped {
     this.listClassificationTasks.push(classTask);
   }
 
-  removeClassificationTask(task: MulticlassTask) {
-    this.listClassificationTasks = this.listClassificationTasks.filter(
-      (t) => t.taskName !== task.taskName
-    );
-  }
-
   addSegLabel(label: SegLabel) {
     if (this.listSegmentationLabels.find((l) => l.label === label.label)) {
       return;
@@ -104,17 +98,6 @@ export class LabelsService implements ProjectScoped {
     this.listTextLabels.push(label);
   }
 
-  removeTextLabel(label: TextLabel) {
-    this.listTextLabels = this.listTextLabels.filter(
-      (l) => l.name !== label.name
-    );
-  }
-
-  setActiveIndex(index: number) {
-    if (index >= 0 && index < this.listSegmentationLabels.length) {
-      this.activeLabel = this.listSegmentationLabels[index];
-    }
-  }
   removeSegLabel(SegLabel: SegLabel) {
     if (this.activeLabel && this.activeLabel.label === SegLabel.label) {
       this.activeLabel = null;

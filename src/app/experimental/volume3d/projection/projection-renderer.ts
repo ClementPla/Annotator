@@ -219,11 +219,6 @@ export class ProjectionRenderer {
     this.requestRender();
   }
 
-  /** Output size in pixels: columns × slices. */
-  get outputSize(): { width: number; height: number } {
-    return { width: this.columns, height: this.depth };
-  }
-
   requestRender(): void {
     if (this.renderPending) return;
     this.renderPending = true;

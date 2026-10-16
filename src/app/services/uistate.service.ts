@@ -22,7 +22,6 @@ export class UIStateService {
   readonly isLoading = computed(() => this.loadingState().isLoading);
   readonly loadingStatus = computed(() => this.loadingState().message);
 
-  readonly thumbnailsSize = signal(128);
   readonly showFpsCounter = signal(false);
 
   // ── Loading State Management ─────────────────────────────────────────────
@@ -43,13 +42,5 @@ export class UIStateService {
 
   public navigateToEditor(): Promise<boolean> {
     return this.router.navigate(['/editor']);
-  }
-
-  public navigateToExport(): Promise<boolean> {
-    return this.router.navigate(['/export']);
-  }
-
-  public navigateToTestZone(): Promise<boolean> {
-    return this.router.navigate(['/testing-zone']);
   }
 }

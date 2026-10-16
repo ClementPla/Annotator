@@ -39,8 +39,6 @@ export class ImageAdjustmentRenderer {
     }
   }
 
-  get hasGPU(): boolean { return this.initialized; }
-
   destroy(): void {
     this.inputTexture?.destroy();
     this.outputTexture?.destroy();

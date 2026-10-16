@@ -541,8 +541,4 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   get hasImage(): boolean {
     return this.sequenceService.currentFrameImage() !== null;
   }
-
-  get currentFrameName(): string | null {
-    return this.sequenceService.currentFrame()?.relativePath ?? null;
-  }
 }

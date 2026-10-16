@@ -179,10 +179,6 @@ export class MaskVolumeService implements ProjectScoped {
     if (this.status() === 'ready') this.dirtySlices.add(`${z}:${label}`);
   }
 
-  hasDirtySlices(): boolean {
-    return this.dirtySlices.size > 0;
-  }
-
   /** Persist the slices written directly since the last save. */
   async saveDirty(): Promise<void> {
     const jobs = this.takeDirty();

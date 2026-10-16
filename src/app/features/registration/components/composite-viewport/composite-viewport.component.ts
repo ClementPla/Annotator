@@ -132,8 +132,6 @@ export class CompositeViewportComponent
         : '';
   });
 
-  readonly maskId = `checker-mask-${Math.random().toString(36).slice(2, 9)}`;
-
   constructor() {
     effect(() => {
       const _track = [this.mode()];

@@ -54,15 +54,6 @@ export class ViewportController {
   setSize(width: number, height: number): void {
     this._size.set({ width, height });
   }
-  setScale(val: number) {
-    this._scale.set(val);
-    this.onRedrawNeeded?.(); // You can even trigger redraws automatically here
-  }
-
-  setOffset(val: {x: number, y: number}) {
-    this._offset.set(val);
-    this.onRedrawNeeded?.();
-  }
 
   // ── Coordinate conversions ───────────────────────────────────────────────
 
@@ -72,11 +63,6 @@ export class ViewportController {
       x: (vp.x - o.x) / s,
       y: (vp.y - o.y) / s,
     };
-  }
-
-  nativeToViewport(p: { x: number; y: number }): { x: number; y: number } {
-    const s = this._scale(), o = this._offset();
-    return { x: p.x * s + o.x, y: p.y * s + o.y };
   }
 
   clientToViewport(
@@ -311,7 +297,6 @@ export class SyncGroup {
   pause():  void { this.active = false; }
   resume(): void { this.active = true;  }
   toggle(): void { this.active = !this.active; }
-  get isSynced(): boolean { return this.active; }
 
   /** Broadcast a transform change from `source` to the other controllers,
    *  guarded against re-entry. */

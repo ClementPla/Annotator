@@ -112,27 +112,6 @@ export class PyramidService implements OnDestroy, ProjectScoped {
     return finest.width < targetW || finest.height < targetH;
   }
 
-  nativeToLevel(p: { x: number; y: number }, level: PyramidLevel) {
-    return { x: p.x * level.scale, y: p.y * level.scale };
-  }
-
-  levelToNative(p: { x: number; y: number }, level: PyramidLevel) {
-    return { x: p.x / level.scale, y: p.y / level.scale };
-  }
-
-  /** The view transform for drawing a level's canvas instead of the native
-   *  image: the canvas is `level.scale` smaller. */
-  adjustTransformForLevel(
-    nativeScale:  number,
-    nativeOffset: { x: number; y: number },
-    level:        PyramidLevel,
-  ): { scale: number; offset: { x: number; y: number } } {
-    return {
-      scale:  nativeScale / level.scale,
-      offset: nativeOffset, // offset stays in CSS px — level change doesn't shift origin
-    };
-  }
-
   // ── Build ────────────────────────────────────────────────────────────────
 
   private async buildPyramid(img: HTMLImageElement): Promise<Pyramid> {

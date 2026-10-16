@@ -110,20 +110,6 @@ export class ViewportPaneComponent
     return mapMovingToRef(pending, this.transform());
   });
 
-  readonly residualSegments = computed<{ from: Point2D; to: Point2D }[]>(
-    () => {
-      if (this.side() !== 'moving') return [];
-      const t = this.transform();
-      if (t.type !== 'homography') return [];
-      return this.pairs().map((p) => {
-        const predicted = inverseMapToMoving(mapMovingToRef(p.moving, t), t);
-        return predicted
-          ? { from: p.moving, to: predicted }
-          : { from: p.moving, to: p.moving };
-      });
-    },
-  );
-
   constructor() {
     effect(() => {
       const _track = [

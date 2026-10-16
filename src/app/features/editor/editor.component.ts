@@ -51,7 +51,6 @@ import { NotificationService } from '../../services/notification.service';
 import { api } from '../../lib/api';
 import { OrchestratorService } from './drawable-canvas/service/orchestrator.service';
 
-import { Tools } from '../../core/tools';
 import { VerticalMenuComponent } from '../../shared/generics/vertical-menu/vertical-menu.component';
 import { MenuGroupDirective } from '../../shared/generics/vertical-menu/menu-group.directive';
 import { ExperimentalDirective } from '../../experimental/experimental.directive';
@@ -119,7 +118,6 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly multiFramesOptions = viewChild(MultiFramesOptionsComponent);
   readonly quickAccessMenu = viewChild<QuickAccessMenuComponent>('quickAccessMenu');
 
-  public viewPortSize = 800;
   public displayDownloadDialog = false;
   public downloadProgress = 0;
 
@@ -220,6 +218,9 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
     this.keyboardService.action$
       .pipe(takeUntil(this.destroy$))
       .subscribe((action) => this.handleShortcutAction(action));
+    this.keyboardService.tool$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((tool) => this.editorService.selectTool(tool));
 
     this.ioService.requestedReload
       .pipe(takeUntil(this.destroy$))
@@ -264,21 +265,6 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private handleShortcutAction(action: string) {
     const actionHandlers: Record<string, () => void | Promise<void>> = {
-      selectPen: () => this.editorService.selectTool(Tools.PEN),
-      selectEraser: () => this.editorService.selectTool(Tools.ERASER),
-      selectLasso: () => this.editorService.selectTool(Tools.LASSO),
-      selectLassoEraser: () =>
-        this.editorService.selectTool(Tools.LASSO_ERASER),
-      selectLine: () => this.editorService.selectTool(Tools.LINE),
-      selectPan: () => this.editorService.selectTool(Tools.PAN),
-      selectPath: () => this.editorService.selectTool(Tools.PATH),
-      selectRect: () => this.editorService.selectTool(Tools.RECT),
-      selectEllipse: () => this.editorService.selectTool(Tools.ELLIPSE),
-      selectNode: () => this.editorService.selectTool(Tools.NODE),
-      selectSelect: () => this.editorService.selectTool(Tools.SELECT),
-      selectVectorize: () => this.editorService.selectTool(Tools.VECTORIZE),
-      selectSkeletonize: () => this.editorService.selectTool(Tools.SKELETONIZE),
-
       undo: () => this.editorService.requestUndo(),
       redo: () => this.editorService.requestRedo(),
 
@@ -638,15 +624,6 @@ export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get showRightPanel(): boolean {
     return this.showSettingsPanel || this.pythonSegmentation.available();
-  }
-
-  get totalImages(): number {
-    return this.sequenceService.frameCount();
-  }
-
-  get activeImageName(): string | null {
-    const frame = this.sequenceService.currentFrame();
-    return frame?.relativePath ?? null;
   }
 
   get isLoading(): boolean {

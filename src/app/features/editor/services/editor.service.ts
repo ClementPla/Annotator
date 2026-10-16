@@ -203,9 +203,6 @@ export class EditorService {
 
   /** The tool used before the current one, ignoring pan. */
   private readonly _previousTool = signal<Tool>(Tools.ERASER);
-  get previousTool(): Tool {
-    return this._previousTool();
-  }
 
   /** Flip between the current tool and the previous one. */
   public swapToPreviousTool(): void {

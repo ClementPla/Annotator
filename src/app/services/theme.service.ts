@@ -50,10 +50,6 @@ export class ThemeService {
     this.applyDarkClass(dark);
   }
 
-  toggleDarkMode(): void {
-    this.setDarkMode(!this.darkMode());
-  }
-
   private applyPreset(key: ThemePresetKey): void {
     const preset =
       this.presets.find((p) => p.value === key)?.preset ?? Aura;

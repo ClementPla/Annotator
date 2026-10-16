@@ -310,8 +310,6 @@ export class ZoomPanService {
 
   public getScale(): number { return this.scale; }
   public getOffset(): Point2D { return this.offset; }
-  public getViewportWidth(): number { return this.viewportWidth; }
-  public getViewportHeight(): number { return this.viewportHeight; }
 
   // ── Internal ─────────────────────────────────────────────────────────────
 

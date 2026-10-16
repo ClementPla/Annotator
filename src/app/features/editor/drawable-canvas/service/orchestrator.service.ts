@@ -1,5 +1,5 @@
 import { Injectable, Injector, inject } from '@angular/core';
-import { auditTime, BehaviorSubject, merge, Subject, animationFrameScheduler } from 'rxjs';
+import { auditTime, merge, Subject, animationFrameScheduler } from 'rxjs';
 import { notifyExperimentalImageLoaded } from '../../../../experimental/registry';
 
 import { CanvasManagerService } from './canvas-manager.service';
@@ -12,11 +12,6 @@ import { DrawService } from './draw.service';
 import { EditorService } from '../../services/editor.service';
 import { Point2D } from '../interface';
 import { Pyramid, PyramidService } from '../../../../services/pyramid.service';
-
-export interface ViewTransform {
-  scale: number;
-  offset: Point2D;
-}
 
 /** Native longest side (px) past which a display pyramid is built. */
 const PYRAMID_MIN_DIM = 4096;
@@ -34,9 +29,6 @@ export class OrchestratorService {
   private editorService = inject(EditorService);
   private pyramid = inject(PyramidService);
   private injector = inject(Injector);
-
-  private isReadySubject = new BehaviorSubject<boolean>(false);
-  public isReady$ = this.isReadySubject.asObservable();
 
   public redrawRequest = new Subject<void>();
 
@@ -101,7 +93,6 @@ export class OrchestratorService {
     nativeWidth?: number,
     nativeHeight?: number,
   ): Promise<HTMLImageElement> {
-    this.isReadySubject.next(false);
     try {
       const img = await this.preloadImage(imgSrc);
       this.loadedImage = img;
@@ -126,7 +117,6 @@ export class OrchestratorService {
 
       this.resetHistory();
 
-      this.isReadySubject.next(true);
       this.redrawRequest.next();
 
       if (this.editorService.resetZoomAfterNavigation) {
@@ -226,10 +216,6 @@ export class OrchestratorService {
   public get height(): number { return this.state.height; }
   public get image(): HTMLImageElement | null { return this.loadedImage; }
 
-  public getViewTransform(): ViewTransform {
-    return { scale: this.zoomPan.getScale(), offset: this.zoomPan.getOffset() };
-  }
-
   public getViewBox()    { return this.zoomPan.getViewBox(); }
   public getSVGViewBox() { return this.zoomPan.getSVGViewBox(); }
 
@@ -297,16 +283,7 @@ export class OrchestratorService {
     this.zoomPan.wheel(event);
   }
 
-  public startPan(event: MouseEvent) {
-    this.state.recomputeCanvasSum = false;
-    this.zoomPan.startDrag(event);
-  }
-
   public pan(event: MouseEvent) {
     this.zoomPan.drag(event);
-  }
-
-  public endPan() {
-    this.zoomPan.endDrag();
   }
 }

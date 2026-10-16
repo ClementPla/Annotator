@@ -122,10 +122,6 @@ export class RegistrationStateService implements ProjectScoped {
     this._sidebarCollapsed.update((v) => !v);
   }
 
-  setSidebarCollapsed(v: boolean): void {
-    this._sidebarCollapsed.set(v);
-  }
-
   // ── Registration core ────────────────────────────────────────────────────
   private _registration = signal<FrameRegistration | null>(null);
   readonly registration = this._registration.asReadonly();
@@ -165,9 +161,6 @@ export class RegistrationStateService implements ProjectScoped {
   readonly isAwaitingMoving = computed(
     () => this._placement().phase === 'awaiting-moving',
   );
-  readonly isAwaitingReference = computed(
-    () => this._placement().phase === 'awaiting-ref',
-  );
   private _hoverPoint = signal<{ side: 'ref' | 'moving'; pt: Point2D } | null>(
     null,
   );
@@ -179,10 +172,6 @@ export class RegistrationStateService implements ProjectScoped {
 
   setHoverPoint(side: 'ref' | 'moving', pt: Point2D): void {
     this._hoverPoint.set({ side, pt });
-  }
-
-  clearHoverPoint(): void {
-    this._hoverPoint.set(null);
   }
 
 
@@ -334,12 +323,6 @@ export class RegistrationStateService implements ProjectScoped {
   }
   // ── Transform type ───────────────────────────────────────────────────────
 
-  setTransformType(t: TransformType): void {
-    this._transformType.set(t);
-    const reg = this._registration();
-    if (reg) this.refit(reg);
-  }
-
   setMode(mode: VisualizationMode): void {
     this._vis.update((v) => ({ ...v, mode }));
   }
@@ -362,10 +345,6 @@ export class RegistrationStateService implements ProjectScoped {
     this._vis.update((v) => ({ ...v, syncPanZoom: sync }));
   }
 
-  colorForPair(pairId: string): string {
-    const idx = this.pairs().findIndex((p) => p.id === pairId);
-    return colorForIndex(idx === -1 ? 0 : idx);
-  }
   setHoveredPair(id: string | null): void {
     if (this._hoveredPairId() !== id) {
       this._hoveredPairId.set(id);

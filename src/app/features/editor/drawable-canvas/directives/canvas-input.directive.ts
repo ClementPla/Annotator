@@ -30,7 +30,6 @@ export class CanvasInputDirective {
     coords: Point2D; // image space (px, clamped, integer)
     cursor: Point2D; // viewport space (CSS px)
 }>();
-  readonly canvasUp = output<MouseEvent>();
   /** Right-click on the canvas, for the label picker. */
   readonly contextMenu = output<MouseEvent>();
 

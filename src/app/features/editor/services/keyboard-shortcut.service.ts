@@ -1,12 +1,11 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { Subject, fromEvent } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
+import { ALL_TOOLS, Tool } from '../../../core/tools';
 
-export interface ShortcutConfig {
+interface ShortcutConfig {
   keys: string[];
   action: string;
-  description: string;
-  category: 'tools' | 'navigation' | 'view' | 'file' | 'edit';
 }
 
 @Injectable({
@@ -16,44 +15,31 @@ export class KeyboardShortcutService implements OnDestroy {
   private destroy$ = new Subject<void>();
   private actions$ = new Subject<string>();
   public action$ = this.actions$.asObservable();
+  /** Tool picked by one of its `Tool.keys`. */
+  private tools$ = new Subject<Tool>();
+  public tool$ = this.tools$.asObservable();
 
   private heldModifiers = new Set<string>();
-  private modifierRelease$ = new Subject<string>();
-  public modifierReleased$ = this.modifierRelease$.asObservable();
 
   private shortcuts: ShortcutConfig[] = [
-    { keys: ['1', 'p'], action: 'selectPen', description: 'Select pen tool', category: 'tools' },
-    { keys: ['2', 'e'], action: 'selectEraser', description: 'Select eraser', category: 'tools' },
-    { keys: ['3', 'shift+l'], action: 'selectLasso', description: 'Select lasso tool', category: 'tools' },
-    { keys: ['4', 'ctrl+shift+e'], action: 'selectLassoEraser', description: 'Select lasso eraser', category: 'tools' },
-    { keys: ['l'], action: 'selectLine', description: 'Select line tool', category: 'tools' },
-    { keys: ['g'], action: 'selectPan', description: 'Select pan tool', category: 'tools' },
-    { keys: ['b'], action: 'selectPath', description: 'Select path (bezier) tool', category: 'tools' },
-    { keys: ['r'], action: 'selectRect', description: 'Select box tool', category: 'tools' },
-    { keys: ['o'], action: 'selectEllipse', description: 'Select ellipse tool', category: 'tools' },
-    { keys: ['n'], action: 'selectNode', description: 'Select node (edit) tool', category: 'tools' },
-    { keys: ['s'], action: 'selectSelect', description: 'Select (move/duplicate paths) tool', category: 'tools' },
-    { keys: ['v'], action: 'selectVectorize', description: 'Select vectorize tool', category: 'tools' },
-    { keys: ['k'], action: 'selectSkeletonize', description: 'Select skeletonize tool', category: 'tools' },
+    { keys: ['ctrl+z'], action: 'undo' },
+    { keys: ['ctrl+y'], action: 'redo' },
 
-    { keys: ['ctrl+z'], action: 'undo', description: 'Undo', category: 'edit' },
-    { keys: ['ctrl+y'], action: 'redo', description: 'Redo', category: 'edit' },
+    { keys: ['tab'], action: 'toggleAllVisibility' },
+    { keys: ['ctrl+tab'], action: 'nextLabel' },
+    { keys: ['ctrl+shift+tab'], action: 'previousLabel' },
+    { keys: ['ctrl+e'], action: 'toggleEdges' },
+    { keys: ['q'], action: 'toggleImageProcessing' },
+    { keys: ['d'], action: 'togglePostProcessing' },
+    { keys: ['=', '+', 'shift++'], action: 'zoomIn' },
+    { keys: ['-', '_', 'shift+_'], action: 'zoomOut' },
 
-    { keys: ['tab'], action: 'toggleAllVisibility', description: 'Toggle all labels visibility', category: 'view' },
-    { keys: ['ctrl+tab'], action: 'nextLabel', description: 'Cycle to next label', category: 'view' },
-    { keys: ['ctrl+shift+tab'], action: 'previousLabel', description: 'Cycle to previous label', category: 'view' },
-    { keys: ['ctrl+e'], action: 'toggleEdges', description: 'Toggle edge display', category: 'view' },
-    { keys: ['q'], action: 'toggleImageProcessing', description: 'Toggle image processing', category: 'view' },
-    { keys: ['d'], action: 'togglePostProcessing', description: 'Toggle post-processing', category: 'view' },
-    { keys: ['=', '+', 'shift++'], action: 'zoomIn', description: 'Zoom in', category: 'view' },
-    { keys: ['-', '_', 'shift+_'], action: 'zoomOut', description: 'Zoom out', category: 'view' },
-
-    { keys: ['ctrl+s'], action: 'save', description: 'Save annotations', category: 'file' },
+    { keys: ['ctrl+s'], action: 'save' },
     // Left/right move between sequences, up/down between frames.
-    { keys: ['arrowright'], action: 'nextSequence', description: 'Next sequence', category: 'navigation' },
-    { keys: ['arrowleft'], action: 'previousSequence', description: 'Previous sequence', category: 'navigation' },
-    { keys: ['arrowup'], action: 'nextFrame', description: 'Next frame in sequence', category: 'navigation' },
-    { keys: ['arrowdown'], action: 'previousFrame', description: 'Previous frame in sequence', category: 'navigation' },
+    { keys: ['arrowright'], action: 'nextSequence' },
+    { keys: ['arrowleft'], action: 'previousSequence' },
+    { keys: ['arrowup'], action: 'nextFrame' },
+    { keys: ['arrowdown'], action: 'previousFrame' },
   ];
 
   private holdKeys = new Map<string, string>([
@@ -87,7 +73,15 @@ export class KeyboardShortcutService implements OnDestroy {
           return;
         }
 
-        const action = this.matchShortcut(event);
+        const key = this.normalizeKey(event);
+        const tool = ALL_TOOLS.find(t => t.keys.includes(key));
+        if (tool) {
+          event.preventDefault();
+          this.tools$.next(tool);
+          return;
+        }
+
+        const action = this.matchShortcut(key);
         if (action) {
           event.preventDefault();
           this.actions$.next(action);
@@ -124,9 +118,7 @@ export class KeyboardShortcutService implements OnDestroy {
       });
   }
 
-  private matchShortcut(event: KeyboardEvent): string | null {
-    const normalizedKey = this.normalizeKey(event);
-    
+  private matchShortcut(normalizedKey: string): string | null {
     for (const shortcut of this.shortcuts) {
       if (shortcut.keys.some(k => k.toLowerCase() === normalizedKey)) {
         return shortcut.action;
@@ -157,24 +149,5 @@ export class KeyboardShortcutService implements OnDestroy {
     const isEditable = activeElement.getAttribute('contenteditable') === 'true';
     
     return tagName === 'INPUT' || tagName === 'TEXTAREA' || isEditable;
-  }
-
-  public getShortcutsByCategory(category: ShortcutConfig['category']): ShortcutConfig[] {
-    return this.shortcuts.filter(s => s.category === category);
-  }
-
-  public getAllShortcuts(): ShortcutConfig[] {
-    return [...this.shortcuts];
-  }
-
-  public formatKeyForDisplay(key: string): string {
-    return key
-      .replace('ctrl', '⌘/Ctrl')
-      .replace('shift', '⇧')
-      .replace('alt', 'Alt')
-      .replace('arrowright', '→')
-      .replace('arrowleft', '←')
-      .replace('+', ' + ')
-      .toUpperCase();
   }
 }

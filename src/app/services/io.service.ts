@@ -1,6 +1,5 @@
 import { Injectable, OnDestroy, inject } from '@angular/core';
 import { Subject } from 'rxjs';
-import { invoke } from '@tauri-apps/api/core';
 
 import { LabelsService } from './labels/labels.service';
 import { SequenceService } from './sequence.service';
@@ -243,18 +242,6 @@ export class IOService implements OnDestroy, ProjectScoped {
       return this.save();
     }
     return true;
-  }
-
-  public async deleteAnnotation(labelId: number): Promise<void> {
-    const frame = this.sequenceService.currentFrame();
-    if (!frame) {
-      return;
-    }
-
-    await invoke('delete_annotation', {
-      frameId: frame.id,
-      labelId,
-    });
   }
 
 }

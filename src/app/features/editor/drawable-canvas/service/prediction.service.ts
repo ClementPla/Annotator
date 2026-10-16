@@ -6,7 +6,6 @@ import { SequenceService } from '../../../../services/sequence.service';
 import { IOService } from '../../../../services/io.service';
 import { NotificationService } from '../../../../services/notification.service';
 import { CanvasManagerService } from './canvas-manager.service';
-import { StateManagerService } from './state-manager.service';
 import { UndoRedoService } from './undo-redo.service';
 
 import { api, ScribbleInput, VectorShape, VectorNode } from '../../../../lib/api';
@@ -26,7 +25,6 @@ export class PredictionService {
   private labelService = inject(LabelsService);
   private sequenceService = inject(SequenceService);
   private canvasManager = inject(CanvasManagerService);
-  private stateManager = inject(StateManagerService);
   private undoRedo = inject(UndoRedoService);
   private io = inject(IOService);
   private notifications = inject(NotificationService);
