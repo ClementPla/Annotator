@@ -98,15 +98,22 @@ pub fn gaussian_blur(src: &Array2<f32>, sigma: f32) -> Array2<f32> {
     out
 }
 
+/// The indices left, right, above and below (x, y), reflected at the edges.
+fn reflected_neighbours(x: usize, y: usize, w: usize, h: usize) -> (usize, usize, usize, usize) {
+    (
+        reflect(x as isize - 1, w),
+        reflect(x as isize + 1, w),
+        reflect(y as isize - 1, h),
+        reflect(y as isize + 1, h),
+    )
+}
+
 pub fn gradient_magnitude(src: &Array2<f32>) -> Array2<f32> {
     let (h, w) = (src.shape()[0], src.shape()[1]);
     let mut out = Array2::<f32>::zeros((h, w));
     for y in 0..h {
         for x in 0..w {
-            let xm = reflect(x as isize - 1, w);
-            let xp = reflect(x as isize + 1, w);
-            let ym = reflect(y as isize - 1, h);
-            let yp = reflect(y as isize + 1, h);
+            let (xm, xp, ym, yp) = reflected_neighbours(x, y, w, h);
             let gx = 0.5 * (src[[y, xp]] - src[[y, xm]]);
             let gy = 0.5 * (src[[yp, x]] - src[[ym, x]]);
             out[[y, x]] = (gx * gx + gy * gy).sqrt();
@@ -125,10 +132,7 @@ fn hessian_components(src: &Array2<f32>, sigma: f32) -> (Array2<f32>, Array2<f32
     let mut lxy = Array2::<f32>::zeros((h, w));
     for y in 0..h {
         for x in 0..w {
-            let xm = reflect(x as isize - 1, w);
-            let xp = reflect(x as isize + 1, w);
-            let ym = reflect(y as isize - 1, h);
-            let yp = reflect(y as isize + 1, h);
+            let (xm, xp, ym, yp) = reflected_neighbours(x, y, w, h);
             let c = src[[y, x]];
             lxx[[y, x]] = norm * (src[[y, xp]] - 2.0 * c + src[[y, xm]]);
             lyy[[y, x]] = norm * (src[[yp, x]] - 2.0 * c + src[[ym, x]]);

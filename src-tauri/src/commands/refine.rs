@@ -85,25 +85,30 @@ fn clamp_index(i: isize, n: usize) -> usize {
 }
 
 fn filter_rows(src: &Array2<f32>, kernel: &[f32]) -> Array2<f32> {
-    let (h, w) = src.dim();
-    let radius = (kernel.len() / 2) as isize;
-    Array2::from_shape_fn((h, w), |(y, x)| {
-        kernel
-            .iter()
-            .enumerate()
-            .map(|(k, weight)| weight * src[[y, clamp_index(x as isize + k as isize - radius, w)]])
-            .sum()
-    })
+    filter_axis(src, kernel, false)
 }
 
 fn filter_columns(src: &Array2<f32>, kernel: &[f32]) -> Array2<f32> {
+    filter_axis(src, kernel, true)
+}
+
+/// Convolve along x (`vertical: false`) or y, clamping at the edges.
+fn filter_axis(src: &Array2<f32>, kernel: &[f32], vertical: bool) -> Array2<f32> {
     let (h, w) = src.dim();
     let radius = (kernel.len() / 2) as isize;
     Array2::from_shape_fn((h, w), |(y, x)| {
         kernel
             .iter()
             .enumerate()
-            .map(|(k, weight)| weight * src[[clamp_index(y as isize + k as isize - radius, h), x]])
+            .map(|(k, weight)| {
+                let offset = k as isize - radius;
+                let sample = if vertical {
+                    src[[clamp_index(y as isize + offset, h), x]]
+                } else {
+                    src[[y, clamp_index(x as isize + offset, w)]]
+                };
+                weight * sample
+            })
             .sum()
     })
 }

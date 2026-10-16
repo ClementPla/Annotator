@@ -57,14 +57,13 @@ impl Default for DatasetConfig {
 /// Frames with at least one annotation that the logged-in user has reviewed.
 pub fn annotated_frame_ids(db: &DbState) -> Result<Vec<i64>, String> {
     db.with_conn(|conn| {
-        // Both annotation tables: a frame may hold vector paths only.
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare(&format!(
             "SELECT f.id FROM frames f \
              WHERE EXISTS (SELECT 1 FROM frame_reviews r WHERE r.frame_id = f.id) \
-               AND (EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
-                 OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id)) \
+               AND {} \
              ORDER BY f.id",
-        )?;
+            queries::FRAME_HAS_ANNOTATION
+        ))?;
         let rows = stmt.query_map([], |r| r.get::<_, i64>(0))?;
         let ids = rows.collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(ids)
@@ -76,10 +75,12 @@ pub fn annotated_frame_ids(db: &DbState) -> Result<Vec<i64>, String> {
 pub fn annotated_unreviewed_count(db: &DbState) -> Result<usize, String> {
     db.with_conn(|conn| {
         let n: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM frames f \
-             WHERE NOT EXISTS (SELECT 1 FROM frame_reviews r WHERE r.frame_id = f.id) \
-               AND (EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
-                 OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id))",
+            &format!(
+                "SELECT COUNT(*) FROM frames f \
+                 WHERE NOT EXISTS (SELECT 1 FROM frame_reviews r WHERE r.frame_id = f.id) \
+                   AND {}",
+                queries::FRAME_HAS_ANNOTATION
+            ),
             [],
             |r| r.get(0),
         )?;

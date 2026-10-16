@@ -12,6 +12,11 @@ pub const SCHEMA_VERSION: i64 = 6;
 /// The account every project has. See the `users` table in `schema.rs`.
 pub const DEFAULT_USER_ID: i64 = 1;
 
+/// SQL condition: frame `f` carries a raster or a vector annotation. A frame
+/// may hold vector paths only.
+pub const FRAME_HAS_ANNOTATION: &str = "(EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
+     OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id))";
+
 fn configure_connection(conn: &Connection) -> Result<()> {
     // `execute_batch`: these PRAGMAs return rows.
     conn.execute_batch("
@@ -356,13 +361,29 @@ pub fn save_annotation(
     Ok(())
 }
 
+/// Replace the current user's vector shapes of one (frame, label).
+pub fn upsert_vector_shapes(
+    conn: &Connection,
+    frame_id: i64,
+    label_id: i64,
+    user_id: i64,
+    shapes_json: &str,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO main.vector_annotations (frame_id, label_id, user_id, shapes, modified_at)
+         VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)
+         ON CONFLICT(frame_id, label_id, user_id)
+         DO UPDATE SET shapes = excluded.shapes, modified_at = CURRENT_TIMESTAMP",
+        (frame_id, label_id, user_id, shapes_json),
+    )?;
+    Ok(())
+}
+
 /// Erase every annotation the current user made on the frames of
 /// `sequence_id`, raster and vector, and return how many frames carried one.
 pub fn clear_sequence_annotations(conn: &Connection, sequence_id: i64) -> Result<usize> {
     let affected: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM frames f WHERE f.sequence_id = ?1 \
-           AND (EXISTS (SELECT 1 FROM annotations a WHERE a.frame_id = f.id) \
-             OR EXISTS (SELECT 1 FROM vector_annotations v WHERE v.frame_id = f.id))",
+        &format!("SELECT COUNT(*) FROM frames f WHERE f.sequence_id = ?1 AND {FRAME_HAS_ANNOTATION}"),
         params![sequence_id],
         |row| row.get(0),
     )?;

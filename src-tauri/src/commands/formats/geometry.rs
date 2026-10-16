@@ -389,29 +389,12 @@ fn zhang_suen_thin(img: &mut [u8], w: usize, h: usize) {
                     if img[y * w + x] == 0 {
                         continue;
                     }
-                    // Neighbours p2..p9 clockwise from north.
-                    let p = [
-                        img[(y - 1) * w + x],     // p2 N
-                        img[(y - 1) * w + x + 1], // p3 NE
-                        img[y * w + x + 1],       // p4 E
-                        img[(y + 1) * w + x + 1], // p5 SE
-                        img[(y + 1) * w + x],     // p6 S
-                        img[(y + 1) * w + x - 1], // p7 SW
-                        img[y * w + x - 1],       // p8 W
-                        img[(y - 1) * w + x - 1], // p9 NW
-                    ];
+                    let p = ring8(img, w, x, y);
                     let b: u8 = p.iter().sum();
                     if b < 2 || b > 6 {
                         continue;
                     }
-                    // A = 0→1 transitions around the ring.
-                    let mut a = 0;
-                    for i in 0..8 {
-                        if p[i] == 0 && p[(i + 1) % 8] == 1 {
-                            a += 1;
-                        }
-                    }
-                    if a != 1 {
+                    if transitions(&p) != 1 {
                         continue;
                     }
                     let (n, e, s, wst) = (p[0], p[2], p[4], p[6]);
@@ -468,9 +451,13 @@ fn are_8_adjacent(a: usize, b: usize, w: usize) -> bool {
 /// 2 = pass-through, ≥3 = junction. Unlike a neighbour count, it ignores the
 /// staircase corners of a slanted 8-connected line.
 fn crossing_number(img: &[u8], w: usize, idx: usize) -> u32 {
-    let (x, y) = (idx % w, idx / w);
-    // p2..p9 clockwise from north: N, NE, E, SE, S, SW, W, NW.
-    let ring = [
+    transitions(&ring8(img, w, idx % w, idx / w))
+}
+
+/// The 8 neighbours p2..p9 of (x, y), clockwise from north: N, NE, E, SE, S,
+/// SW, W, NW. (x, y) must not be on the border.
+fn ring8(img: &[u8], w: usize, x: usize, y: usize) -> [u8; 8] {
+    [
         img[(y - 1) * w + x],
         img[(y - 1) * w + x + 1],
         img[y * w + x + 1],
@@ -479,14 +466,12 @@ fn crossing_number(img: &[u8], w: usize, idx: usize) -> u32 {
         img[(y + 1) * w + x - 1],
         img[y * w + x - 1],
         img[(y - 1) * w + x - 1],
-    ];
-    let mut c = 0;
-    for i in 0..8 {
-        if ring[i] == 0 && ring[(i + 1) % 8] == 1 {
-            c += 1;
-        }
-    }
-    c
+    ]
+}
+
+/// 0→1 transitions around a ring of neighbours.
+fn transitions(ring: &[u8; 8]) -> u32 {
+    (0..8).filter(|&i| ring[i] == 0 && ring[(i + 1) % 8] == 1).count() as u32
 }
 
 /// An endpoint or a junction.

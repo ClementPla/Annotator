@@ -215,14 +215,7 @@ pub fn write_dataset(conn: &Connection, dataset: &Dataset) -> Result<ImportResul
                 let mut all = load_shapes_for(conn, frame_id, label_id)?;
                 all.extend(new_shapes);
                 let json = serde_json::to_string(&all)?;
-                conn.execute(
-                    "INSERT INTO main.vector_annotations
-                     (frame_id, label_id, user_id, shapes, modified_at)
-                     VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)
-                     ON CONFLICT(frame_id, label_id, user_id)
-                     DO UPDATE SET shapes = excluded.shapes, modified_at = CURRENT_TIMESTAMP",
-                    (frame_id, label_id, user, &json),
-                )?;
+                queries::upsert_vector_shapes(conn, frame_id, label_id, user, &json)?;
             }
         }
 

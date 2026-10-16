@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::Path;
 
-use image::{GrayImage, RgbImage};
+use image::{DynamicImage, GrayImage, RgbImage};
 use serde_json::json;
 
 use super::{bool_opt, get_bool, Capabilities, ExportFormat, OptionSpec, OptionValues, Progress};
@@ -159,19 +159,21 @@ fn colormap_rgb(dataset: &Dataset, frame: &FrameData) -> Vec<u8> {
 }
 
 fn save_gray(pixels: &[u8], w: u32, h: u32, dir: &Path, stem: &str) -> Result<()> {
-    fs::create_dir_all(dir).map_err(|e| AppError::Generic(format!("create {}: {e}", dir.display())))?;
     let img = GrayImage::from_raw(w, h, pixels.to_vec())
         .ok_or_else(|| AppError::Generic("invalid mask dimensions".into()))?;
-    img.save(dir.join(format!("{stem}.png")))
-        .map_err(|e| AppError::Generic(format!("save mask: {e}")))?;
-    Ok(())
+    save_png(&DynamicImage::ImageLuma8(img), dir, stem, "mask")
 }
 
 fn save_rgb(pixels: &[u8], w: u32, h: u32, dir: &Path, stem: &str) -> Result<()> {
-    fs::create_dir_all(dir).map_err(|e| AppError::Generic(format!("create {}: {e}", dir.display())))?;
     let img = RgbImage::from_raw(w, h, pixels.to_vec())
         .ok_or_else(|| AppError::Generic("invalid colormap dimensions".into()))?;
+    save_png(&DynamicImage::ImageRgb8(img), dir, stem, "colormap")
+}
+
+/// Write `img` to `dir/stem.png`, creating `dir`. `what` names it in errors.
+fn save_png(img: &DynamicImage, dir: &Path, stem: &str, what: &str) -> Result<()> {
+    fs::create_dir_all(dir).map_err(|e| AppError::Generic(format!("create {}: {e}", dir.display())))?;
     img.save(dir.join(format!("{stem}.png")))
-        .map_err(|e| AppError::Generic(format!("save colormap: {e}")))?;
+        .map_err(|e| AppError::Generic(format!("save {what}: {e}")))?;
     Ok(())
 }

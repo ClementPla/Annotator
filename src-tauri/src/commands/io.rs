@@ -119,15 +119,10 @@ fn scan_and_import(db: &DbState, options: ScanOptions) -> Result<ScanResult> {
   let indexes = probe_videos(&videos);
   db.with_conn(|conn| {
     let tx = conn.unchecked_transaction()?;
-    for (video, index) in videos.iter().zip(indexes) {
-      match import_video(&tx, video, index, options.video_frame_step) {
-        Ok(frames) => {
-          result.sequences_created += 1;
-          result.frames_imported += frames;
-        }
-        Err(e) => result.errors.push(format!("Failed to import {}: {}", video.relative_path, e)),
-      }
-    }
+    let (sequences, frames) =
+      import_probed_videos(&tx, &videos, indexes, options.video_frame_step, &mut result.errors);
+    result.sequences_created += sequences;
+    result.frames_imported += frames;
     tx.commit()?;
     Ok(())
   })?;
@@ -312,15 +307,10 @@ fn add_images(
     new_videos.push(video);
   }
   let indexes = probe_videos(&new_videos);
-  for (video, index) in new_videos.iter().zip(indexes) {
-    match import_video(&tx, video, index, options.video_frame_step) {
-      Ok(frames) => {
-        result.sequences_created += 1;
-        result.frames_imported += frames;
-      }
-      Err(e) => result.errors.push(format!("Failed to import {}: {}", video.relative_path, e)),
-    }
-  }
+  let (sequences, frames) =
+    import_probed_videos(&tx, &new_videos, indexes, options.video_frame_step, &mut result.errors);
+  result.sequences_created += sequences;
+  result.frames_imported += frames;
 
   tx.commit()?;
   log::info!(
@@ -530,6 +520,28 @@ fn import_frame(
 /// whole file.
 fn probe_videos(videos: &[&ImageFile]) -> Vec<Result<crate::video::VideoIndex>> {
   videos.par_iter().map(|video| crate::video::probe(&video.absolute_path)).collect()
+}
+
+/// Import probed videos, one sequence each, and return how many sequences and
+/// frames were created. Failures go to `errors`.
+fn import_probed_videos(
+  conn: &rusqlite::Connection,
+  videos: &[&ImageFile],
+  indexes: Vec<Result<crate::video::VideoIndex>>,
+  step: u32,
+  errors: &mut Vec<String>,
+) -> (usize, usize) {
+  let (mut sequences, mut frames) = (0, 0);
+  for (video, index) in videos.iter().zip(indexes) {
+    match import_video(conn, video, index, step) {
+      Ok(n) => {
+        sequences += 1;
+        frames += n;
+      }
+      Err(e) => errors.push(format!("Failed to import {}: {}", video.relative_path, e)),
+    }
+  }
+  (sequences, frames)
 }
 
 fn import_video(

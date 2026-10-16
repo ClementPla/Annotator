@@ -6,6 +6,7 @@
 
 use burn::module::Module;
 use burn::record::{BinBytesRecorder, FullPrecisionSettings, Recorder};
+use burn::tensor::backend::Backend;
 use serde::{Deserialize, Serialize};
 
 use super::backend::{CpuInfer, Selection};
@@ -66,40 +67,28 @@ pub fn encode_head(head: &Head) -> Result<Vec<u8>, String> {
 /// have the wrong shape without complaint, so the parameter count is compared
 /// before and after loading.
 pub fn decode_head(bytes: Vec<u8>, meta: &ModelMeta) -> Result<Head, String> {
-    let r = recorder();
     match Selection::detect() {
         #[cfg(feature = "gpu")]
-        Selection::Cuda => {
-            let device = Default::default();
-            let fresh = SegHead::<GpuInfer>::with_depth(
-                meta.feature_dim,
-                meta.hidden,
-                meta.depth,
-                meta.classes,
-                &device,
-            );
-            let expected = fresh.num_params();
-            let rec = r.load(bytes, &device).map_err(load_err)?;
-            let loaded = fresh.load_record(rec);
-            check_params(expected, loaded.num_params())?;
-            Ok(Head::Cuda(loaded))
-        }
-        Selection::Cpu => {
-            let device = Default::default();
-            let fresh = SegHead::<CpuInfer>::with_depth(
-                meta.feature_dim,
-                meta.hidden,
-                meta.depth,
-                meta.classes,
-                &device,
-            );
-            let expected = fresh.num_params();
-            let rec = r.load(bytes, &device).map_err(load_err)?;
-            let loaded = fresh.load_record(rec);
-            check_params(expected, loaded.num_params())?;
-            Ok(Head::Cpu(loaded))
-        }
+        Selection::Cuda => load_head::<GpuInfer>(bytes, meta).map(Head::Cuda),
+        Selection::Cpu => load_head::<CpuInfer>(bytes, meta).map(Head::Cpu),
     }
+}
+
+/// Load `bytes` into a fresh head of `meta`'s geometry on backend `B`.
+fn load_head<B: Backend>(bytes: Vec<u8>, meta: &ModelMeta) -> Result<SegHead<B>, String> {
+    let device = Default::default();
+    let fresh = SegHead::<B>::with_depth(
+        meta.feature_dim,
+        meta.hidden,
+        meta.depth,
+        meta.classes,
+        &device,
+    );
+    let expected = fresh.num_params();
+    let rec = recorder().load(bytes, &device).map_err(load_err)?;
+    let loaded = fresh.load_record(rec);
+    check_params(expected, loaded.num_params())?;
+    Ok(loaded)
 }
 
 fn load_err(e: impl std::fmt::Display) -> String {

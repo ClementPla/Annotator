@@ -1,5 +1,5 @@
 use crate::superpixel::SuperpixelMap;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use tauri::ipc::Response;
 use tauri::State;
 
@@ -22,29 +22,8 @@ pub async fn superpixel_refine(
     min_overlap_fraction: f32,
     state: State<'_, SuperpixelState>,
 ) -> Result<Response, String> {
-    // Rebuild when asked, or when the cached map does not match the image size.
-    {
-        let mut guard = state.lock();
-        let needs_compute = compute_map
-            || guard
-                .as_ref()
-                .map_or(true, |m| !m.matches(width, height));
-        if needs_compute {
-            let map = SuperpixelMap::compute(&image, width, height, target_count)?;
-            println!(
-                "Computed {} superpixels for {}x{} image",
-                map.num_superpixels(),
-                width,
-                height
-            );
-            *guard = Some(map);
-        }
-    }
-
-    let guard = state.lock();
-    let map = guard
-        .as_ref()
-        .ok_or("Superpixel map is not available")?;
+    let guard = ensure_map(&state, &image, width, height, compute_map, target_count)?;
+    let map = guard.as_ref().ok_or("Superpixel map is not available")?;
 
     let mask = map.refine(&brush, similarity_threshold, min_overlap_fraction)?;
 
@@ -67,22 +46,34 @@ pub async fn superpixel_overlay(
     target_count: usize,
     state: State<'_, SuperpixelState>,
 ) -> Result<Response, String> {
-    {
-        let mut guard = state.lock();
-        let needs_compute = compute_map
-            || guard
-                .as_ref()
-                .map_or(true, |m| !m.matches(width, height));
-        if needs_compute {
-            let map = SuperpixelMap::compute(&image, width, height, target_count)?;
-            *guard = Some(map);
-        }
-    }
-
-    let guard = state.lock();
-    let map = guard
-        .as_ref()
-        .ok_or("Superpixel map is not available")?;
+    let guard = ensure_map(&state, &image, width, height, compute_map, target_count)?;
+    let map = guard.as_ref().ok_or("Superpixel map is not available")?;
 
     Ok(Response::new(map.boundary_overlay([255, 225, 0, 180])))
+}
+
+/// The locked map, rebuilt first when asked or when the cached one does not
+/// match the image size.
+fn ensure_map<'a>(
+    state: &'a SuperpixelState,
+    image: &[u8],
+    width: usize,
+    height: usize,
+    compute_map: bool,
+    target_count: usize,
+) -> Result<MutexGuard<'a, Option<SuperpixelMap>>, String> {
+    let mut guard = state.lock();
+    let needs_compute =
+        compute_map || guard.as_ref().map_or(true, |m| !m.matches(width, height));
+    if needs_compute {
+        let map = SuperpixelMap::compute(image, width, height, target_count)?;
+        log::info!(
+            "Computed {} superpixels for {}x{} image",
+            map.num_superpixels(),
+            width,
+            height
+        );
+        *guard = Some(map);
+    }
+    Ok(guard)
 }

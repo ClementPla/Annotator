@@ -339,9 +339,6 @@ fn enforce_connectivity(
     let mut label = 0i32;
     let mut buffer: Vec<usize> = Vec::with_capacity(64);
 
-    const DX: [i32; 4] = [-1, 1, 0, 0];
-    const DY: [i32; 4] = [0, 0, -1, 1];
-
     for start in 0..n {
         if new_labels[start] != -1 {
             continue;
@@ -349,18 +346,9 @@ fn enforce_connectivity(
 
         // A labelled neighbour to merge into, should this segment be too small.
         let mut adjacent = label.max(0);
-        {
-            let x = (start % width) as i32;
-            let y = (start / width) as i32;
-            for k in 0..4 {
-                let nx = x + DX[k];
-                let ny = y + DY[k];
-                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                    let ni = ny as usize * width + nx as usize;
-                    if new_labels[ni] >= 0 {
-                        adjacent = new_labels[ni];
-                    }
-                }
+        for ni in neighbours4(start, width, height) {
+            if new_labels[ni] >= 0 {
+                adjacent = new_labels[ni];
             }
         }
 
@@ -371,17 +359,10 @@ fn enforce_connectivity(
         while head < buffer.len() {
             let idx = buffer[head];
             head += 1;
-            let x = (idx % width) as i32;
-            let y = (idx / width) as i32;
-            for k in 0..4 {
-                let nx = x + DX[k];
-                let ny = y + DY[k];
-                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                    let ni = ny as usize * width + nx as usize;
-                    if new_labels[ni] == -1 && old_labels[ni] == old_labels[idx] {
-                        new_labels[ni] = label;
-                        buffer.push(ni);
-                    }
+            for ni in neighbours4(idx, width, height) {
+                if new_labels[ni] == -1 && old_labels[ni] == old_labels[idx] {
+                    new_labels[ni] = label;
+                    buffer.push(ni);
                 }
             }
         }
@@ -399,6 +380,19 @@ fn enforce_connectivity(
     let labels =
         Array2::from_shape_fn((height, width), |(y, x)| new_labels[y * width + x].max(0) as u32);
     (labels, num)
+}
+
+/// The in-bounds 4-neighbours (left, right, up, down) of pixel `idx`.
+fn neighbours4(idx: usize, width: usize, height: usize) -> impl Iterator<Item = usize> {
+    let (x, y) = (idx % width, idx / width);
+    [
+        (x > 0).then(|| idx - 1),
+        (x + 1 < width).then(|| idx + 1),
+        (y > 0).then(|| idx - width),
+        (y + 1 < height).then(|| idx + width),
+    ]
+    .into_iter()
+    .flatten()
 }
 
 fn build_adjacency(
