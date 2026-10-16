@@ -4,6 +4,7 @@
 //! on the main thread and would freeze the window. Their bodies stay
 //! synchronous; progress goes out as `ml-progress` / `ml-train-progress` events.
 
+use ts_rs::TS;
 use std::sync::atomic::Ordering;
 
 use serde::{Deserialize, Serialize};
@@ -21,8 +22,9 @@ use super::registry;
 use super::scribble::Rng;
 use super::train::{self, Samples, TrainConfig};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct EncoderStatus {
     #[serde(flatten)]
     pub spec: registry::EncoderSpec,
@@ -58,8 +60,9 @@ pub async fn ml_download_encoder(app: AppHandle, encoder_id: String) -> Result<S
 
 /// What the project currently offers the trainer.
 // Not `rename_all = "camelCase"`: the frontend reads the snake_case fields.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct DatasetSummary {
     /// Annotated and reviewed.
     pub annotated_frames: usize,
@@ -82,27 +85,41 @@ pub fn ml_dataset_summary(db: State<DbState>) -> Result<DatasetSummary, String> 
     })
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct TrainOptions {
     /// Omit to train on the local feature basis alone.
+    #[ts(optional = nullable)]
     pub encoder_id: Option<String>,
+    #[ts(optional)]
     pub working_size: Option<u32>,
+    #[ts(optional)]
     pub patches_per_frame: Option<usize>,
     /// Persist encoder features between runs. Defaults to on.
+    #[ts(optional)]
     pub cache_features: Option<bool>,
     /// Labels to train on. Omit for every label in the project.
+    #[ts(as = "Option<Vec<i32>>", optional)]
     pub label_ids: Option<Vec<i64>>,
+    #[ts(optional)]
     pub augment_repeats: Option<usize>,
+    #[ts(optional)]
     pub epochs: Option<usize>,
+    #[ts(optional)]
     pub hidden: Option<usize>,
+    #[ts(optional)]
     pub depth: Option<usize>,
+    #[ts(optional)]
     pub val_fraction: Option<f32>,
+    #[ts(as = "Option<u32>", optional)]
     pub seed: Option<u64>,
 }
 
-#[derive(Clone, Serialize)]
+/// Payload of the `ml-progress` event (feature extraction phase).
+#[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "MlProgress")]
 struct Progress<'a> {
     stage: &'a str,
     done: usize,
@@ -430,8 +447,10 @@ fn emit_train(app: &AppHandle, p: train::TrainProgress) {
     );
 }
 
-#[derive(Clone, Serialize)]
+/// Payload of `ml-train-progress`, emitted once per epoch.
+#[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 struct TrainTick {
     budget: usize,
     repeat: usize,
@@ -448,8 +467,9 @@ struct TrainTick {
     features: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct TrainSummary {
     pub train_frames: usize,
     pub val_frames: usize,
@@ -613,11 +633,14 @@ pub fn ml_stop_training(state: State<MlState>) {
 }
 
 /// What Didascalie keeps in local app data: features and encoder weights.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct StorageUsage {
+    #[ts(type = "number")]
     pub feature_bytes: u64,
     pub feature_files: usize,
+    #[ts(type = "number")]
     pub model_bytes: u64,
     pub cache_dir: String,
 }

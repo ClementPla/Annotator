@@ -6,13 +6,15 @@
 //! models that are gated or published without ONNX. See
 //! `docs/literature-review-fewshot-scribble.md`.
 
+use ts_rs::TS;
 use serde::{Deserialize, Serialize};
 
 use crate::dl::model_manager::ModelConfig;
 
 /// How pixel values are scaled before entering a graph. A wrong value does
 /// not error, it degrades the features.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub enum Normalization {
     /// Plain `[0, 1]`.
     Unit,
@@ -32,8 +34,9 @@ impl Normalization {
 
 /// A pretrained encoder the user can download. The numeric fields are hints
 /// for the UI; the real shapes are read from the graph at load time.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct EncoderSpec {
     /// Used by the frontend and stored in run metadata.
     pub id: String,

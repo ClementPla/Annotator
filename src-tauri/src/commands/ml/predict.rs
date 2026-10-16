@@ -4,6 +4,7 @@
 //! inference reuses [`dataset::assemble_stack`] and refuses a width that
 //! differs from the model's `feature_dim`.
 
+use ts_rs::TS;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use ndarray::Array3;
@@ -47,8 +48,9 @@ pub struct MlState {
 }
 
 /// Scribbles supplied by the UI, as flat pixel indices at native resolution.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct ScribbleInput {
     #[serde(default)]
     pub positive: Vec<u32>,
@@ -56,9 +58,11 @@ pub struct ScribbleInput {
     pub negative: Vec<u32>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct PredictedMask {
+    #[ts(type = "number")]
     pub label_id: i64,
     /// Base64 of a native-resolution uint8 mask (1 where predicted).
     pub mask_base64: String,
@@ -66,9 +70,11 @@ pub struct PredictedMask {
     pub coverage: f32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct PredictedFrame {
+    #[ts(type = "number")]
     pub frame_id: i64,
     pub width: u32,
     pub height: u32,

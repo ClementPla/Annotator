@@ -5,36 +5,45 @@
 //! make existing projects unreadable; renaming a field takes a schema
 //! migration.
 
+use ts_rs::TS;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct LabelConfig {
     pub name: String,
     pub color: String,
+    #[ts(optional = nullable)]
     pub shades: Option<Vec<String>>,  // For instance segmentation
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct MulticlassConfig {
     pub name: String,
     pub classes: Vec<String>,
+    #[ts(optional = nullable)]
     pub default: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct MultilabelConfig {
     pub name: String,
     pub classes: Vec<String>,
+    #[ts(optional = nullable)]
     pub default: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct ProjectConfig {
     pub name: String,
     pub input_folder: Option<String>,      // None if images embedded
     /// Other paths the image folder is reached by, from other computers. See
     /// `commands::project::resolve_image_folder`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(as = "Option<Vec<String>>", optional)]
     pub input_folder_alternates: Vec<String>,
     pub images_embedded: bool,
     /// Files smaller than this are embedded even when `images_embedded` is off.
@@ -53,9 +62,13 @@ pub struct ProjectConfig {
     
     pub input_regex: String,
     pub recursive: bool,
+    #[ts(optional = nullable)]
     pub segmentation_labels: Option<Vec<LabelConfig>>,
+    #[ts(optional = nullable)]
     pub classification_tasks: Option<Vec<MulticlassConfig>>,
+    #[ts(optional = nullable)]
     pub multilabel_task: Option<MultilabelConfig>,
+    #[ts(optional = nullable)]
     pub text_fields: Option<Vec<String>>,
     pub folders_as_sequences: bool,
 }

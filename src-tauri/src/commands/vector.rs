@@ -8,10 +8,13 @@ use crate::utils::AppError;
 
 /// All vector shapes of one (frame, label). `shapes` is a JSON array of
 /// `VectorShape`, owned by the frontend and stored verbatim.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "VectorAnnotationsWire")]
 pub struct VectorAnnotations {
+    #[ts(type = "number")]
     pub label_id: i64,
+    #[ts(as = "Vec<VectorShape>")]
     pub shapes: serde_json::Value,
 }
 

@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use rusqlite::params;
 use tauri::State;
 use serde::{Deserialize, Serialize};
@@ -5,17 +6,20 @@ use crate::storage::{queries, DbState};
 use crate::utils::AppError;
 use crate::utils::error::Result;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct BatchClassificationPayload {
+    #[ts(type = "number")]
     pub frame_id: i64,
     pub task_name: String,
     pub selected_classes: Vec<String>,
     pub is_multilabel: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct ClassificationData {
     pub task_name: String,
     pub task_index: i32,
@@ -155,23 +159,27 @@ pub fn save_batch_classifications(
 // ── Whole sequences ────────────────────────────────────────────────────────
 
 /// How the frames of a sequence are classified, by the current user.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct SequenceClassification {
     /// Frames in the sequence, classified or not.
+    #[ts(type = "number")]
     pub frame_count: i64,
     /// One entry per distinct answer to a task. A task every frame answers the
     /// same way has a single entry covering `frame_count` frames.
     pub answers: Vec<SequenceClassificationAnswer>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct SequenceClassificationAnswer {
     pub task_name: String,
     pub is_multilabel: bool,
     pub selected_classes: Vec<String>,
     /// Frames of the sequence giving this answer.
+    #[ts(type = "number")]
     pub frame_count: i64,
 }
 

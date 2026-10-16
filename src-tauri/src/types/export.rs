@@ -1,9 +1,11 @@
 //! Result and progress types shared by dataset export and import.
 
+use ts_rs::TS;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct ExportResult {
     pub total_exported: u32,
     pub errors: Vec<String>,
@@ -18,8 +20,9 @@ pub struct ExportProgress {
 }
 
 /// Outcome of importing annotations into the open project (matched by filename).
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct ImportResult {
     pub frames_matched: u32,
     pub frames_unmatched: u32,

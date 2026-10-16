@@ -8,6 +8,7 @@
 //! propagation. In both, a layer returned for a named label replaces that
 //! label; a single unnamed mask is painted onto the active label.
 
+use ts_rs::TS;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -83,19 +84,23 @@ pub async fn find_keypoints_prefill(
 
 /// A project label as the editor lists it. Sent by the frontend so that the
 /// order, which a `C×H×W` result is matched against, is the one the user sees.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "PythonSegLabel")]
 pub struct BridgeLabel {
+    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
     pub is_instance: bool,
 }
 
 /// What both segmentation commands need to know about the editor's state.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "PythonSegContext")]
 pub struct SegContext {
     pub labels: Vec<BridgeLabel>,
+    #[ts(type = "number | null")]
     pub active_label_id: Option<i64>,
     /// Pixel value a stroke would write on the active label right now: the
     /// selected instance id, or 1.
@@ -171,17 +176,20 @@ fn current_masks(db: &DbState, frame_id: i64, ctx: &SegContext) -> Result<MaskPa
     })
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "PythonSegLayer")]
 pub struct SegmentedLayer {
+    #[ts(type = "number")]
     pub label_id: i64,
     pub additive: bool,
     /// Base64 uint8 mask at native resolution, holding the values to write.
     pub mask_base64: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "PythonSegFrame")]
 pub struct SegmentedFrame {
     pub layers: Vec<SegmentedLayer>,
     /// Label names the function returned that the project does not have.
@@ -242,10 +250,12 @@ struct SequenceProgress<'a> {
     total: usize,
 }
 
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "PythonSequenceReport")]
 pub struct SequenceSegReport {
     /// Frames that received at least one mask.
+    #[ts(type = "number[]")]
     pub applied: Vec<i64>,
     pub unknown_labels: Vec<String>,
 }

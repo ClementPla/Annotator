@@ -4,6 +4,7 @@
 //! class per pixel out. Metrics are computed on held-out frames, never on
 //! pixels or patches of a frame that was trained on.
 
+use ts_rs::TS;
 use burn::module::{AutodiffModule, Module};
 use burn::nn::loss::CrossEntropyLossConfig;
 use burn::nn::conv::{Conv2d, Conv2dConfig};
@@ -166,8 +167,9 @@ impl Head {
     }
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct EvalMetrics {
     pub accuracy: f32,
     /// Mean Dice over the classes present in the reference.

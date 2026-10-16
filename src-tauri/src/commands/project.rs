@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use std::path::{Path, PathBuf};
 use rusqlite::params;
 use serde::Serialize;
@@ -41,8 +42,9 @@ pub fn join_relative(folder: &Path, relative: &str) -> PathBuf {
 }
 
 /// The image folder of the open project, as this computer sees it.
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct ImageFolderStatus {
     /// None when the project has no image folder (everything is embedded).
     pub folder: Option<String>,

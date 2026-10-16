@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,9 +35,11 @@ pub struct AnnotationData {
     pub mask_data: Vec<u8>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct AnnotationResponse {
+    #[ts(type = "number")]
     pub label_id: i64,
     pub label_name: String,
     pub color: String,
@@ -47,9 +50,11 @@ pub struct AnnotationResponse {
     pub height: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct LabelId {
+    #[ts(type = "number")]
     pub id: i64,
     pub name: String,
 }

@@ -10,6 +10,7 @@ pub mod masks;
 pub mod coco;
 pub mod yolo;
 
+use ts_rs::TS;
 use serde::Serialize;
 use std::path::Path;
 
@@ -18,15 +19,17 @@ use crate::utils::error::Result;
 
 // ── Self-describing options ─────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(tag = "type", rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "FormatOption")]
 pub enum OptionSpec {
     Bool { key: String, label: String, default: bool },
     Enum { key: String, label: String, choices: Vec<Choice>, default: String },
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "FormatChoice")]
 pub struct Choice {
     pub value: String,
     pub label: String,
@@ -63,8 +66,9 @@ pub fn default_color(i: usize) -> String {
     PALETTE[i % PALETTE.len()].to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Default, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "FormatCapabilities")]
 pub struct Capabilities {
     pub masks: bool,
     pub polygons: bool,
@@ -132,8 +136,9 @@ pub fn find_importer(id: &str) -> Option<Box<dyn ImportFormat>> {
 }
 
 /// UI metadata: one entry per format id, merging its export/import sides.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "DatasetFormat")]
 pub struct FormatInfo {
     pub id: String,
     pub name: String,

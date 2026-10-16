@@ -101,18 +101,6 @@
                     ></p-select>
                   </div>
                 }
-                @case ('int') {
-                  <div class="flex flex-col gap-1">
-                    <label class="text-sm">{{ opt.label }}</label>
-                    <input
-                      type="number"
-                      pInputText
-                      [(ngModel)]="importOptionValues[opt.key]"
-                      [min]="$any(opt).min"
-                      [max]="$any(opt).max"
-                    />
-                  </div>
-                }
               }
             }
           </div>

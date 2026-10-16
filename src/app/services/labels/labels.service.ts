@@ -224,7 +224,6 @@ export class LabelsService implements ProjectScoped {
         name: l.label,
         color: l.color,
         shades: l.shades ?? undefined,
-        id: l.id,
       })),
       classification_tasks: this.listClassificationTasks.map((t) => ({
         name: t.taskName,

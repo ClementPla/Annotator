@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use rusqlite::params;
 use tauri::State;
 use serde::{Deserialize, Serialize};
@@ -5,8 +6,9 @@ use serde::{Deserialize, Serialize};
 use crate::storage::{queries, DbState};
 use crate::utils::error::Result;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct TextDescriptionData {
     pub field_name: String,
     pub content: String,

@@ -29,10 +29,12 @@ pub struct Frame {
   pub is_embedded: bool,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct FrameImage {
   pub frame: Frame,
+  /// A data URL: `data:image/png;base64,...`.
   pub image_base64: String,
 }
 

@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -74,10 +75,12 @@ pub struct Status {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/", rename = "PythonFunction")]
 pub struct FunctionInfo {
     pub name: String,
     /// "keypoints" | "seg" | "sequence_seg"
+    #[ts(type = "\"keypoints\" | \"seg\" | \"sequence_seg\"")]
     pub kind: String,
     #[serde(default)]
     pub doc: String,
@@ -86,7 +89,8 @@ pub struct FunctionInfo {
     pub wants: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]   // ← Serialize MUST be here
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
 pub struct PingReply {
     pub ok: bool,
     pub protocol_version: u32,

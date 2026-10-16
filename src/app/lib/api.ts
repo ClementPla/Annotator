@@ -32,6 +32,41 @@ import type { SkipReason } from './generated/SkipReason';
 import type { SkippedFrame } from './generated/SkippedFrame';
 import type { VectorNode } from './generated/VectorNode';
 import type { VectorShape } from './generated/VectorShape';
+import type { AnnotationResponse } from './generated/AnnotationResponse';
+import type { BatchClassificationPayload } from './generated/BatchClassificationPayload';
+import type { ClassificationData } from './generated/ClassificationData';
+import type { DatasetFormat } from './generated/DatasetFormat';
+import type { DatasetSummary } from './generated/DatasetSummary';
+import type { EncoderStatus } from './generated/EncoderStatus';
+import type { EvalMetrics } from './generated/EvalMetrics';
+import type { ExportResult } from './generated/ExportResult';
+import type { FormatChoice } from './generated/FormatChoice';
+import type { FormatOption } from './generated/FormatOption';
+import type { FrameImage } from './generated/FrameImage';
+import type { ImageFolderStatus } from './generated/ImageFolderStatus';
+import type { ImportResult } from './generated/ImportResult';
+import type { LabelConfig } from './generated/LabelConfig';
+import type { LabelId } from './generated/LabelId';
+import type { MlProgress } from './generated/MlProgress';
+import type { MulticlassConfig } from './generated/MulticlassConfig';
+import type { MultilabelConfig } from './generated/MultilabelConfig';
+import type { PingReply } from './generated/PingReply';
+import type { PredictedFrame } from './generated/PredictedFrame';
+import type { PredictedMask } from './generated/PredictedMask';
+import type { ProjectConfig } from './generated/ProjectConfig';
+import type { PythonFunction } from './generated/PythonFunction';
+import type { PythonSegContext } from './generated/PythonSegContext';
+import type { PythonSegFrame } from './generated/PythonSegFrame';
+import type { PythonSegLayer } from './generated/PythonSegLayer';
+import type { PythonSequenceReport } from './generated/PythonSequenceReport';
+import type { ScribbleInput } from './generated/ScribbleInput';
+import type { SequenceClassification } from './generated/SequenceClassification';
+import type { StorageUsage } from './generated/StorageUsage';
+import type { TextDescriptionData } from './generated/TextDescriptionData';
+import type { TrainOptions } from './generated/TrainOptions';
+import type { TrainSummary } from './generated/TrainSummary';
+import type { TrainTick } from './generated/TrainTick';
+import type { VectorAnnotationsWire } from './generated/VectorAnnotationsWire';
 
 export type {
   ScanOptions,
@@ -63,146 +98,43 @@ export type {
   SkippedFrame,
   VectorNode,
   VectorShape,
+  AnnotationResponse,
+  BatchClassificationPayload,
+  ClassificationData,
+  DatasetFormat,
+  DatasetSummary,
+  EncoderStatus,
+  EvalMetrics,
+  ExportResult,
+  FormatChoice,
+  FormatOption,
+  FrameImage,
+  ImageFolderStatus,
+  ImportResult,
+  LabelConfig,
+  LabelId,
+  MlProgress,
+  MulticlassConfig,
+  MultilabelConfig,
+  PingReply,
+  PredictedFrame,
+  PredictedMask,
+  ProjectConfig,
+  PythonFunction,
+  PythonSegContext,
+  PythonSegFrame,
+  PythonSegLayer,
+  PythonSequenceReport,
+  ScribbleInput,
+  SequenceClassification,
+  StorageUsage,
+  TextDescriptionData,
+  TrainOptions,
+  TrainSummary,
+  TrainTick,
+  VectorAnnotationsWire,
 };
-export interface FrameImage {
-  frame: Frame;
-  imageBase64: string; // data URL: "data:image/png;base64,..."
-}
-
-export interface AnnotationResponse {
-  labelId: number;
-  labelName: string;
-  color: string;
-  /** Base64 of the raw uint8 value mask (0 = bg, 1 = semantic, id = instance). */
-  maskBase64: string;
-  width: number;
-  height: number;
-}
-
-export interface LabelConfig {
-  id: number;
-  name: string;
-  color: string;
-  /** Per-instance shades, for instance-segmentation labels. */
-  shades?: string[];
-}
-
-export interface MulticlassConfig {
-  name: string;
-  classes: string[];
-  default?: string;
-}
-
-export interface MultilabelConfig {
-  name: string;
-  classes: string[];
-  default?: string[];
-}
-
-export interface ProjectConfig {
-  name: string;
-  input_folder: string | null;
-  /** Other paths the image folder is reached by, on other computers. */
-  input_folder_alternates?: string[];
-  images_embedded: boolean;
-  embed_threshold_kb: number;
-  segmentation_enabled: boolean;
-  classification_enabled: boolean;
-  instance_segmentation_enabled: boolean;
-  text_description_enabled: boolean;
-  input_regex: string;
-  recursive: boolean;
-  folders_as_sequences: boolean;
-  segmentation_labels?: LabelConfig[];
-  classification_tasks?: MulticlassConfig[];
-  multilabel_task?: MultilabelConfig;
-  text_fields?: string[];
-}
-
-export interface ImageFolderStatus {
-  /** Null when the project has none (every image is embedded). */
-  folder: string | null;
-  /** Images are read from it, and it is not there. */
-  missing: boolean;
-}
-
-export interface ClassificationData {
-  taskName: string;
-  taskIndex: number;
-  selectedClasses: string[];
-  isMultilabel: boolean;
-}
-
-export interface TextDescriptionData {
-  fieldName: string;
-  content: string;
-}
-
-/** See `get_sequence_classification`. */
-export interface SequenceClassification {
-  frameCount: number;
-  /** One entry per distinct answer to a task. */
-  answers: {
-    taskName: string;
-    isMultilabel: boolean;
-    selectedClasses: string[];
-    frameCount: number;
-  }[];
-}
-
-export interface BatchClassificationPayload {
-  frameId: number; // snake_case to match Rust
-  taskName: string;
-  selectedClasses: string[];
-  isMultilabel: boolean;
-}
-
-export interface LabelId {
-  id: number;
-  name: string;
-}
-
-export interface ExportResult {
-  totalExported: number;
-  errors: string[];
-}
-
 // ── Pluggable dataset formats (COCO, YOLO, NIfTI, …) ──────────────────────────
-
-export interface FormatChoice {
-  value: string;
-  label: string;
-}
-
-export type FormatOption =
-  | { type: 'bool'; key: string; label: string; default: boolean }
-  | { type: 'enum'; key: string; label: string; choices: FormatChoice[]; default: string }
-  | { type: 'int'; key: string; label: string; default: number; min: number; max: number };
-
-export interface DatasetFormat {
-  id: string;
-  name: string;
-  description: string;
-  canExport: boolean;
-  canImport: boolean;
-  exportOptions: FormatOption[];
-  importOptions: FormatOption[];
-  capabilities: {
-    masks: boolean;
-    polygons: boolean;
-    bboxes: boolean;
-    classifications: boolean;
-    instances: boolean;
-  };
-}
-
-export interface ImportResult {
-  framesMatched: number;
-  framesUnmatched: number;
-  annotationsImported: number;
-  labelsCreated: number;
-  errors: string[];
-}
 
 export type KeypointSource = 'user' | 'prefilled';
 /** A pair as the frontend holds it: the wire type, plus where it came from
@@ -211,178 +143,14 @@ export type KeypointPair = KeypointPairWire & { source?: KeypointSource };
 
 // ── Python bridge ───────────────────────────────────────────────────────────
 
-export type PythonFunctionKind = 'keypoints' | 'seg' | 'sequence_seg';
-
-export interface PythonFunction {
-  name: string;
-  kind: PythonFunctionKind;
-  /** First line of the function's docstring; empty when it has none. */
-  doc: string;
-  /** Extras the function declared, e.g. `masks` or `active_label`. */
-  wants: string[];
-}
-
-export interface PingReply {
-  ok: boolean;
-  protocol_version: number;
-  /** Keypoint function names. */
-  registered: string[];
-  functions: PythonFunction[];
-}
-
-export interface PythonSegContext {
-  /** Project labels in the order the editor lists them. */
-  labels: { id: number; name: string; isInstance: boolean }[];
-  activeLabelId: number | null;
-  /** Value a stroke would write on the active label: instance id, or 1. */
-  activeValue: number;
-  /** Whether the function declared `masks`; they are only sent then. */
-  sendMasks: boolean;
-}
-
-export interface PythonSegLayer {
-  labelId: number;
-  /** Paint onto the label's mask instead of replacing it. */
-  additive: boolean;
-  /** Base64 uint8 mask at native resolution, holding the values to write. */
-  maskBase64: string;
-}
-
-export interface PythonSegFrame {
-  layers: PythonSegLayer[];
-  /** Returned label names the project does not have. */
-  unknownLabels: string[];
-}
-
-export interface PythonSequenceReport {
-  /** Frames that received at least one mask. */
-  applied: number[];
-  unknownLabels: string[];
-}
+export type PythonFunctionKind = PythonFunction['kind'];
 
 type WirePair = [[number, number], [number, number]];
 
 // ── Vector annotations ──────────────────────────────────────────────────────
 // Handles are absolute image-space coordinates; a straight segment is a node
 // whose handles equal its anchor.
-export interface VectorAnnotationsWire {
-  labelId: number;
-  shapes: VectorShape[];
-}
-
 // ── Segmentation-head lab ────────────────────────────────────────────────────
-
-export interface EncoderStatus {
-  id: string;
-  name: string;
-  description: string;
-  repoId: string;
-  filename: string;
-  patch: number;
-  embedDim: number;
-  inputSize: number;
-  approxMb: number;
-  domain: string;
-  cached: boolean;
-}
-
-export interface DatasetSummary {
-  /** Annotated and reviewed. */
-  annotatedFrames: number;
-  /** Annotated but not reviewed, so excluded from training. */
-  unreviewedFrames: number;
-  labels: number;
-  /** Labels plus background. */
-  classes: number;
-}
-
-export interface EvalMetrics {
-  accuracy: number;
-  /** Mean over the classes present in the reference. */
-  meanDice: number;
-  perClassDice: number[];
-}
-
-export interface TrainOptions {
-  /** Omit for the local feature basis alone. */
-  encoderId?: string | null;
-  workingSize?: number;
-  patchesPerFrame?: number;
-  cacheFeatures?: boolean;
-  labelIds?: number[];
-  augmentRepeats?: number;
-  epochs?: number;
-  hidden?: number;
-  valFraction?: number;
-  seed?: number;
-}
-
-/** Payload of the `ml-progress` event (feature extraction phase). */
-export interface MlProgress {
-  stage: string;
-  done: number;
-  total: number;
-  /** Milliseconds for the most recent frame. */
-  lastMs: number;
-  etaMs: number;
-}
-
-/** Payload of `ml-train-progress`, emitted once per epoch. */
-export interface TrainTick {
-  budget: number;
-  repeat: number;
-  epoch: number;
-  epochs: number;
-  loss: number;
-  /** Fit index within a sweep; both 0 for a single training run. */
-  point: number;
-  points: number;
-  epochMs: number;
-  elapsedMs: number;
-  /** Projected time left across the whole job. */
-  etaMs: number;
-  device: string;
-  samples: number;
-  features: number;
-}
-
-export interface StorageUsage {
-  featureBytes: number;
-  featureFiles: number;
-  modelBytes: number;
-  cacheDir: string;
-}
-
-export interface TrainSummary {
-  trainFrames: number;
-  valFrames: number;
-  featureDim: number;
-  classes: number;
-  encoder: string | null;
-  metrics: EvalMetrics;
-  /** Backend the head was fitted on, e.g. `CUDA (GPU)` or `CPU (burn ndarray)`. */
-  device: string;
-}
-
-export interface PredictedMask {
-  labelId: number;
-  /** Base64 uint8 mask at native resolution, 1 where predicted. */
-  maskBase64: string;
-  coverage: number;
-}
-
-export interface PredictedFrame {
-  frameId: number;
-  width: number;
-  height: number;
-  masks: PredictedMask[];
-}
-
-/** Scribble conditioning: flat pixel indices at native resolution. */
-export interface ScribbleInput {
-  positive: number[];
-  negative: number[];
-}
 
 /** The refinement options Otsu and flood fill share. */
 export interface RefineOptions {
