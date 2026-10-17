@@ -5,6 +5,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ScanOptions } from './generated/ScanOptions';
 import type { ScanResult } from './generated/ScanResult';
 import type { AddImagesResult } from './generated/AddImagesResult';
+import type { MicroscopyImport } from './generated/MicroscopyImport';
+import type { MicroscopyInspection } from './generated/MicroscopyInspection';
 import type { EditImpact } from './generated/EditImpact';
 import type { ProjectEdit } from './generated/ProjectEdit';
 import type { TaskKind } from './generated/TaskKind';
@@ -580,6 +582,14 @@ export const api = {
 
   addImagesToProject: (options: ScanOptions) =>
     invoke<AddImagesResult>('add_images_to_project', { options }),
+
+  /** Describe microscopy files (series, channels, levels) before an import. */
+  inspectMicroscopy: (paths: string[]) =>
+    invoke<MicroscopyInspection[]>('inspect_microscopy', { paths }),
+
+  /** Convert and add microscopy files to the open project, one sequence per series. */
+  importMicroscopy: (files: MicroscopyImport[]) =>
+    invoke<AddImagesResult>('import_microscopy', { files }),
 
   projectEditImpact: (edit: ProjectEdit) =>
     invoke<EditImpact>('project_edit_impact', { edit }),

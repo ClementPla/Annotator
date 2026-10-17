@@ -150,6 +150,25 @@ CREATE TABLE IF NOT EXISTS sequence_display (
     settings TEXT NOT NULL,
     modified_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+-- Where a frame converted from a microscopy file came from (see
+-- `crate::microscopy`): the file (relative to the image folder, or absolute),
+-- its series, resolution level, time point and slice (NULL for a maximum
+-- projection over Z), and the file's channels the frame's pages hold (JSON
+-- array). Pixel sizes are in micrometres. The frame itself is a multi-page
+-- TIFF, one page per channel, in `frames.embedded_data`.
+CREATE TABLE IF NOT EXISTS frame_sources (
+    frame_id INTEGER PRIMARY KEY REFERENCES frames(id) ON DELETE CASCADE,
+    source_path TEXT NOT NULL,
+    series INTEGER NOT NULL,
+    level INTEGER NOT NULL DEFAULT 0,
+    t INTEGER NOT NULL,
+    z INTEGER,
+    channels TEXT NOT NULL,
+    physical_size_x REAL,
+    physical_size_y REAL,
+    physical_size_z REAL
+);
+CREATE INDEX IF NOT EXISTS idx_frame_sources_path ON frame_sources(source_path);
 CREATE TABLE IF NOT EXISTS registrations (
     id INTEGER PRIMARY KEY,
     sequence_id INTEGER NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,

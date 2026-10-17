@@ -2,6 +2,7 @@ pub mod flood_fill;
 pub mod superpixel;
 pub mod images;
 pub mod io;
+pub mod microscopy;
 pub mod segmentation;
 pub mod refine;
 pub mod annotation;

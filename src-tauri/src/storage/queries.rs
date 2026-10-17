@@ -7,7 +7,7 @@ use crate::types::image::{AnnotationData, MaskEncoding};
 
 /// On-disk schema version. Bump it with the schema, and add an arm to
 /// `run_migrations`.
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 
 /// The account every project has. See the `users` table in `schema.rs`.
 pub const DEFAULT_USER_ID: i64 = 1;
@@ -105,6 +105,13 @@ fn run_migrations(conn: &Connection) -> Result<()> {
         tx.execute_batch(super::schema::VIDEO_FRAMES_INDEX)
             .map_err(AppError::Database)?;
         v = 6;
+    }
+
+    // v6 -> v7: frames converted from microscopy files, multi-page TIFFs
+    // described by `frame_sources` (created by the baseline above). The bump
+    // makes older builds refuse a project they would show one page of.
+    if v < 7 {
+        v = 7;
     }
 
     // PRAGMA takes no bound parameters.

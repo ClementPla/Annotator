@@ -29,8 +29,9 @@ import { FILE_FORMAT_GROUPS, FILE_FORMATS, FileFormatGroup } from '../../../lib/
         </div>
       }
       <small class="note">
-        Microscopy files are read through Bio-Formats, whose import is coming:
-        for now a scan lists the ones it finds and leaves them out.
+        Microscopy files (and OME-TIFF) are converted through Bio-Formats at
+        full bit depth: one sequence per series, every channel, time point and
+        slice (a maximum projection past 64 slices).
       </small>
     </div>
   `,

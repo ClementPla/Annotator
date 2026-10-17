@@ -148,23 +148,27 @@ fn scan_and_import(db: &DbState, options: ScanOptions) -> Result<ScanResult> {
     options.recursive,
     options.folders_as_sequences
   );
-  let mut set_aside = Vec::new();
-  let image_files = set_aside_microscopy(image_files, &mut set_aside);
+  let (microscopy, image_files) = split_microscopy(image_files);
   let sequences = group_into_sequences(image_files, options.folders_as_sequences);
   log::info!("[import] grouped into {} sequence(s)", sequences.len());
   let mut result = import_sequences(db, sequences, options.embed_images, options.embed_threshold_kb)?;
-  result.errors.extend(set_aside);
 
   // Videos stay on disk whatever `embed_images` says (see `crate::video`), and
-  // are indexed before the connection is taken.
+  // are indexed before the connection is taken; microscopy files are
+  // converted then too.
   let videos: Vec<&ImageFile> = videos.iter().collect();
   let indexes = probe_videos(&videos);
+  let prepared = prepare_microscopy(&microscopy, &mut result.errors);
   db.with_conn(|conn| {
     let tx = conn.unchecked_transaction()?;
     let (sequences, frames) =
       import_probed_videos(&tx, &videos, indexes, options.video_frame_step, &mut result.errors);
     result.sequences_created += sequences;
     result.frames_imported += frames;
+    let (sequences, frames) = insert_microscopy(&tx, &prepared, &mut result.errors);
+    result.sequences_created += sequences;
+    result.frames_imported += frames;
+    result.frames_embedded += frames;
     tx.commit()?;
     Ok(())
   })?;
@@ -224,7 +228,7 @@ fn add_images(
   let mut result = AddImagesResult::default();
   let (videos, images) =
     split_videos(scan_for_images(&scan_root, &folder, filter, options.recursive)?);
-  let images = set_aside_microscopy(images, &mut result.errors);
+  let (microscopy, images) = split_microscopy(images);
   let mut groups: Vec<(String, Vec<ImageFile>)> =
     group_into_sequences(images, options.folders_as_sequences).into_iter().collect();
   groups.sort_by(|a, b| a.0.cmp(&b.0));
@@ -353,6 +357,25 @@ fn add_images(
   result.sequences_created += sequences;
   result.frames_imported += frames;
 
+  // Microscopy files are converted and embedded wherever they are. A file is
+  // known by its path: its frames are named after it, not the file itself.
+  let mut new_microscopy = Vec::new();
+  for mut file in microscopy {
+    if let Some(prefix) = &prefix {
+      file.relative_path = prefix.join(&file.relative_path).to_string_lossy().to_string();
+    }
+    if crate::microscopy::import::already_imported(&tx, &file.relative_path)? {
+      result.frames_skipped += 1;
+    } else {
+      new_microscopy.push(file);
+    }
+  }
+  let prepared = prepare_microscopy(&new_microscopy, &mut result.errors);
+  let (sequences, frames) = insert_microscopy(&tx, &prepared, &mut result.errors);
+  result.sequences_created += sequences;
+  result.frames_imported += frames;
+  result.frames_embedded += frames;
+
   tx.commit()?;
   log::info!(
     "[import] added {} frame(s), skipped {}, {} error(s)",
@@ -364,7 +387,7 @@ fn add_images(
 }
 
 /// `name (2)`, `name (3)`, …: the first one no sequence uses yet.
-fn free_sequence_name(conn: &rusqlite::Connection, name: &str) -> Result<String> {
+pub(crate) fn free_sequence_name(conn: &rusqlite::Connection, name: &str) -> Result<String> {
   for n in 2.. {
     let candidate = format!("{} ({})", name, n);
     let taken: bool = conn.query_row(
@@ -379,7 +402,7 @@ fn free_sequence_name(conn: &rusqlite::Connection, name: &str) -> Result<String>
   unreachable!()
 }
 
-fn sha256_hex(data: &[u8]) -> String {
+pub(crate) fn sha256_hex(data: &[u8]) -> String {
   let mut hasher = Sha256::new();
   hasher.update(data);
   let digest = hasher.finalize();
@@ -437,21 +460,54 @@ fn split_videos(files: Vec<ImageFile>) -> (Vec<ImageFile>, Vec<ImageFile>) {
   files.into_iter().partition(|f| crate::video::is_video(&f.absolute_path))
 }
 
-/// Leave microscopy files out, with an error for each: they are read through
-/// Bio-Formats, whose import is not in this build yet.
-fn set_aside_microscopy(files: Vec<ImageFile>, errors: &mut Vec<String>) -> Vec<ImageFile> {
-  let (microscopy, others): (Vec<_>, Vec<_>) = files.into_iter().partition(|f| {
-    f.absolute_path
-      .extension()
-      .and_then(|e| e.to_str())
-      .is_some_and(|e| crate::types::project::MICROSCOPY_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
-  });
-  for file in microscopy {
-    errors.push(
-      format!("{}: microscopy files need the Bio-Formats import, which is not in this version yet", file.relative_path)
-    );
+/// Microscopy files (see `crate::microscopy`), then the others.
+fn split_microscopy(files: Vec<ImageFile>) -> (Vec<ImageFile>, Vec<ImageFile>) {
+  files.into_iter().partition(|f| crate::microscopy::is_microscopy(&f.absolute_path))
+}
+
+/// Convert microscopy files with their default picks. Failures go to
+/// `errors`.
+fn prepare_microscopy(
+  files: &[ImageFile],
+  errors: &mut Vec<String>
+) -> Vec<crate::microscopy::import::Prepared> {
+  let mut prepared = Vec::new();
+  for file in files {
+    log::info!("[import] converting {}", file.relative_path);
+    match crate::microscopy::import::prepare(&file.absolute_path, &file.relative_path, None) {
+      Ok(p) => prepared.push(p),
+      Err(e) => errors.push(format!("{}: {}", file.relative_path, e)),
+    }
   }
-  others
+  prepared
+}
+
+/// Add converted microscopy files, each in a savepoint so a failure leaves
+/// nothing of that file behind. Returns the sequences and frames created.
+fn insert_microscopy(
+  conn: &rusqlite::Connection,
+  prepared: &[crate::microscopy::import::Prepared],
+  errors: &mut Vec<String>
+) -> (usize, usize) {
+  let (mut sequences, mut frames) = (0, 0);
+  for file in prepared {
+    let attempt = conn
+      .execute_batch("SAVEPOINT microscopy_file")
+      .map_err(AppError::from)
+      .and_then(|_| crate::microscopy::import::insert(conn, file));
+    match attempt {
+      Ok((s, f)) => {
+        let _ = conn.execute_batch("RELEASE microscopy_file");
+        sequences += s;
+        frames += f;
+      }
+      Err(e) => {
+        let _ = conn.execute_batch("ROLLBACK TO microscopy_file; RELEASE microscopy_file");
+        errors.push(format!("{}: {}", file.source_path, e));
+      }
+    }
+  }
+  (sequences, frames)
 }
 
 /// Group images into sequences: by subfolder with `folders_as_sequences`
@@ -771,8 +827,8 @@ mod tests {
     }
 
     #[test]
-    fn microscopy_files_are_set_aside_with_an_error() {
-        let root = dir_with("microscopy_aside", &[]);
+    fn an_unreadable_microscopy_file_is_reported_and_the_rest_imported() {
+        let root = dir_with("microscopy_unreadable", &[]);
         write_png(&root, "a.png", 1);
         fs::write(root.join("plate.CZI"), b"x").unwrap();
         let conn = open_project();

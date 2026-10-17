@@ -23,6 +23,7 @@ mod storage;
 mod superpixel;
 mod types;
 mod video;
+mod microscopy;
 
 /// Per-OS webview tuning, applied before the webview is created. Windows
 /// forces the GPU on in main.rs; this covers Linux (WebKitGTK). Every
@@ -131,6 +132,8 @@ pub fn run() {
             commands::dl::mask_sam_segment,
             commands::io::scan_and_import_folder,
             commands::io::add_images_to_project,
+            commands::microscopy::inspect_microscopy,
+            commands::microscopy::import_microscopy,
             commands::users::list_users,
             commands::users::current_user,
             commands::users::login,

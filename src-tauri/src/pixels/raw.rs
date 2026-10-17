@@ -84,7 +84,7 @@ impl RawFrame {
 /// dropped: annotation backdrops have none that matters.
 pub fn decode(bytes: &[u8]) -> Result<RawFrame> {
     if is_tiff(bytes) {
-        if let Some(frame) = decode_multipage_tiff(bytes)? {
+        if let Some(frame) = decode_grey_tiff(bytes)? {
             return Ok(frame);
         }
     }
@@ -99,9 +99,13 @@ pub fn decode(bytes: &[u8]) -> Result<RawFrame> {
 pub fn needs_render(bytes: &[u8]) -> bool {
     use image::ColorType as C;
     if is_tiff(bytes) {
-        if let Ok(dec) = tiff::decoder::Decoder::new(Cursor::new(bytes)) {
+        if let Ok(mut dec) = tiff::decoder::Decoder::new(Cursor::new(bytes)) {
             if dec.more_images() {
                 return true;
+            }
+            // `image` may not decode a float page: decide from the header.
+            if let Ok(tiff::ColorType::Gray(bits) | tiff::ColorType::RGB(bits)) = dec.colortype() {
+                return bits > 8;
             }
         }
     }
@@ -160,9 +164,10 @@ fn from_dynamic(img: image::DynamicImage) -> RawFrame {
 }
 
 /// One channel per page, when every page is a single-sample image of the same
-/// size and type. `None` for a single page or a layout this does not cover,
-/// which `image` then decodes.
-fn decode_multipage_tiff(bytes: &[u8]) -> Result<Option<RawFrame>> {
+/// size and type: what the microscopy import writes, one page or several.
+/// `None` for a layout this does not cover (colour pages), which `image` then
+/// decodes.
+fn decode_grey_tiff(bytes: &[u8]) -> Result<Option<RawFrame>> {
     use tiff::decoder::{Decoder, DecodingResult};
 
     let err = |e: tiff::TiffError| AppError::Generic(format!("Failed to read TIFF: {e}"));
@@ -182,7 +187,7 @@ fn decode_multipage_tiff(bytes: &[u8]) -> Result<Option<RawFrame>> {
         }
         dec.next_image().map_err(err)?;
     }
-    if pages.len() < 2 {
+    if pages.is_empty() {
         return Ok(None);
     }
 
@@ -289,8 +294,8 @@ mod tests {
     }
 
     #[test]
-    fn a_single_page_tiff_goes_through_image() {
-        use tiff::encoder::{colortype, TiffEncoder};
+    fn a_single_grey_page_keeps_its_values() {
+        use tiff::encoder::{colortype, Compression, DeflateLevel, Predictor, TiffEncoder};
         let mut out = Vec::new();
         {
             let mut enc = TiffEncoder::new(Cursor::new(&mut out)).unwrap();
@@ -300,6 +305,32 @@ mod tests {
         let f = decode(&out).unwrap();
         assert_eq!(f.channels, 1);
         assert_eq!(f.samples, Samples::U16(vec![7, 4095]));
+
+        // A float page, compressed as the microscopy import writes it.
+        let mut out = Vec::new();
+        {
+            let mut enc = TiffEncoder::new(Cursor::new(&mut out))
+                .unwrap()
+                .with_compression(Compression::Deflate(DeflateLevel::Balanced));
+            enc.write_image::<colortype::Gray32Float>(2, 1, &[-300.0, 1.5])
+                .unwrap();
+        }
+        let f = decode(&out).unwrap();
+        assert_eq!((f.channels, f.samples.clone()), (1, Samples::F32(vec![-300.0, 1.5])));
+        assert!(needs_render(&out));
+
+        // Integer pages with the horizontal predictor.
+        let mut out = Vec::new();
+        {
+            let mut enc = TiffEncoder::new(Cursor::new(&mut out))
+                .unwrap()
+                .with_compression(Compression::Deflate(DeflateLevel::Balanced))
+                .with_predictor(Predictor::Horizontal);
+            enc.write_image::<colortype::Gray16>(3, 1, &[100, 90, 4000]).unwrap();
+            enc.write_image::<colortype::Gray16>(3, 1, &[1, 2, 3]).unwrap();
+        }
+        let f = decode(&out).unwrap();
+        assert_eq!(f.samples, Samples::U16(vec![100, 90, 4000, 1, 2, 3]));
     }
 
     #[test]
@@ -318,5 +349,12 @@ mod tests {
         }
         assert!(needs_render(&pages));
         assert!(!needs_render(b"not an image"));
+
+        let mut grey8 = Vec::new();
+        TiffEncoder::new(Cursor::new(&mut grey8))
+            .unwrap()
+            .write_image::<colortype::Gray8>(1, 1, &[1])
+            .unwrap();
+        assert!(!needs_render(&grey8));
     }
 }
