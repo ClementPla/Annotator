@@ -10,6 +10,7 @@ import {
   ScanResult,
 } from '../../lib/api';
 import { ALL_EXTENSIONS } from '../../lib/file-formats';
+import type { MicroscopyImport } from '../../lib/generated/MicroscopyImport';
 import { LabelsService } from '../labels/labels.service';
 import { NotificationService } from '../notification.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
@@ -242,13 +243,13 @@ export class ProjectService {
 
   // ── Folder Scanning ──────────────────────────────────────────────────────
 
-  async scanFolder(): Promise<ScanResult> {
+  /** The scan the configured folder gets. */
+  scanOptions(): ScanOptions {
     const config = this._config();
     if (!config.input_folder) {
       throw new Error('No input folder set');
     }
-
-    const result = await api.scanAndImportFolder({
+    return {
       folderPath: config.input_folder,
       embedImages: config.images_embedded,
       embedThresholdKb: config.embed_threshold_kb,
@@ -257,7 +258,13 @@ export class ProjectService {
       recursive: config.recursive,
       foldersAsSequences: config.folders_as_sequences,
       videoFrameStep: this.videoFrameStep(),
-    });
+    };
+  }
+
+  /** Import the configured folder, with what to take of its microscopy files
+   *  (see `MicroscopyImportDialogComponent`; default picks when omitted). */
+  async scanFolder(microscopy?: MicroscopyImport[]): Promise<ScanResult> {
+    const result = await api.scanAndImportFolder({ ...this.scanOptions(), microscopy });
 
     await this.refreshCounts();
 

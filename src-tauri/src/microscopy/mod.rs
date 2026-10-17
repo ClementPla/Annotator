@@ -98,6 +98,10 @@ pub struct MicroscopySeries {
     /// One per page of an imported frame: a channel, or a sample of an RGB
     /// channel.
     pub channels: Vec<MicroscopyChannel>,
+    /// What an import takes of this series unless told otherwise (see
+    /// [`SeriesPick::default_for`]); None for a thumbnail or unreadable series.
+    #[ts(optional = nullable)]
+    pub default_pick: Option<SeriesPick>,
     /// Why the series cannot be read. The other fields are then empty.
     #[ts(optional = nullable)]
     pub error: Option<String>,
@@ -143,6 +147,17 @@ pub struct MicroscopyChannel {
 }
 
 // ── What to import ───────────────────────────────────────────────────────────
+
+/// A file to import, with the series to take: none takes every series'
+/// default pick, an empty list leaves the file out.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
+pub struct MicroscopyImport {
+    pub path: String,
+    #[ts(optional = nullable)]
+    pub series: Option<Vec<SeriesPick>>,
+}
 
 /// What to import of one series, in `didascalie-bioformats export`'s terms.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -292,7 +307,12 @@ fn parse_inspect(json: &str) -> Result<MicroscopyFile> {
     let head: Head = serde_json::from_str(json)
         .map_err(|e| AppError::Other(format!("Unexpected answer from {PROGRAM}: {e}")))?;
     check_protocol(head.protocol)?;
-    serde_json::from_str(json).map_err(|e| AppError::Other(format!("Unexpected answer from {PROGRAM}: {e}")))
+    let mut file: MicroscopyFile = serde_json::from_str(json)
+        .map_err(|e| AppError::Other(format!("Unexpected answer from {PROGRAM}: {e}")))?;
+    for series in &mut file.series {
+        series.default_pick = SeriesPick::default_for(series);
+    }
+    Ok(file)
 }
 
 /// One frame written by [`export`]: a multi-page TIFF.
@@ -384,6 +404,8 @@ mod tests {
         assert_eq!(s.channels[1].name.as_deref(), Some("mRFP1.2"));
         assert_eq!(s.physical_size_um.unwrap().z, Some(0.35));
         assert_eq!(f.series[1].error.as_deref(), Some("unsupported compression"));
+        assert_eq!(s.default_pick.as_ref().map(|p| p.z.as_str()), Some("all"));
+        assert_eq!(f.series[1].default_pick, None);
     }
 
     #[test]

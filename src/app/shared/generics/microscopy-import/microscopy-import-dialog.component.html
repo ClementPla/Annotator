@@ -1,0 +1,249 @@
+<p-dialog
+  header="Microscopy files"
+  [visible]="visible()"
+  (visibleChange)="onVisibleChange($event)"
+  [modal]="true"
+  [style]="{ width: '56rem', maxWidth: '96vw' }"
+  [contentStyle]="{ maxHeight: '70vh', overflow: 'auto' }"
+  appendTo="body"
+>
+  <div class="flex flex-col gap-5">
+    <p class="muted text-sm m-0">
+      Each series becomes a sequence, each time point and slice a frame, at the file's own bit
+      depth.
+    </p>
+
+    @if (bulk().several) {
+      <div class="bulk p-3 flex flex-col gap-2" role="group" aria-label="For every file">
+        <span class="text-sm font-medium">For every file</span>
+        @if (bulk().stacks) {
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="bulk-label">Slices</span>
+            <p-select
+              [options]="zOptions"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="bulk().z"
+              (ngModelChange)="allZ($event)"
+              placeholder="Varies"
+              size="small"
+              appendTo="body"
+              ariaLabel="Slices of every stack"
+            ></p-select>
+            <small class="muted">{{ bulk().stacks }} stack{{ bulk().stacks === 1 ? '' : 's' }}</small>
+          </div>
+        }
+        @if (bulk().timeSeries) {
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="bulk-label">Time points</span>
+            <p-select
+              [options]="tOptions"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="bulk().t"
+              (ngModelChange)="allT($event, bulk().tStep)"
+              placeholder="Varies"
+              size="small"
+              appendTo="body"
+              ariaLabel="Time points of every time series"
+            ></p-select>
+            @if (bulk().t === 'step') {
+              <p-inputnumber
+                [ngModel]="bulk().tStep"
+                (ngModelChange)="allT('step', $event)"
+                [min]="2"
+                [showButtons]="true"
+                size="small"
+                inputStyleClass="w-16"
+                ariaLabel="Keep one time point in"
+              ></p-inputnumber>
+            }
+            <small class="muted">
+              {{ bulk().timeSeries }} time series
+            </small>
+          </div>
+        }
+        @if (bulk().pyramids) {
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="bulk-label">Resolution</span>
+            <p-select
+              [options]="maxSideOptions"
+              optionLabel="label"
+              optionValue="value"
+              [(ngModel)]="bulkMaxSide"
+              (ngModelChange)="allMaxSide($event)"
+              placeholder="As each file"
+              size="small"
+              appendTo="body"
+              ariaLabel="Resolution of every multi-resolution file"
+            ></p-select>
+          </div>
+        }
+        @if (bulk().channels.length) {
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="bulk-label">Channels</span>
+            @for (channel of bulk().channels; track channel.label) {
+              <button
+                type="button"
+                class="chip"
+                [class.on]="channel.state === 'on'"
+                [class.mixed]="channel.state === 'mixed'"
+                [attr.aria-pressed]="channel.state === 'mixed' ? 'mixed' : channel.state === 'on'"
+                [title]="
+                  channel.state === 'mixed'
+                    ? 'Kept in some files: click to keep it everywhere'
+                    : 'Click to ' + (channel.state === 'on' ? 'drop' : 'keep') + ' it in every file'
+                "
+                (click)="allChannel(channel.label, channel.state)"
+              >
+                @if (channel.color) {
+                  <span class="swatch" [style.background]="channel.color"></span>
+                }
+                {{ channel.label }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @for (file of files(); track file.path) {
+      <section class="flex flex-col gap-2">
+        <button
+          type="button"
+          class="file-head"
+          [attr.aria-expanded]="!isFolded(file)"
+          (click)="toggleFold(file)"
+        >
+          <i class="pi text-xs" [class.pi-chevron-right]="isFolded(file)" [class.pi-chevron-down]="!isFolded(file)"></i>
+          <span class="font-medium">{{ file.name }}</span>
+          <small class="muted truncate flex-1" [title]="file.path">{{ file.path }}</small>
+          @if (!file.error) {
+            <small class="muted whitespace-nowrap">{{ fileSummary(file) }}</small>
+          }
+        </button>
+        @if (file.error) {
+          <small class="text-red-500">Cannot be read: {{ file.error }}. It will be left out.</small>
+        }
+
+        @if (!isFolded(file)) {
+        @for (row of file.rows; track row.series.index) {
+          <div class="series p-3 flex flex-col gap-3" [class.off]="!row.include || !importable(row)">
+            <div class="flex items-center gap-3 flex-wrap">
+              <p-checkbox
+                [(ngModel)]="row.include"
+                (ngModelChange)="touch()"
+                [binary]="true"
+                [disabled]="!importable(row)"
+                [inputId]="file.path + '#' + row.series.index"
+              ></p-checkbox>
+              <label [for]="file.path + '#' + row.series.index" class="font-medium">
+                {{ row.series.name || 'Series ' + (row.series.index + 1) }}
+              </label>
+              @if (row.series.error) {
+                <small class="text-red-500">{{ row.series.error }}</small>
+              } @else {
+                <small class="muted">
+                  {{ row.series.width }} × {{ row.series.height }}
+                  · {{ row.series.sizeC }} channel{{ row.series.sizeC === 1 ? '' : 's' }}
+                  @if (row.series.sizeZ > 1) { · {{ row.series.sizeZ }} slices }
+                  @if (row.series.sizeT > 1) { · {{ row.series.sizeT }} time points }
+                  · {{ depth(row) }}
+                  @if (pixelSize(row); as size) { · {{ size }} }
+                  @if (row.series.thumbnail) { · preview of another series }
+                </small>
+              }
+            </div>
+
+            @if (row.include && importable(row)) {
+              <div class="flex flex-wrap items-center gap-2">
+                @for (channel of sourceChannels(row.series); track channel.source) {
+                  <button
+                    type="button"
+                    class="chip"
+                    [class.on]="hasChannel(row, channel)"
+                    [attr.aria-pressed]="hasChannel(row, channel)"
+                    (click)="toggleChannel(row, channel)"
+                  >
+                    @if (channel.color) {
+                      <span class="swatch" [style.background]="channel.color"></span>
+                    }
+                    {{ channel.label }}
+                  </button>
+                }
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3">
+                @if (row.series.sizeZ > 1) {
+                  <p-select
+                    [options]="zOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    [(ngModel)]="row.z"
+                    (ngModelChange)="touch()"
+                    size="small"
+                    appendTo="body"
+                    ariaLabel="Slices"
+                  ></p-select>
+                }
+                @if (row.series.sizeT > 1) {
+                  <p-select
+                    [options]="tOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    [(ngModel)]="row.t"
+                    (ngModelChange)="touch()"
+                    size="small"
+                    appendTo="body"
+                    ariaLabel="Time points"
+                  ></p-select>
+                  @if (row.t === 'step') {
+                    <p-inputnumber
+                      [(ngModel)]="row.tStep"
+                      (ngModelChange)="touch()"
+                      [min]="2"
+                      [max]="row.series.sizeT"
+                      [showButtons]="true"
+                      size="small"
+                      inputStyleClass="w-16"
+                      ariaLabel="Keep one time point in"
+                    ></p-inputnumber>
+                  }
+                }
+                @if (row.series.levels.length > 1) {
+                  <p-select
+                    [options]="levelOptions(row)"
+                    optionLabel="label"
+                    optionValue="value"
+                    [(ngModel)]="row.level"
+                    (ngModelChange)="touch()"
+                    size="small"
+                    appendTo="body"
+                    ariaLabel="Resolution"
+                  ></p-select>
+                }
+                <small class="muted ml-auto">
+                  {{ frameCount(row) }} frame{{ frameCount(row) === 1 ? '' : 's' }}
+                </small>
+              </div>
+            }
+          </div>
+        }
+        }
+      </section>
+    }
+  </div>
+
+  <ng-template #footer>
+    <div class="flex items-center gap-3 w-full">
+      <small class="muted mr-auto">
+        @if (totals(); as t) {
+          {{ t.series }} sequence{{ t.series === 1 ? '' : 's' }}, {{ t.frames }}
+          frame{{ t.frames === 1 ? '' : 's' }}, up to {{ formatBytes(t.bytes) }} before compression
+        }
+      </small>
+      <p-button label="Cancel import" severity="secondary" [text]="true" (onClick)="cancel()"></p-button>
+      <p-button label="Import" icon="pi pi-check" (onClick)="confirm()"></p-button>
+    </div>
+  </ng-template>
+</p-dialog>

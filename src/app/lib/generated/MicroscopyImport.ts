@@ -2,6 +2,7 @@
 import type { SeriesPick } from "./SeriesPick";
 
 /**
- * A file to import, with the series to take; none takes the default picks.
+ * A file to import, with the series to take: none takes every series'
+ * default pick, an empty list leaves the file out.
  */
 export type MicroscopyImport = { path: string, series?: Array<SeriesPick> | null, };

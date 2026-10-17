@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -16,6 +16,7 @@ import { MessageService } from 'primeng/api';
 
 import { LabelledSwitchComponent } from '../../../shared/generics/labelled-switch/labelled-switch.component';
 import { FormatTogglesComponent } from '../../../shared/generics/format-toggles/format-toggles.component';
+import { MicroscopyImportDialogComponent } from '../../../shared/generics/microscopy-import/microscopy-import-dialog.component';
 import { FolderDropZoneComponent } from '../folder-drop-zone/folder-drop-zone.component';
 import { ClassificationConfigurationComponent } from '../project-configuration/classification-configuration/classification-configuration.component';
 import { PixelsConfigurationComponent } from '../project-configuration/pixels-configuration/pixels-configuration.component';
@@ -43,6 +44,7 @@ const OWNER_NAME_KEY = 'didascalie_user_name';
     ToastModule,
     LabelledSwitchComponent,
     FormatTogglesComponent,
+    MicroscopyImportDialogComponent,
     FolderDropZoneComponent,
     ClassificationConfigurationComponent,
     PixelsConfigurationComponent,
@@ -52,6 +54,8 @@ const OWNER_NAME_KEY = 'didascalie_user_name';
   styleUrl: './new-project.component.scss',
 })
 export class NewProjectComponent implements OnInit {
+  private readonly microscopyDialog = viewChild.required(MicroscopyImportDialogComponent);
+
   projectService = inject(ProjectService);
   labelService = inject(LabelsService);
   private router = inject(Router);
@@ -195,9 +199,13 @@ export class NewProjectComponent implements OnInit {
 
     this.isLoading.set(true);
     try {
+      // Microscopy files are chosen before the project exists: cancelling
+      // leaves nothing behind.
+      const microscopy = await this.microscopyDialog().chooseFor(this.projectService.scanOptions());
+      if (microscopy === null) return;
       await this.projectService.create(this.savePath()!);
       await this.nameOwner();
-      const result = await this.projectService.scanFolder();
+      const result = await this.projectService.scanFolder(microscopy);
       this.messageService.add({
         severity: 'success',
         summary: 'Project created',

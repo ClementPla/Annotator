@@ -583,6 +583,10 @@ export const api = {
   addImagesToProject: (options: ScanOptions) =>
     invoke<AddImagesResult>('add_images_to_project', { options }),
 
+  /** The microscopy files a folder scan with these options would take. */
+  findMicroscopyFiles: (options: ScanOptions) =>
+    invoke<string[]>('find_microscopy_files', { options }),
+
   /** Describe microscopy files (series, channels, levels) before an import. */
   inspectMicroscopy: (paths: string[]) =>
     invoke<MicroscopyInspection[]>('inspect_microscopy', { paths }),

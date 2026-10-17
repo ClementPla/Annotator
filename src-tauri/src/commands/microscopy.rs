@@ -3,13 +3,13 @@
 
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
 use crate::commands::io::AddImagesResult;
 use crate::storage::DbState;
-use crate::microscopy::{self, import, MicroscopyFile, SeriesPick};
+use crate::microscopy::{self, import, MicroscopyFile, MicroscopyImport};
 use crate::utils::error::{AppError, Result};
 
 /// One file described by [`inspect_microscopy`]: its series, or why it cannot
@@ -23,16 +23,6 @@ pub struct MicroscopyInspection {
     pub file: Option<MicroscopyFile>,
     #[ts(optional = nullable)]
     pub error: Option<String>,
-}
-
-/// A file to import, with the series to take; none takes the default picks.
-#[derive(Debug, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../src/app/lib/generated/")]
-pub struct MicroscopyImport {
-    pub path: String,
-    #[ts(optional = nullable)]
-    pub series: Option<Vec<SeriesPick>>,
 }
 
 /// Describe microscopy files, one at a time, away from the main thread.
@@ -49,6 +39,15 @@ pub async fn inspect_microscopy(paths: Vec<String>) -> Result<Vec<MicroscopyInsp
     })
     .await
     .map_err(|e| AppError::Generic(e.to_string()))
+}
+
+/// The microscopy files a folder scan with `options` would take, for the
+/// import dialog to describe before the scan runs.
+#[tauri::command]
+pub async fn find_microscopy_files(options: crate::commands::io::ScanOptions) -> Result<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || crate::commands::io::find_microscopy(&options))
+        .await
+        .map_err(|e| AppError::Generic(e.to_string()))?
 }
 
 /// Convert and add microscopy files to the open project, one sequence per
@@ -80,6 +79,9 @@ fn import_files(db: &DbState, files: Vec<MicroscopyImport>) -> Result<AddImagesR
             continue;
         }
         log::info!("[microscopy] converting {}", file.path);
+        if file.series.as_ref().is_some_and(|s| s.is_empty()) {
+            continue;
+        }
         match import::prepare(path, &source, file.series) {
             Ok(p) => prepared.push(p),
             Err(e) => result.errors.push(format!("{}: {}", file.path, e)),

@@ -132,6 +132,7 @@ pub fn run() {
             commands::dl::mask_sam_segment,
             commands::io::scan_and_import_folder,
             commands::io::add_images_to_project,
+            commands::microscopy::find_microscopy_files,
             commands::microscopy::inspect_microscopy,
             commands::microscopy::import_microscopy,
             commands::users::list_users,

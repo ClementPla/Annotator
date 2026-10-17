@@ -67,35 +67,37 @@
           (folderChange)="onFolderChange($event)"
         ></app-folder-drop-zone>
 
-        <app-format-toggles [(extensions)]="extensions"></app-format-toggles>
+        <app-format-toggles [(extensions)]="extensions">
+          <div class="input-options">
+            <p-floatLabel class="flex-1">
+              <input
+                pInputText
+                id="inputRegex"
+                class="w-full"
+                [(ngModel)]="inputRegex"
+              />
+              <label for="inputRegex">Filename pattern (regex, .* takes any name)</label>
+            </p-floatLabel>
+
+            <p-floatLabel
+              class="video-step"
+              title="Each video is one sequence. 1 keeps every frame, 10 one frame out of ten."
+            >
+              <input
+                pInputText
+                id="videoFrameStep"
+                type="number"
+                min="1"
+                step="1"
+                class="w-full"
+                [(ngModel)]="videoFrameStep"
+              />
+              <label for="videoFrameStep">Video frame step</label>
+            </p-floatLabel>
+          </div>
+        </app-format-toggles>
 
         <div class="input-options">
-          <p-floatLabel class="flex-1">
-            <input
-              pInputText
-              id="inputRegex"
-              class="w-full"
-              [(ngModel)]="inputRegex"
-            />
-            <label for="inputRegex">Filename pattern (regex, .* takes any name)</label>
-          </p-floatLabel>
-
-          <p-floatLabel
-            class="video-step"
-            title="Each video is one sequence. 1 keeps every frame, 10 one frame out of ten."
-          >
-            <input
-              pInputText
-              id="videoFrameStep"
-              type="number"
-              min="1"
-              step="1"
-              class="w-full"
-              [(ngModel)]="videoFrameStep"
-            />
-            <label for="videoFrameStep">Video frame step</label>
-          </p-floatLabel>
-
           <app-labelled-switch [(checked)]="recursive">
             Recursive
           </app-labelled-switch>
@@ -160,4 +162,5 @@
   </footer>
 
   <p-toast position="bottom-left"></p-toast>
+  <app-microscopy-import-dialog></app-microscopy-import-dialog>
 </div>

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -13,7 +13,7 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 
-import { AddImagesResult, EditImpact, ProjectEdit, TaskKind } from '../../lib/api';
+import { AddImagesResult, EditImpact, ProjectEdit, ScanOptions, TaskKind } from '../../lib/api';
 import { SegLabel } from '../../core/interface';
 import { getDefaultColor } from '../../core/misc/colors';
 import { LabelsService } from '../../services/labels/labels.service';
@@ -21,6 +21,7 @@ import { NotificationService } from '../../services/notification.service';
 import { ProjectService } from '../../services/project/project.service';
 import { LabelledSwitchComponent } from '../../shared/generics/labelled-switch/labelled-switch.component';
 import { FormatTogglesComponent } from '../../shared/generics/format-toggles/format-toggles.component';
+import { MicroscopyImportDialogComponent } from '../../shared/generics/microscopy-import/microscopy-import-dialog.component';
 import { FolderDropZoneComponent } from '../launcher/folder-drop-zone/folder-drop-zone.component';
 import { ProjectSettingsService } from './project-settings.service';
 
@@ -67,12 +68,14 @@ function plural(n: number, noun: string): string {
     TooltipModule,
     LabelledSwitchComponent,
     FormatTogglesComponent,
+    MicroscopyImportDialogComponent,
     FolderDropZoneComponent,
   ],
   templateUrl: './project-settings.component.html',
   styleUrl: './project-settings.component.scss',
 })
 export class ProjectSettingsComponent {
+  private readonly microscopyDialog = viewChild.required(MicroscopyImportDialogComponent);
   readonly project = inject(ProjectService);
   private readonly settings = inject(ProjectSettingsService);
   private readonly labelsService = inject(LabelsService);
@@ -330,7 +333,7 @@ export class ProjectSettingsComponent {
 
     this.adding.set(true);
     try {
-      const result = await this.settings.addImages({
+      const options: ScanOptions = {
         folderPath: folder,
         embedImages: this.addEmbed || this.addFolderIsOutside(),
         embedThresholdKb: this.config().embed_threshold_kb,
@@ -339,7 +342,10 @@ export class ProjectSettingsComponent {
         recursive: this.addRecursive,
         foldersAsSequences: this.addFoldersAsSequences,
         videoFrameStep: Math.max(1, Math.floor(Number(this.addVideoFrameStep)) || 1),
-      });
+      };
+      const microscopy = await this.microscopyDialog().chooseFor(options);
+      if (microscopy === null) return;
+      const result = await this.settings.addImages({ ...options, microscopy });
       this.lastImport.set(result);
       if (result.framesImported > 0) {
         this.notifications.success(

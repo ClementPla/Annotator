@@ -34,6 +34,12 @@ pub struct ScanOptions {
   /// Keep one frame out of this many from each video (1, or 0, keeps them
   /// all). A video is always one sequence, whatever `folders_as_sequences`.
   pub video_frame_step: u32,
+  /// What to take of the microscopy files the scan finds, chosen in the
+  /// import dialog (see `find_microscopy_files`). A file it does not list
+  /// gets the default picks.
+  #[serde(default)]
+  #[ts(optional)]
+  pub microscopy: Option<Vec<crate::microscopy::MicroscopyImport>>,
 }
 
 #[derive(Serialize, Debug, TS)]
@@ -158,7 +164,7 @@ fn scan_and_import(db: &DbState, options: ScanOptions) -> Result<ScanResult> {
   // converted then too.
   let videos: Vec<&ImageFile> = videos.iter().collect();
   let indexes = probe_videos(&videos);
-  let prepared = prepare_microscopy(&microscopy, &mut result.errors);
+  let prepared = prepare_microscopy(&microscopy, options.microscopy.as_deref(), &mut result.errors);
   db.with_conn(|conn| {
     let tx = conn.unchecked_transaction()?;
     let (sequences, frames) =
@@ -370,7 +376,7 @@ fn add_images(
       new_microscopy.push(file);
     }
   }
-  let prepared = prepare_microscopy(&new_microscopy, &mut result.errors);
+  let prepared = prepare_microscopy(&new_microscopy, options.microscopy.as_deref(), &mut result.errors);
   let (sequences, frames) = insert_microscopy(&tx, &prepared, &mut result.errors);
   result.sequences_created += sequences;
   result.frames_imported += frames;
@@ -465,16 +471,32 @@ fn split_microscopy(files: Vec<ImageFile>) -> (Vec<ImageFile>, Vec<ImageFile>) {
   files.into_iter().partition(|f| crate::microscopy::is_microscopy(&f.absolute_path))
 }
 
-/// Convert microscopy files with their default picks. Failures go to
-/// `errors`.
+/// The absolute paths of the microscopy files a scan with `options` takes.
+pub fn find_microscopy(options: &ScanOptions) -> Result<Vec<String>> {
+  let folder = PathBuf::from(&options.folder_path);
+  let filter = FileFilter::from_options(options)?;
+  let (microscopy, _) = split_microscopy(scan_for_images(&folder, &folder, &filter, options.recursive)?);
+  Ok(microscopy.into_iter().map(|f| f.absolute_path.to_string_lossy().to_string()).collect())
+}
+
+/// Convert microscopy files with the series `picks` gives for them (by
+/// absolute path), else their default picks; a file given no series is left
+/// out. Failures go to `errors`.
 fn prepare_microscopy(
   files: &[ImageFile],
+  picks: Option<&[crate::microscopy::MicroscopyImport]>,
   errors: &mut Vec<String>
 ) -> Vec<crate::microscopy::import::Prepared> {
   let mut prepared = Vec::new();
   for file in files {
+    let series = picks
+      .and_then(|p| p.iter().find(|m| Path::new(&m.path) == file.absolute_path))
+      .and_then(|m| m.series.clone());
+    if series.as_ref().is_some_and(|s| s.is_empty()) {
+      continue;
+    }
     log::info!("[import] converting {}", file.relative_path);
-    match crate::microscopy::import::prepare(&file.absolute_path, &file.relative_path, None) {
+    match crate::microscopy::import::prepare(&file.absolute_path, &file.relative_path, series) {
       Ok(p) => prepared.push(p),
       Err(e) => errors.push(format!("{}: {}", file.relative_path, e)),
     }
@@ -842,6 +864,34 @@ mod tests {
     }
 
     #[test]
+    fn microscopy_files_are_found_and_can_be_left_out() {
+        let root = dir_with("microscopy_found", &["a.png", "plate.czi", "cells.ome.tif", "plain.tif"]);
+        let opts = options(&root, false);
+        let mut found = find_microscopy(&opts).unwrap();
+        found.sort();
+        let names: Vec<_> = found
+            .iter()
+            .map(|p| Path::new(p).file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, ["cells.ome.tif", "plate.czi"]);
+
+        // Given no series, a file is skipped without being read.
+        let filter = FileFilter::from_options(&opts).unwrap();
+        let files: Vec<_> = scan_for_images(&root, &root, &filter, true)
+            .unwrap()
+            .into_iter()
+            .filter(|f| crate::microscopy::is_microscopy(&f.absolute_path))
+            .collect();
+        let picks: Vec<_> = found
+            .iter()
+            .map(|p| crate::microscopy::MicroscopyImport { path: p.clone(), series: Some(vec![]) })
+            .collect();
+        let mut errors = Vec::new();
+        assert!(prepare_microscopy(&files, Some(&picks), &mut errors).is_empty());
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
     fn an_invalid_pattern_is_an_error() {
         assert!(FileFilter::new(&["png".into()], "(").is_err());
     }
@@ -891,6 +941,7 @@ mod tests {
             recursive: true,
             folders_as_sequences,
             video_frame_step: 1,
+            microscopy: None,
         }
     }
 

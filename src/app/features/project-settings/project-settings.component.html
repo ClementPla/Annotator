@@ -75,33 +75,36 @@
         ></app-folder-drop-zone>
 
         @if (addFolder()) {
-          <app-format-toggles [(extensions)]="addExtensions"></app-format-toggles>
+          <app-format-toggles [(extensions)]="addExtensions">
+            <div class="input-options">
+              <label class="field flex-1">
+                <span class="field-label">Filename pattern (regex, .* takes any name)</span>
+                <input
+                  pInputText
+                  class="w-full"
+                  aria-label="Filename pattern"
+                  [(ngModel)]="addRegex"
+                />
+              </label>
+              <label
+                class="field"
+                title="Each video is one sequence. 1 keeps every frame, 10 one frame out of ten."
+              >
+                <span class="field-label">Video frame step</span>
+                <input
+                  pInputText
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="video-step"
+                  aria-label="Video frame step"
+                  [(ngModel)]="addVideoFrameStep"
+                />
+              </label>
+            </div>
+          </app-format-toggles>
 
           <div class="input-options">
-            <label class="field flex-1">
-              <span class="field-label">Filename pattern (regex, .* takes any name)</span>
-              <input
-                pInputText
-                class="w-full"
-                aria-label="Filename pattern"
-                [(ngModel)]="addRegex"
-              />
-            </label>
-            <label
-              class="field"
-              title="Each video is one sequence. 1 keeps every frame, 10 one frame out of ten."
-            >
-              <span class="field-label">Video frame step</span>
-              <input
-                pInputText
-                type="number"
-                min="1"
-                step="1"
-                class="video-step"
-                aria-label="Video frame step"
-                [(ngModel)]="addVideoFrameStep"
-              />
-            </label>
             <app-labelled-switch [(checked)]="addRecursive">
               Recursive
             </app-labelled-switch>
@@ -477,3 +480,5 @@
     ></p-button>
   </ng-template>
 </p-dialog>
+
+<app-microscopy-import-dialog></app-microscopy-import-dialog>

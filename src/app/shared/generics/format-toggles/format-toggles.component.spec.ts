@@ -11,6 +11,9 @@ describe('FormatTogglesComponent', () => {
     return fixture.componentInstance as unknown as {
       selected: () => string[];
       select: (group: FileFormatGroup, labels: string[] | null) => void;
+      toggleGroup: (group: FileFormatGroup) => void;
+      groupState: (group: FileFormatGroup) => 'all' | 'some' | 'none';
+      toggleFormat: (group: FileFormatGroup, label: string) => void;
       extensions: () => string[];
     };
   }
@@ -35,5 +38,24 @@ describe('FormatTogglesComponent', () => {
     expect(toggles.extensions()).toEqual(['jpg', 'jpeg', 'mp4', 'm4v', 'mov']);
     toggles.select(videos, null);
     expect(toggles.extensions()).toEqual(['jpg', 'jpeg']);
+  });
+
+  it('turns a whole group on, or off when it is all on', () => {
+    const toggles = create(['png', 'mp4', 'm4v', 'mov', 'mkv', 'webm', 'avi']);
+    expect(toggles.groupState(images)).toBe('some');
+    expect(toggles.groupState(videos)).toBe('all');
+    toggles.toggleGroup(images);
+    expect(toggles.groupState(images)).toBe('all');
+    toggles.toggleGroup(videos);
+    expect(toggles.groupState(videos)).toBe('none');
+    expect(toggles.extensions()).toEqual(['png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff']);
+  });
+
+  it('toggles one format and keeps the rest of its group', () => {
+    const toggles = create(['png', 'jpg', 'jpeg', 'mp4', 'm4v']);
+    toggles.toggleFormat(images, 'PNG');
+    expect(toggles.extensions()).toEqual(['jpg', 'jpeg', 'mp4', 'm4v']);
+    toggles.toggleFormat(images, 'BMP');
+    expect(toggles.extensions()).toEqual(['jpg', 'jpeg', 'bmp', 'mp4', 'm4v']);
   });
 });

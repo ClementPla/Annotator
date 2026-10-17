@@ -2,6 +2,7 @@
 import type { LevelSize } from "./LevelSize";
 import type { MicroscopyChannel } from "./MicroscopyChannel";
 import type { PhysicalSize } from "./PhysicalSize";
+import type { SeriesPick } from "./SeriesPick";
 
 /**
  * One image of a file: a field, a position, a scene.
@@ -33,6 +34,11 @@ levels: Array<LevelSize>, physicalSizeUm?: PhysicalSize | null, timeIncrementS?:
  * channel.
  */
 channels: Array<MicroscopyChannel>, 
+/**
+ * What an import takes of this series unless told otherwise (see
+ * [`SeriesPick::default_for`]); None for a thumbnail or unreadable series.
+ */
+defaultPick?: SeriesPick | null, 
 /**
  * Why the series cannot be read. The other fields are then empty.
  */
