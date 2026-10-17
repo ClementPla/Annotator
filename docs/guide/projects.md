@@ -13,7 +13,39 @@ and write it from Python with the [companion library](../python.md).
 To back up or share a project, copy the file while it is closed. While a project
 is open, `-wal` and `-shm` files sit next to it and hold the latest changes.
 
-## Supported images
+## Supported files
+
+| Group | Formats | Extensions |
+| --- | --- | --- |
+| Images | PNG, JPEG, BMP, TIFF | `.png` `.jpg` `.jpeg` `.bmp` `.tif` `.tiff` |
+| Videos | MP4, MOV, MKV, WebM, AVI | `.mp4` `.m4v` `.mov` `.mkv` `.webm` `.avi` |
+| Microscopy | Zeiss CZI, LSM and ZVI; Leica LIF; Nikon ND2; Olympus OIB/OIF and VSI; Imaris IMS; whole-slide SVS, NDPI, SCN and BIF; DeltaVision; Gatan DM; MetaMorph STK; OME-TIFF | `.czi` `.lsm` `.zvi` `.lif` `.nd2` `.oib` `.oif` `.vsi` `.ims` `.svs` `.ndpi` `.scn` `.bif` `.dv` `.r3d` `.dm3` `.dm4` `.stk` `.ome.tif` `.ome.tiff` |
+
+Extensions are recognised whatever their case (`.PNG`, `.Tif`).
+
+### Choosing what to import
+
+When a project is created, and when images are added from the project
+settings, **Formats** shows one button per group: **Images**, **Videos** and
+**Microscopy**, all on by default. A button turns its whole group on or off; a
+group with only some formats on shows a dashed outline and how many are on.
+
+**More options** opens one button per format, to leave out, say, the TIFF files
+of a folder but keep its PNGs, and two more settings:
+
+- **Filename pattern**, a regular expression the file name must also match.
+  It narrows the formats that are on rather than replacing them: `^scan_` keeps
+  only the files whose name starts with `scan_`. The default, `.*`, takes any
+  name.
+- **Video frame step**, see [Videos](#videos).
+
+The choice is saved with the project and offered again when images are added.
+
+While the files are imported, a progress line shows what is being done (reading
+images, indexing videos, converting microscopy files), how many files are done
+out of how many, and the file last finished.
+
+### Images
 
 PNG, JPEG, TIFF and BMP images are imported as they are: 8-bit RGB or
 greyscale, and **16-bit** or float greyscale and RGB too. A TIFF whose pages
@@ -30,8 +62,10 @@ DICOM and NIfTI are not supported. Convert them first; the
 
 ### Microscopy files
 
-CZI, LIF, ND2, OME-TIFF and the other formats listed under **Microscopy** in
-the import formats are converted when imported, at their own bit depth. Before
+The formats of the **Microscopy** group in the table above, OME-TIFF
+included, are converted when imported, at their own bit depth. A file is
+recognised as OME-TIFF by its name (`.ome.tif`, `.ome.tiff`); other TIFF files are
+read as images. Before
 the import, a dialog lists every file with its series (fields, positions,
 scenes) and lets you choose, per series or for every file at once:
 

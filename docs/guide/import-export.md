@@ -5,14 +5,20 @@
 Images are imported from a folder when the project is created, and more can be
 added later. Options at import time:
 
+- the **formats** to take: images, videos and microscopy files, as whole groups
+  or one format at a time
+  ([supported files](projects.md#supported-files));
+- a **filename pattern**, a regular expression that narrows those files (`.*`,
+  the default, takes any name);
 - **recursive**, to walk subdirectories;
 - **folders as sequences**, so each subdirectory becomes a sequence;
-- a **filename pattern**, to include only matching files;
 - **embed or reference** the image data
   ([which to pick](projects.md#embedded-or-referenced-images)).
 
 Videos are imported too, each as one sequence; see
-[Videos](projects.md#videos).
+[Videos](projects.md#videos). Microscopy files are converted, after a dialog
+where you choose their series, channels, slices and time points; see
+[Microscopy files](projects.md#microscopy-files).
 
 To continue a partially labelled dataset, import its annotations in **COCO** or
 **YOLO** layout with **Import annotations…** on the start page. Frames are
@@ -44,4 +50,5 @@ COCO and YOLO conversion. Prefer it for anything scripted or repeated. See
 [Python library](../python.md).
 
 !!! note "DICOM and NIfTI"
-    Not supported yet. Supported image formats are PNG, JPEG, TIFF and BMP.
+    Not supported yet. The formats that are supported are listed under
+    [Supported files](projects.md#supported-files).

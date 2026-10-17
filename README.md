@@ -46,6 +46,7 @@ A *didascalie* (*di-da-ska-LEE*) is the French word for a stage direction, one o
 - **Classification and text notes** per frame, with several tasks per project and batch classification from the gallery.
 - **Assisted labelling**, from instant operators to a model trained on your own scribbles (see below).
 - **Very large images.** Gigapixel microscopy is annotated at full resolution, from a resolution pyramid and tiles loaded on demand.
+- **Microscopy and 16-bit images.** CZI, LIF, ND2, OME-TIFF and other microscopy formats are imported at their own bit depth, with their channels; 16-bit and multi-channel images keep their values, shown through a window per channel.
 - **Sequences.** Group images into videos, volumes or patient visits (video files are imported directly, with `ffmpeg` installed), copy labels from one frame to the others, and play a sequence back with its labels in the inspector.
 - **Frame registration.** Place corresponding keypoints on two frames and check the estimated homography side by side, as an overlay or as a checkerboard.
 - **A gallery to track progress**, with filters by name, review status and keypoints.

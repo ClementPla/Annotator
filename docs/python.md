@@ -39,6 +39,24 @@ analysis.
 
 **Format conversion.** To and from COCO and YOLO.
 
+## Files and formats
+
+`import_folder` takes files the way the application does: by extension first
+(`extensions=`, or the project's formats), then by `pattern`. It reads PNG,
+JPEG, BMP and TIFF images. Videos and microscopy files are skipped: import them
+from the application, then read the project from Python.
+
+`get_frame_image` returns a frame as the application shows it, 8-bit RGB. For a
+16-bit or multi-channel frame, such as a converted microscopy file,
+`raw=True` returns its own values instead, as a `(height, width, channels)`
+array of `uint8`, `uint16` or `float32`:
+
+```python
+with DidascalieProject("cells.dida") as project:
+    values = project.get_frame_image(frame_id, raw=True)
+    print(values.dtype, values.shape)   # uint16 (1024, 1024, 3)
+```
+
 ## Accounts
 
 A project the library creates has no [accounts](guide/multi-user.md). The

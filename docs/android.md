@@ -24,6 +24,7 @@ been tested on one device, a Samsung Galaxy Tab S9 FE with Android 16.
 | --- | --- |
 | Trained model, MedSAM | The training and inference stack is not built for Android. |
 | Projects made from video files | Frames are decoded by `ffmpeg`, which Android does not have. |
+| Importing microscopy files | They are converted by a separate desktop program. |
 | [Python functions](guide/python-functions.md) | ZeroMQ is left out of the build. |
 | Creating a project, importing, exporting to COCO or YOLO | They rely on desktop folder dialogs. Prepare the project on a computer. |
 | Detached windows, automatic updates | Desktop only. |

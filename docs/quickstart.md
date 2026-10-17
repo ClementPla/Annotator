@@ -8,7 +8,9 @@ image, train a model on a few scribbles, and export the result.
 Launch Didascalie and choose **New project**. You will be asked for:
 
 - a **name** and where to save the `.dida` file;
-- an **input folder** of images;
+- an **input folder** of images, videos or microscopy files, and which
+  formats to take from it (all of them by default; see
+  [Supported files](guide/projects.md#supported-files));
 - whether to **embed** the images or reference them on disk
   ([which to pick](guide/projects.md#embedded-or-referenced-images));
 - which **annotation types** the project uses: segmentation, classification, text;
