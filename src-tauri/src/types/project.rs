@@ -60,6 +60,11 @@ pub struct ProjectConfig {
     pub instance_segmentation_enabled: bool,
     pub text_description_enabled: bool,
     
+    /// File extensions a folder scan takes (lowercase, no dot). Missing, as in
+    /// projects from before it existed, reads as every supported format.
+    #[serde(default = "default_extensions")]
+    pub extensions: Vec<String>,
+    /// An optional pattern file names must also match. Empty takes any name.
     pub input_regex: String,
     pub recursive: bool,
     #[ts(optional = nullable)]
@@ -71,6 +76,26 @@ pub struct ProjectConfig {
     #[ts(optional = nullable)]
     pub text_fields: Option<Vec<String>>,
     pub folders_as_sequences: bool,
+}
+
+/// Image file extensions a folder scan can take.
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "bmp", "tif", "tiff"];
+
+/// Microscopy file extensions, read through Bio-Formats: single-file formats
+/// with an extension of their own (OME-TIFF goes with TIFF).
+pub const MICROSCOPY_EXTENSIONS: &[&str] = &[
+    "czi", "lif", "nd2", "lsm", "oib", "oif", "ims", "vsi", "svs", "ndpi", "scn", "bif", "dv",
+    "r3d", "zvi", "dm3", "dm4", "stk",
+];
+
+/// Every extension a folder scan can take: images, videos, then microscopy.
+pub fn default_extensions() -> Vec<String> {
+    IMAGE_EXTENSIONS
+        .iter()
+        .chain(crate::video::EXTENSIONS)
+        .chain(MICROSCOPY_EXTENSIONS)
+        .map(|e| e.to_string())
+        .collect()
 }
 
 /// Matches DEFAULT_PROJECT_CONFIG on the TypeScript side.
@@ -97,7 +122,8 @@ impl Default for ProjectConfig {
             classification_enabled: false,
             instance_segmentation_enabled: false,
             text_description_enabled: false, 
-            input_regex: String::from(r"\.(png|jpg|jpeg|bmp|tiff?|mp4|m4v|mov|mkv|webm|avi)$"),
+            extensions: default_extensions(),
+            input_regex: String::from(".*"),
             recursive: false,
             segmentation_labels: None,
             classification_tasks: None,
@@ -120,6 +146,12 @@ mod tests {
                "instance_segmentation_enabled": false, "text_description_enabled": false,
                "input_regex": "x", "recursive": true, "folders_as_sequences": false}}"#
         )
+    }
+
+    #[test]
+    fn a_config_without_extensions_takes_every_format() {
+        let config: ProjectConfig = serde_json::from_str(&config_with("")).unwrap();
+        assert_eq!(config.extensions, super::default_extensions());
     }
 
     #[test]

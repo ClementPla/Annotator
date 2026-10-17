@@ -15,6 +15,7 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 
 import { LabelledSwitchComponent } from '../../../shared/generics/labelled-switch/labelled-switch.component';
+import { FormatTogglesComponent } from '../../../shared/generics/format-toggles/format-toggles.component';
 import { FolderDropZoneComponent } from '../folder-drop-zone/folder-drop-zone.component';
 import { ClassificationConfigurationComponent } from '../project-configuration/classification-configuration/classification-configuration.component';
 import { PixelsConfigurationComponent } from '../project-configuration/pixels-configuration/pixels-configuration.component';
@@ -41,6 +42,7 @@ const OWNER_NAME_KEY = 'didascalie_user_name';
     ProgressBarModule,
     ToastModule,
     LabelledSwitchComponent,
+    FormatTogglesComponent,
     FolderDropZoneComponent,
     ClassificationConfigurationComponent,
     PixelsConfigurationComponent,
@@ -101,6 +103,13 @@ export class NewProjectComponent implements OnInit {
   set inputFolder(v: string) {
     this.projectService.setInputFolder(v);
     if (v) this.folderError.set(false);
+  }
+
+  get extensions(): string[] {
+    return this.projectService.extensions();
+  }
+  set extensions(v: string[]) {
+    this.projectService.setExtensions(v);
   }
 
   get inputRegex(): string {

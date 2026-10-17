@@ -25,6 +25,9 @@ pub struct ScanOptions {
   pub folder_path: String,
   pub embed_images: bool,
   pub embed_threshold_kb: u32,
+  /// Extensions to take (any case, with or without the dot).
+  pub extensions: Vec<String>,
+  /// An optional pattern file names must also match. Empty takes any name.
   pub input_regex: String,
   pub recursive: bool,
   pub folders_as_sequences: bool, // NEW: if true, subfolders become sequences
@@ -54,6 +57,43 @@ pub struct AddImagesResult {
   /// Files left out because the project already holds them.
   pub frames_skipped: usize,
   pub errors: Vec<String>,
+}
+
+/// Which files a scan takes: those with an enabled extension, whatever its
+/// case, whose name also matches the pattern when there is one.
+pub struct FileFilter {
+  extensions: std::collections::HashSet<String>,
+  pattern: Option<Regex>,
+}
+
+impl FileFilter {
+  pub fn new(extensions: &[String], pattern: &str) -> Result<Self> {
+    let pattern = if pattern.trim().is_empty() {
+      None
+    } else {
+      Some(
+        Regex::new(pattern).map_err(|e| AppError::Other(format!("Invalid filename pattern: {}", e)))?
+      )
+    };
+    let extensions = extensions
+      .iter()
+      .map(|e| e.trim_start_matches('.').to_ascii_lowercase())
+      .collect();
+    Ok(Self { extensions, pattern })
+  }
+
+  fn from_options(options: &ScanOptions) -> Result<Self> {
+    Self::new(&options.extensions, &options.input_regex)
+  }
+
+  fn matches(&self, file_name: &str) -> bool {
+    let extension = Path::new(file_name)
+      .extension()
+      .and_then(|e| e.to_str())
+      .map(|e| e.to_ascii_lowercase());
+    extension.is_some_and(|e| self.extensions.contains(&e)) &&
+      self.pattern.as_ref().map_or(true, |re| re.is_match(file_name))
+  }
 }
 
 #[derive(Debug)]
@@ -95,23 +135,25 @@ fn scan_and_import(db: &DbState, options: ScanOptions) -> Result<ScanResult> {
     );
   }
 
-  let regex = Regex::new(&options.input_regex).map_err(|e|
-    AppError::Generic(format!("Invalid regex: {}", e))
-  )?;
+  let filter = FileFilter::from_options(&options)?;
 
   let (videos, image_files) =
-    split_videos(scan_for_images(&folder_path, &folder_path, &regex, options.recursive)?);
+    split_videos(scan_for_images(&folder_path, &folder_path, &filter, options.recursive)?);
   log::info!(
-    "[import] {} image(s) and {} video(s) matched /{}/ (recursive: {}, foldersAsSequences: {})",
+    "[import] {} image(s) and {} video(s) matched {:?} /{}/ (recursive: {}, foldersAsSequences: {})",
     image_files.len(),
     videos.len(),
+    options.extensions,
     options.input_regex,
     options.recursive,
     options.folders_as_sequences
   );
+  let mut set_aside = Vec::new();
+  let image_files = set_aside_microscopy(image_files, &mut set_aside);
   let sequences = group_into_sequences(image_files, options.folders_as_sequences);
   log::info!("[import] grouped into {} sequence(s)", sequences.len());
   let mut result = import_sequences(db, sequences, options.embed_images, options.embed_threshold_kb)?;
+  result.errors.extend(set_aside);
 
   // Videos stay on disk whatever `embed_images` says (see `crate::video`), and
   // are indexed before the connection is taken.
@@ -146,15 +188,13 @@ pub async fn add_images_to_project(app: AppHandle, options: ScanOptions) -> Resu
 
 fn add_images_to_open_project(db: &DbState, options: ScanOptions) -> Result<AddImagesResult> {
   log::info!("[import] adding images from {}", options.folder_path);
-  let regex = Regex::new(&options.input_regex).map_err(|e|
-    AppError::Other(format!("Invalid filename pattern: {}", e))
-  )?;
+  let filter = FileFilter::from_options(&options)?;
   db.with_conn(|conn| {
     crate::commands::users::require_admin(conn)?;
     let config = crate::storage::queries::get_project_config(conn)?;
     let input_folder = crate::commands::project::resolve_image_folder(&config)
       .map(|folder| folder.to_string_lossy().into_owned());
-    add_images(conn, input_folder.as_deref(), &options, &regex)
+    add_images(conn, input_folder.as_deref(), &options, &filter)
   })
 }
 
@@ -164,7 +204,7 @@ fn add_images(
   conn: &rusqlite::Connection,
   input_folder: Option<&str>,
   options: &ScanOptions,
-  regex: &Regex
+  filter: &FileFilter
 ) -> Result<AddImagesResult> {
   let folder = fs::canonicalize(&options.folder_path).map_err(|_|
     AppError::Other(format!("Folder not found: {}", options.folder_path))
@@ -181,8 +221,10 @@ fn add_images(
   };
   let embed_images = options.embed_images || !inside;
 
+  let mut result = AddImagesResult::default();
   let (videos, images) =
-    split_videos(scan_for_images(&scan_root, &folder, regex, options.recursive)?);
+    split_videos(scan_for_images(&scan_root, &folder, filter, options.recursive)?);
+  let images = set_aside_microscopy(images, &mut result.errors);
   let mut groups: Vec<(String, Vec<ImageFile>)> =
     group_into_sequences(images, options.folders_as_sequences).into_iter().collect();
   groups.sort_by(|a, b| a.0.cmp(&b.0));
@@ -196,7 +238,6 @@ fn add_images(
     rows.collect::<std::result::Result<_, _>>()?
   };
 
-  let mut result = AddImagesResult::default();
   let tx = conn.unchecked_transaction()?;
   let mut next_sort_order: i64 = tx.query_row(
     "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM sequences",
@@ -352,7 +393,7 @@ fn sha256_hex(data: &[u8]) -> String {
 fn scan_for_images(
   root: &Path,
   current: &Path,
-  regex: &Regex,
+  filter: &FileFilter,
   recursive: bool
 ) -> Result<Vec<ImageFile>> {
   let mut images = Vec::new();
@@ -366,7 +407,7 @@ fn scan_for_images(
 
     if file_type.is_dir() {
       if recursive {
-        let sub_images = scan_for_images(root, &path, regex, recursive)?;
+        let sub_images = scan_for_images(root, &path, filter, recursive)?;
         images.extend(sub_images);
       }
     } else if file_type.is_file() {
@@ -375,7 +416,7 @@ fn scan_for_images(
         .and_then(|n| n.to_str())
         .unwrap_or("");
 
-      if regex.is_match(file_name) {
+      if filter.matches(file_name) {
         let relative_path = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().to_string();
 
         images.push(ImageFile {
@@ -394,6 +435,23 @@ fn scan_for_images(
 /// Separate the videos (first) from the images among scanned files.
 fn split_videos(files: Vec<ImageFile>) -> (Vec<ImageFile>, Vec<ImageFile>) {
   files.into_iter().partition(|f| crate::video::is_video(&f.absolute_path))
+}
+
+/// Leave microscopy files out, with an error for each: they are read through
+/// Bio-Formats, whose import is not in this build yet.
+fn set_aside_microscopy(files: Vec<ImageFile>, errors: &mut Vec<String>) -> Vec<ImageFile> {
+  let (microscopy, others): (Vec<_>, Vec<_>) = files.into_iter().partition(|f| {
+    f.absolute_path
+      .extension()
+      .and_then(|e| e.to_str())
+      .is_some_and(|e| crate::types::project::MICROSCOPY_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+  });
+  for file in microscopy {
+    errors.push(
+      format!("{}: microscopy files need the Bio-Formats import, which is not in this version yet", file.relative_path)
+    );
+  }
+  others
 }
 
 /// Group images into sequences: by subfolder with `folders_as_sequences`
@@ -659,13 +717,23 @@ mod tests {
         root
     }
 
-    /// The pattern DEFAULT_PROJECT_CONFIG ships on the TypeScript side.
-    const DEFAULT_REGEX: &str = r"\.(png|jpe?g|bmp|tiff?)$";
+    /// Every image format and no name pattern: what a new project scans for,
+    /// videos aside.
+    fn images_filter() -> FileFilter {
+        let extensions: Vec<String> =
+            crate::types::project::IMAGE_EXTENSIONS.iter().map(|e| e.to_string()).collect();
+        FileFilter::new(&extensions, "").unwrap()
+    }
+
+    fn filter(extensions: &[&str], pattern: &str) -> FileFilter {
+        let extensions: Vec<String> = extensions.iter().map(|e| e.to_string()).collect();
+        FileFilter::new(&extensions, pattern).unwrap()
+    }
 
     #[test]
     fn the_default_pattern_matches_a_flat_folder_of_pngs() {
         let root = dir_with("flat_pngs", &["a.png", "b.png", "c.png"]);
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
+        let re = images_filter();
         let found = scan_for_images(&root, &root, &re, true).unwrap();
         assert_eq!(found.len(), 3, "found: {:?}", found.iter().map(|i| &i.relative_path).collect::<Vec<_>>());
     }
@@ -673,21 +741,59 @@ mod tests {
     #[test]
     fn the_default_pattern_ignores_non_images() {
         let root = dir_with("non_images", &["a.png", "notes.txt", "data.csv"]);
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
+        let re = images_filter();
         assert_eq!(scan_for_images(&root, &root, &re, true).unwrap().len(), 1);
     }
 
     #[test]
-    fn the_default_pattern_is_case_sensitive() {
-        let root = dir_with("case", &["a.PNG", "b.JPG"]);
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
-        assert_eq!(scan_for_images(&root, &root, &re, true).unwrap().len(), 0);
+    fn extensions_match_whatever_their_case() {
+        let root = dir_with("case", &["a.PNG", "b.JPG", "c.Tiff"]);
+        let re = images_filter();
+        assert_eq!(scan_for_images(&root, &root, &re, true).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn a_disabled_format_is_left_out() {
+        let root = dir_with("disabled_format", &["a.png", "b.jpg", "c.jpeg", "d.tif"]);
+        let re = filter(&["jpg", ".JPEG"], "");
+        let found = scan_for_images(&root, &root, &re, true).unwrap();
+        let names: Vec<_> = found.iter().map(|i| i.relative_path.as_str()).collect();
+        assert_eq!(names, ["b.jpg", "c.jpeg"]);
+    }
+
+    #[test]
+    fn the_pattern_narrows_the_enabled_formats() {
+        let root = dir_with("pattern_narrows", &["scan_01.png", "scan_02.png", "mask_01.png", "scan_03.bmp"]);
+        let re = filter(&["png"], "^scan_");
+        let found = scan_for_images(&root, &root, &re, true).unwrap();
+        let names: Vec<_> = found.iter().map(|i| i.relative_path.as_str()).collect();
+        assert_eq!(names, ["scan_01.png", "scan_02.png"]);
+    }
+
+    #[test]
+    fn microscopy_files_are_set_aside_with_an_error() {
+        let root = dir_with("microscopy_aside", &[]);
+        write_png(&root, "a.png", 1);
+        fs::write(root.join("plate.CZI"), b"x").unwrap();
+        let conn = open_project();
+        let mut opts = options(&root, false);
+        opts.extensions.push("czi".into());
+        let re = FileFilter::from_options(&opts).unwrap();
+        let result = add_images(&conn, Some(&root.to_string_lossy()), &opts, &re).unwrap();
+        assert_eq!(result.frames_imported, 1);
+        assert_eq!(result.errors.len(), 1);
+        assert!(result.errors[0].starts_with("plate.CZI: "), "{:?}", result.errors);
+    }
+
+    #[test]
+    fn an_invalid_pattern_is_an_error() {
+        assert!(FileFilter::new(&["png".into()], "(").is_err());
     }
 
     #[test]
     fn flat_mode_gives_each_image_its_own_sequence() {
         let root = dir_with("flat_mode", &["a.png", "b.png"]);
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
+        let re = images_filter();
         let found = scan_for_images(&root, &root, &re, true).unwrap();
         assert_eq!(group_into_sequences(found, false).len(), 2);
     }
@@ -695,7 +801,7 @@ mod tests {
     #[test]
     fn folder_mode_groups_by_subfolder() {
         let root = dir_with("folder_mode", &["s1/a.png", "s1/b.png", "s2/c.png"]);
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
+        let re = images_filter();
         let found = scan_for_images(&root, &root, &re, true).unwrap();
         let seqs = group_into_sequences(found, true);
         assert_eq!(seqs.len(), 2);
@@ -724,7 +830,8 @@ mod tests {
             folder_path: folder.to_string_lossy().to_string(),
             embed_images: false,
             embed_threshold_kb: 0,
-            input_regex: DEFAULT_REGEX.into(),
+            extensions: crate::types::project::default_extensions(),
+            input_regex: String::new(),
             recursive: true,
             folders_as_sequences,
             video_frame_step: 1,
@@ -736,7 +843,7 @@ mod tests {
     }
 
     fn add(conn: &rusqlite::Connection, root: &Path, folder: &Path, as_sequences: bool) -> AddImagesResult {
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
+        let re = images_filter();
         add_images(conn, Some(&root.to_string_lossy()), &options(folder, as_sequences), &re).unwrap()
     }
 
@@ -835,7 +942,7 @@ mod tests {
     #[test]
     fn non_recursive_ignores_subfolders() {
         let root = dir_with("non_recursive", &["top.png", "sub/deep.png"]);
-        let re = Regex::new(DEFAULT_REGEX).unwrap();
+        let re = images_filter();
         assert_eq!(scan_for_images(&root, &root, &re, false).unwrap().len(), 1);
     }
 
@@ -904,7 +1011,9 @@ mod tests {
         assert_eq!(column::<i64>(&conn, "SELECT frame_count FROM videos"), [3]);
     }
 
-    const VIDEO_REGEX: &str = r"\.(png|mp4)$";
+    fn video_filter() -> FileFilter {
+        filter(&["png", "mp4"], "")
+    }
 
     /// Run the ffmpeg the application would, or `None` where there is none
     /// (the tests needing it are then skipped).
@@ -953,7 +1062,7 @@ mod tests {
                 "INSERT OR REPLACE INTO project (id, config) VALUES (1, json_object('input_folder', ?1))",
                 params![root.to_string_lossy()],
             ).unwrap();
-            let re = Regex::new(&format!(r"^{}\.mp4$", name)).unwrap();
+            let re = filter(&["mp4"], &format!(r"^{}\.mp4$", name));
             let mut opts = options(&root, false);
             opts.video_frame_step = step;
             let result = add_images(&conn, Some(&root.to_string_lossy()), &opts, &re).unwrap();
@@ -995,7 +1104,7 @@ mod tests {
         let root = dir_with("video_outside_root", &[]);
         let other = dir_with("video_outside_other", &["clip.mp4"]);
         let conn = open_project();
-        let re = Regex::new(VIDEO_REGEX).unwrap();
+        let re = video_filter();
         let result =
             add_images(&conn, Some(&root.to_string_lossy()), &options(&other, false), &re).unwrap();
         assert_eq!(result.frames_imported, 0);

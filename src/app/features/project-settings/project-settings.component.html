@@ -75,9 +75,11 @@
         ></app-folder-drop-zone>
 
         @if (addFolder()) {
+          <app-format-toggles [(extensions)]="addExtensions"></app-format-toggles>
+
           <div class="input-options">
             <label class="field flex-1">
-              <span class="field-label">Filename pattern (regex)</span>
+              <span class="field-label">Filename pattern (regex, .* takes any name)</span>
               <input
                 pInputText
                 class="w-full"
@@ -122,8 +124,8 @@
           } @else {
             <small class="hint">
               Images already in the project are left as they are; only new
-              files are added. Videos (mp4, m4v, mov, mkv, webm, avi) are added
-              when the pattern matches them, and stay on disk.
+              files are added. Videos are added when their format is on, and
+              stay on disk.
             </small>
           }
 
@@ -134,7 +136,7 @@
             <p-button
               icon="pi pi-plus"
               label="Add images"
-              [disabled]="adding() || !addRegex"
+              [disabled]="adding() || !addExtensions.length"
               (onClick)="addImages()"
             ></p-button>
           </div>

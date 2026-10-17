@@ -20,6 +20,7 @@ import { LabelsService } from '../../services/labels/labels.service';
 import { NotificationService } from '../../services/notification.service';
 import { ProjectService } from '../../services/project/project.service';
 import { LabelledSwitchComponent } from '../../shared/generics/labelled-switch/labelled-switch.component';
+import { FormatTogglesComponent } from '../../shared/generics/format-toggles/format-toggles.component';
 import { FolderDropZoneComponent } from '../launcher/folder-drop-zone/folder-drop-zone.component';
 import { ProjectSettingsService } from './project-settings.service';
 
@@ -65,6 +66,7 @@ function plural(n: number, noun: string): string {
     TagModule,
     TooltipModule,
     LabelledSwitchComponent,
+    FormatTogglesComponent,
     FolderDropZoneComponent,
   ],
   templateUrl: './project-settings.component.html',
@@ -130,6 +132,7 @@ export class ProjectSettingsComponent {
   // ── Adding images ─────────────────────────────────────────────────────────
 
   readonly addFolder = signal<string | null>(null);
+  addExtensions = this.config().extensions;
   addRegex = this.config().input_regex;
   addRecursive = this.config().recursive;
   addFoldersAsSequences = this.config().folders_as_sequences;
@@ -331,6 +334,7 @@ export class ProjectSettingsComponent {
         folderPath: folder,
         embedImages: this.addEmbed || this.addFolderIsOutside(),
         embedThresholdKb: this.config().embed_threshold_kb,
+        extensions: this.addExtensions,
         inputRegex: this.addRegex,
         recursive: this.addRecursive,
         foldersAsSequences: this.addFoldersAsSequences,

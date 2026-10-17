@@ -14,4 +14,13 @@ input_folder_alternates?: Array<string>, images_embedded: boolean,
  * Missing or `null` (as some files written from Python have it) reads as
  * the default.
  */
-embed_threshold_kb: number, segmentation_enabled: boolean, classification_enabled: boolean, instance_segmentation_enabled: boolean, text_description_enabled: boolean, input_regex: string, recursive: boolean, segmentation_labels?: Array<LabelConfig> | null, classification_tasks?: Array<MulticlassConfig> | null, multilabel_task?: MultilabelConfig | null, text_fields?: Array<string> | null, folders_as_sequences: boolean, };
+embed_threshold_kb: number, segmentation_enabled: boolean, classification_enabled: boolean, instance_segmentation_enabled: boolean, text_description_enabled: boolean, 
+/**
+ * File extensions a folder scan takes (lowercase, no dot). Missing, as in
+ * projects from before it existed, reads as every supported format.
+ */
+extensions: Array<string>, 
+/**
+ * An optional pattern file names must also match. Empty takes any name.
+ */
+input_regex: string, recursive: boolean, segmentation_labels?: Array<LabelConfig> | null, classification_tasks?: Array<MulticlassConfig> | null, multilabel_task?: MultilabelConfig | null, text_fields?: Array<string> | null, folders_as_sequences: boolean, };

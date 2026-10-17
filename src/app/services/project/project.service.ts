@@ -9,6 +9,7 @@ import {
   ScanOptions,
   ScanResult,
 } from '../../lib/api';
+import { ALL_EXTENSIONS } from '../../lib/file-formats';
 import { LabelsService } from '../labels/labels.service';
 import { NotificationService } from '../notification.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
@@ -23,7 +24,8 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   classification_enabled: false,
   instance_segmentation_enabled: false,
   text_description_enabled: false, // Add this
-  input_regex: '\\.(png|jpe?g|bmp|tiff?|mp4|m4v|mov|mkv|webm|avi)$',
+  extensions: ALL_EXTENSIONS,
+  input_regex: '.*',
   recursive: true,
   folders_as_sequences: false,
   segmentation_labels: [],
@@ -74,6 +76,7 @@ export class ProjectService {
   readonly isInstanceSegmentation = computed(
     () => this._config().instance_segmentation_enabled,
   );
+  readonly extensions = computed(() => this._config().extensions);
   readonly inputRegex = computed(() => this._config().input_regex);
   readonly recursive = computed(() => this._config().recursive);
   readonly foldersAsSequences = computed(
@@ -107,6 +110,10 @@ export class ProjectService {
 
   setInstanceSegmentationEnabled(enabled: boolean): void {
     this.updateConfig({ instance_segmentation_enabled: enabled });
+  }
+
+  setExtensions(extensions: string[]): void {
+    this.updateConfig({ extensions });
   }
 
   setInputRegex(regex: string): void {
@@ -245,6 +252,7 @@ export class ProjectService {
       folderPath: config.input_folder,
       embedImages: config.images_embedded,
       embedThresholdKb: config.embed_threshold_kb,
+      extensions: config.extensions,
       inputRegex: config.input_regex,
       recursive: config.recursive,
       foldersAsSequences: config.folders_as_sequences,
@@ -328,7 +336,7 @@ export class ProjectService {
 
   isConfigValid(): boolean {
     const config = this._config();
-    return !!(config.name && config.input_folder);
+    return !!(config.name && config.input_folder && config.extensions.length);
   }
 
   // ── Reset ────────────────────────────────────────────────────────────────
