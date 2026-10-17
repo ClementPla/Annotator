@@ -65,12 +65,14 @@ pub async fn load_sequence_image_volume(
             .collect::<crate::utils::error::Result<_>>()
             .map_err(|e| e.to_string())?;
 
+        let db: &DbState = &db;
         slices
             .par_chunks_mut(slice.max(1))
-            .zip(encoded.par_iter())
-            .try_for_each(|(out, bytes)| -> Result<(), String> {
-                let luma = image::load_from_memory(bytes)
-                    .map_err(|e| format!("Failed to decode image: {}", e))?
+            .zip(encoded.par_iter().zip(ids.par_iter()))
+            .try_for_each(|(out, (bytes, &id))| -> Result<(), String> {
+                // Deep or multi-channel frames through their display, at native size.
+                let luma = crate::commands::pixels::frame_picture(db, id, bytes, 0)
+                    .map_err(|e| e.to_string())?
                     .to_luma8();
                 if luma.width() != w || luma.height() != h {
                     return Err(format!(

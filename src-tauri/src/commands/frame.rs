@@ -263,6 +263,11 @@ fn read_frame_bytes_with(
 #[tauri::command]
 pub fn get_frame_image(db: State<DbState>, frame_id: i64) -> Result<FrameImage> {
     let (meta, bytes) = read_frame_bytes(&db, frame_id)?;
+    if crate::pixels::raw::needs_render(&bytes) {
+        // The webview cannot show these bytes: a render through the sequence's display.
+        let picture = crate::commands::pixels::frame_picture(&db, frame_id, &bytes, 0)?;
+        return Ok(FrameImage { frame: meta.frame, image_base64: png_data_url(&picture)? });
+    }
     let mime = detect_mime_type(&bytes);
     let image_base64 = format!("data:{};base64,{}", mime, BASE64.encode(&bytes));
     Ok(FrameImage { frame: meta.frame, image_base64 })
@@ -273,7 +278,19 @@ pub fn get_frame_image(db: State<DbState>, frame_id: i64) -> Result<FrameImage> 
 #[tauri::command]
 pub fn get_frame_overview(db: State<DbState>, frame_id: i64, max_dim: u32) -> Result<FrameImage> {
     let (meta, bytes) = read_frame_bytes(&db, frame_id)?;
+    if crate::pixels::raw::needs_render(&bytes) {
+        let picture = crate::commands::pixels::frame_picture(&db, frame_id, &bytes, max_dim)?;
+        return Ok(FrameImage { frame: meta.frame, image_base64: png_data_url(&picture)? });
+    }
     overview_from_bytes(meta, bytes, max_dim)
+}
+
+fn png_data_url(picture: &image::DynamicImage) -> Result<String> {
+    let mut out = Vec::new();
+    picture
+        .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
+        .map_err(|e| AppError::Generic(format!("Failed to encode image: {}", e)))?;
+    Ok(format!("data:image/png;base64,{}", BASE64.encode(&out)))
 }
 
 /// The stored bytes when the frame fits within `max_dim`, otherwise a PNG
@@ -347,7 +364,11 @@ pub fn get_frame_thumbnail(
 
   let (meta, bytes) = read_frame_bytes(&db, frame_id)?;
 
-  let thumbnail = decode_thumbnail(&bytes, max_size)?;
+  let thumbnail = if crate::pixels::raw::needs_render(&bytes) {
+    crate::commands::pixels::frame_picture(&db, frame_id, &bytes, max_size)?.thumbnail(max_size, max_size)
+  } else {
+    decode_thumbnail(&bytes, max_size)?
+  };
 
   let mut jpeg_bytes = Vec::new();
   thumbnail

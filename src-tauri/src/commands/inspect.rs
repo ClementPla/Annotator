@@ -10,7 +10,8 @@ use tauri::ipc::Response;
 use tauri::State;
 
 use crate::commands::annotation::decode_to_uint8;
-use crate::commands::frame::{decode_downscaled, detect_mime_type, read_frame_bytes_ahead};
+use crate::commands::frame::{detect_mime_type, read_frame_bytes_ahead};
+use crate::commands::pixels::frame_picture;
 use crate::storage::{queries, DbState};
 
 const PREVIEW_JPEG_QUALITY: u8 = 85;
@@ -66,7 +67,7 @@ pub async fn get_frame_preview(
     }
 
     let longest = target.0.max(target.1).max(1);
-    let mut img = decode_downscaled(&bytes, longest).map_err(|e| e.to_string())?;
+    let mut img = frame_picture(&db, frame_id, &bytes, longest).map_err(|e| e.to_string())?;
     if img.width().max(img.height()) > longest {
         img = img.resize(longest, longest, image::imageops::FilterType::Triangle);
     }

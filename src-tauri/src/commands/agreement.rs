@@ -30,7 +30,8 @@ use tauri::State;
 use ts_rs::TS;
 
 use crate::commands::annotation::decode_to_uint8;
-use crate::commands::frame::{decode_downscaled, read_frame_bytes};
+use crate::commands::frame::read_frame_bytes;
+use crate::commands::pixels::frame_picture;
 use crate::commands::users::{self, UserInfo};
 use crate::commands::vector::{rasterize_shape, VectorShape};
 use crate::storage::{queries, DbState};
@@ -258,7 +259,7 @@ pub async fn intergrader_case_image(
 
     // Never larger than the frame itself.
     let longest = max_dim.min(width.max(height)).max(1);
-    let image = decode_downscaled(&bytes, longest)
+    let image = frame_picture(&db, frame_id, &bytes, longest)
         .map_err(|e| e.to_string())?
         .thumbnail(longest, longest)
         .to_rgb8();

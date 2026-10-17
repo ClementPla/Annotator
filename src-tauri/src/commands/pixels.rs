@@ -7,7 +7,7 @@ use tauri::ipc::Response;
 use tauri::State;
 use ts_rs::TS;
 
-use crate::commands::frame::{overview_from_bytes, read_frame_bytes, Frame};
+use crate::commands::frame::{decode_downscaled, overview_from_bytes, read_frame_bytes, Frame, ThumbnailCache};
 use crate::pixels::cache::{Decoded, RawFrameCache};
 use crate::pixels::raw;
 use crate::pixels::display::{render_rgb, step_for, DisplaySettings, Region};
@@ -88,6 +88,34 @@ pub(crate) fn effective_settings(db: &DbState, d: &Decoded, frame_id: i64) -> Re
         .unwrap_or_else(|| DisplaySettings::auto(&d.frame, &d.stats)))
 }
 
+/// A frame as a picture (thumbnails, previews, 3D, comparisons), its longest
+/// side at most about `max_dim` (0: native size). A frame deeper than 8 bits
+/// or with several channels is rendered through its sequence's display
+/// settings; any other is decoded as stored.
+pub(crate) fn frame_picture(
+    db: &DbState,
+    frame_id: i64,
+    bytes: &[u8],
+    max_dim: u32,
+) -> Result<image::DynamicImage> {
+    if !raw::needs_render(bytes) {
+        // `decode_downscaled` reads 0 as "as small as possible".
+        return if max_dim == 0 {
+            image::load_from_memory(bytes)
+                .map_err(|e| AppError::Generic(format!("Failed to decode image: {e}")))
+        } else {
+            decode_downscaled(bytes, max_dim)
+        };
+    }
+    let d = Decoded::new(raw::decode(bytes)?);
+    let settings = effective_settings(db, &d, frame_id)?;
+    let region = Region::full(&d.frame);
+    let (w, h, rgb) = render_rgb(&d.frame, &settings, region, step_for(region, max_dim));
+    image::RgbImage::from_raw(w, h, rgb)
+        .map(image::DynamicImage::ImageRgb8)
+        .ok_or_else(|| AppError::Generic("Render has the wrong size".into()))
+}
+
 #[tauri::command]
 pub fn frame_pixel_info(
     db: State<DbState>,
@@ -162,11 +190,15 @@ pub fn auto_display_settings(
 #[tauri::command]
 pub fn set_display_settings(
     db: State<DbState>,
+    thumbnails: State<ThumbnailCache>,
     sequence_id: i64,
     settings: Option<DisplaySettings>,
 ) -> Result<()> {
     let json = settings.map(|s| serde_json::to_string(&s)).transpose()?;
-    db.with_conn(|conn| queries::save_display_settings(conn, sequence_id, json.as_deref()))
+    db.with_conn(|conn| queries::save_display_settings(conn, sequence_id, json.as_deref()))?;
+    // Thumbnails of rendered frames show the old display.
+    thumbnails.clear();
+    Ok(())
 }
 
 /// The whole frame, rendered with its display settings and downsampled so its
@@ -334,6 +366,52 @@ mod tests {
 
         queries::save_display_settings(&conn, 2, None).unwrap();
         assert_eq!(queries::load_display_settings(&conn, 2).unwrap(), None);
+    }
+
+    #[test]
+    fn pictures_of_deep_frames_go_through_the_sequence_display() {
+        use crate::pixels::display::ChannelDisplay;
+        use tiff::encoder::{colortype::Gray16, TiffEncoder};
+
+        let conn = queries::create_database(Path::new(":memory:")).unwrap();
+        conn.execute_batch(
+            "INSERT INTO sequences (id, name) VALUES (1, 's');
+             INSERT INTO frames (id, sequence_id, frame_index, width, height) VALUES (7, 1, 0, 2, 1);",
+        )
+        .unwrap();
+        let channel = |color: &str| ChannelDisplay {
+            name: None,
+            visible: true,
+            color: color.into(),
+            min: 0.0,
+            max: 1000.0,
+            gamma: 1.0,
+        };
+        let settings = DisplaySettings { channels: vec![channel("#ff0000"), channel("#00ff00")] };
+        queries::save_display_settings(&conn, 1, Some(&serde_json::to_string(&settings).unwrap())).unwrap();
+        let db = DbState::new();
+        db.set(conn);
+
+        // Two 16-bit channels: [0, 1000] in red, [1000, 0] in green.
+        let mut tiff = std::io::Cursor::new(Vec::new());
+        {
+            let mut enc = TiffEncoder::new(&mut tiff).unwrap();
+            enc.write_image::<Gray16>(2, 1, &[0, 1000]).unwrap();
+            enc.write_image::<Gray16>(2, 1, &[1000, 0]).unwrap();
+        }
+        let picture = frame_picture(&db, 7, tiff.get_ref(), 0).unwrap().to_rgb8();
+        assert_eq!(picture.into_raw(), vec![0, 255, 0, 255, 0, 0]);
+
+        // An ordinary image keeps its size at 0, JPEG included.
+        let jpeg = {
+            let mut out = Vec::new();
+            image::RgbImage::from_pixel(64, 32, image::Rgb([9, 9, 9]))
+                .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Jpeg)
+                .unwrap();
+            out
+        };
+        let picture = frame_picture(&db, 7, &jpeg, 0).unwrap();
+        assert_eq!((picture.width(), picture.height()), (64, 32));
     }
 
     #[test]
