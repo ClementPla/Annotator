@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { open } from '@tauri-apps/plugin-dialog';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 import { ButtonModule } from 'primeng/button';
 import { ToastModule } from 'primeng/toast';
@@ -58,6 +59,19 @@ export class LauncherComponent implements OnInit {
   newProject(): void {
     this.router.navigate(['/new']);
   }
+
+  /** The licences of what ships with the application, the GPL microscopy
+   *  reader's source among them. */
+  async openLicences(): Promise<void> {
+    try {
+      await openUrl(LauncherComponent.LICENCES_URL);
+    } catch (error) {
+      console.error('[launcher] could not open the licences', error);
+    }
+  }
+
+  private static readonly LICENCES_URL =
+    'https://github.com/ClementPla/Didascalie/blob/release/THIRD_PARTY_NOTICES.md';
 
   /** Check the release channel, and say so when already up to date. */
   async checkForUpdates(): Promise<void> {

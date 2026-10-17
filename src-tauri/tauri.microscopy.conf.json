@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/didascalie-bioformats"],
+    "resources": {
+      "binaries/didascalie-bioformats-LICENSE.txt": "licenses/didascalie-bioformats-LICENSE.txt"
+    }
+  }
+}

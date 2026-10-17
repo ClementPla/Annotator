@@ -175,3 +175,7 @@ Pull requests are welcome too, provided they come with a clear, documented ratio
 ## License
 
 BSD 3-Clause. See [`LICENSE`](LICENSE).
+
+Microscopy files are read by [didascalie-bioformats](https://github.com/ClementPla/didascalie-bioformats),
+a separate GPL program shipped with the desktop installers; see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

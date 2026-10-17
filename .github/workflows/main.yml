@@ -7,6 +7,13 @@ on:
 
 # This workflow will trigger on each push to the `release` branch to create or update a GitHub release, build your app, and upload the artifacts to the release.
 
+# The microscopy reader shipped with the app: a release of
+# https://github.com/ClementPla/didascalie-bioformats (a separate GPL program,
+# see THIRD_PARTY_NOTICES.md). Bump it together with the app when the reader's
+# JSON protocol changes (`microscopy::PROTOCOL` in src-tauri).
+env:
+  READER_VERSION: v0.1.0
+
 jobs:
   publish-tauri:
     permissions:
@@ -17,12 +24,16 @@ jobs:
         include:
           - platform: "macos-latest" # for Arm based macs (M1 and above).
             args: "--target aarch64-apple-darwin"
+            target: aarch64-apple-darwin
           - platform: "macos-latest" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
+            target: x86_64-apple-darwin
           - platform: "windows-latest"
             args: ""
+            target: x86_64-pc-windows-msvc
           - platform: "ubuntu-22.04" # for Tauri v1 you could replace this with ubuntu-20.04.
             args: ""
+            target: x86_64-unknown-linux-gnu
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -51,6 +62,20 @@ jobs:
 
       - name: install frontend dependencies
         run: npm install # change this to npm, pnpm or bun depending on which one you use.
+
+      # Into src-tauri/binaries/, which src-tauri/tauri.microscopy.conf.json (merged
+      # below with --config) bundles next to the application. That overlay is kept
+      # out of tauri.conf.json so local and Android builds do not need the binary.
+      - name: fetch the microscopy reader
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p src-tauri/binaries
+          gh release download "$READER_VERSION" --repo ClementPla/didascalie-bioformats             --pattern "didascalie-bioformats-${{ matrix.target }}*" --dir src-tauri/binaries
+          gh release download "$READER_VERSION" --repo ClementPla/didascalie-bioformats             --pattern LICENSE --output src-tauri/binaries/didascalie-bioformats-LICENSE.txt
+          chmod +x src-tauri/binaries/didascalie-bioformats-* || true
+          ls -l src-tauri/binaries
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -88,4 +113,4 @@ jobs:
           # auto-update. A draft is invisible to /releases/latest.
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config src-tauri/tauri.microscopy.conf.json

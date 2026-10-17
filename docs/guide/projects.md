@@ -15,12 +15,40 @@ is open, `-wal` and `-shm` files sit next to it and hold the latest changes.
 
 ## Supported images
 
-Images must be **8-bit RGB** (8-bit greyscale also works), in PNG, JPEG, TIFF or
-BMP.
+PNG, JPEG, TIFF and BMP images are imported as they are: 8-bit RGB or
+greyscale, and **16-bit** or float greyscale and RGB too. A TIFF whose pages
+are greyscale images of one size is read as **one image with a channel per
+page**.
 
-16-bit images, images with more than three channels, DICOM and NIfTI are not
-supported. Convert them first: apply the intensity window you want and export
-8-bit slices. The [Python library](../python.md) can then build the project.
+Images deeper than 8 bits, or with several channels, keep their values: the
+editor shows them through the **Channels** panel (a window, colour and gamma per
+channel, shared by the whole sequence), and Otsu and flood fill work on the
+values themselves, not on what the screen shows.
+
+DICOM and NIfTI are not supported. Convert them first; the
+[Python library](../python.md) can then build the project.
+
+### Microscopy files
+
+CZI, LIF, ND2, OME-TIFF and the other formats listed under **Microscopy** in
+the import formats are converted when imported, at their own bit depth. Before
+the import, a dialog lists every file with its series (fields, positions,
+scenes) and lets you choose, per series or for every file at once:
+
+- which channels to keep, by name;
+- the slices: every one, the middle one, or a maximum projection;
+- the time points: every one, one in N, or the first;
+- for very large images, the resolution to import.
+
+Each series becomes a sequence whose frames run through time, then slices. The
+frames are stored in the project file, so the original files are not needed
+afterwards. The channels start with the names and colours the file records.
+
+The files are read by **didascalie-bioformats**, a separate program installed
+with Didascalie on Windows, macOS and Linux (see
+[`THIRD_PARTY_NOTICES.md`](https://github.com/ClementPla/Didascalie/blob/release/THIRD_PARTY_NOTICES.md)).
+To use another copy, set the `DIDASCALIE_BIOFORMATS` environment variable to
+it. Microscopy files cannot be imported on Android tablets.
 
 A 3D volume is imported as a sequence with one image per slice.
 

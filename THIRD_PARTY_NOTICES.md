@@ -7,6 +7,23 @@ Dependency licences are declared in `package.json` / `Cargo.toml` and the
 respective lockfiles; this file covers the binary assets that are redistributed
 verbatim inside the application, where the licence asks for attribution.
 
+## didascalie-bioformats (microscopy reader)
+
+- Program: `didascalie-bioformats`, shipped next to the application on
+  Windows, macOS and Linux (not on Android)
+- Source: <https://github.com/ClementPla/didascalie-bioformats>; the version
+  shipped is the release tag named in `.github/workflows/main.yml`
+  (`READER_VERSION`)
+- Built on [bioformats-rs](https://github.com/henriksson-lab/bioformats-rs), a
+  Rust translation of [Bio-Formats](https://www.openmicroscopy.org/bio-formats/)
+- Licence: GNU General Public License, version 2 or later. The licence text is
+  installed with it (`licenses/didascalie-bioformats-LICENSE.txt`).
+
+It is a separate program: Didascalie runs it to read microscopy files (CZI,
+LIF, ND2, OME-TIFF, ...) when they are imported, and exchanges only its
+command line and JSON output with it. Didascalie itself stays under the
+BSD-3-Clause licence.
+
 ## Material Symbols (icon font)
 
 - Package: [`@material-symbols/font-400`](https://www.npmjs.com/package/@material-symbols/font-400)
