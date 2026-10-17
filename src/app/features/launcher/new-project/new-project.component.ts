@@ -16,6 +16,7 @@ import { MessageService } from 'primeng/api';
 
 import { LabelledSwitchComponent } from '../../../shared/generics/labelled-switch/labelled-switch.component';
 import { FormatTogglesComponent } from '../../../shared/generics/format-toggles/format-toggles.component';
+import { ImportProgressComponent } from '../../../shared/generics/import-progress/import-progress.component';
 import { MicroscopyImportDialogComponent } from '../../../shared/generics/microscopy-import/microscopy-import-dialog.component';
 import { FolderDropZoneComponent } from '../folder-drop-zone/folder-drop-zone.component';
 import { ClassificationConfigurationComponent } from '../project-configuration/classification-configuration/classification-configuration.component';
@@ -44,6 +45,7 @@ const OWNER_NAME_KEY = 'didascalie_user_name';
     ToastModule,
     LabelledSwitchComponent,
     FormatTogglesComponent,
+    ImportProgressComponent,
     MicroscopyImportDialogComponent,
     FolderDropZoneComponent,
     ClassificationConfigurationComponent,

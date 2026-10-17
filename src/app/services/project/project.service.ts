@@ -1,9 +1,11 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
 import {
   api,
   AddImagesResult,
   ImageFolderStatus,
+  ImportProgress,
   ProjectConfig,
   ProjectEdit,
   ScanOptions,
@@ -264,7 +266,9 @@ export class ProjectService {
   /** Import the configured folder, with what to take of its microscopy files
    *  (see `MicroscopyImportDialogComponent`; default picks when omitted). */
   async scanFolder(microscopy?: MicroscopyImport[]): Promise<ScanResult> {
-    const result = await api.scanAndImportFolder({ ...this.scanOptions(), microscopy });
+    const result = await this.withImportProgress(() =>
+      api.scanAndImportFolder({ ...this.scanOptions(), microscopy }),
+    );
 
     await this.refreshCounts();
 
@@ -273,9 +277,26 @@ export class ProjectService {
 
   /** Add a folder's images to the open project. See `add_images_to_project`. */
   async addImages(options: ScanOptions): Promise<AddImagesResult> {
-    const result = await api.addImagesToProject(options);
+    const result = await this.withImportProgress(() => api.addImagesToProject(options));
     await this.refreshCounts();
     return result;
+  }
+
+  /** Where the running import stands, from its `import-progress` events; null
+   *  when none runs or none came yet. */
+  readonly importProgress = signal<ImportProgress | null>(null);
+
+  private async withImportProgress<T>(run: () => Promise<T>): Promise<T> {
+    this.importProgress.set(null);
+    const unlisten = await listen<ImportProgress>('import-progress', (e) =>
+      this.importProgress.set(e.payload),
+    );
+    try {
+      return await run();
+    } finally {
+      unlisten();
+      this.importProgress.set(null);
+    }
   }
 
   // ── Editing an open project ──────────────────────────────────────────────

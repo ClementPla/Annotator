@@ -7,6 +7,7 @@ import { encodeRle8 } from './rle8';
 import type { ScanOptions } from './generated/ScanOptions';
 import type { ScanResult } from './generated/ScanResult';
 import type { AddImagesResult } from './generated/AddImagesResult';
+import type { ImportProgress } from './generated/ImportProgress';
 import type { MicroscopyImport } from './generated/MicroscopyImport';
 import type { MicroscopyInspection } from './generated/MicroscopyInspection';
 import type { EditImpact } from './generated/EditImpact';
@@ -82,6 +83,7 @@ export type {
   ScanOptions,
   ScanResult,
   AddImagesResult,
+  ImportProgress,
   EditImpact,
   ProjectEdit,
   TaskKind,

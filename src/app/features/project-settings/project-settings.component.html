@@ -134,7 +134,10 @@
 
           <div class="actions">
             @if (adding()) {
-              <p-progressbar mode="indeterminate" class="progress"></p-progressbar>
+              <app-import-progress
+                class="progress"
+                [progress]="project.importProgress()"
+              ></app-import-progress>
             }
             <p-button
               icon="pi pi-plus"

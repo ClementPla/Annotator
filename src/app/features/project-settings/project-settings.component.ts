@@ -21,6 +21,7 @@ import { NotificationService } from '../../services/notification.service';
 import { ProjectService } from '../../services/project/project.service';
 import { LabelledSwitchComponent } from '../../shared/generics/labelled-switch/labelled-switch.component';
 import { FormatTogglesComponent } from '../../shared/generics/format-toggles/format-toggles.component';
+import { ImportProgressComponent } from '../../shared/generics/import-progress/import-progress.component';
 import { MicroscopyImportDialogComponent } from '../../shared/generics/microscopy-import/microscopy-import-dialog.component';
 import { FolderDropZoneComponent } from '../launcher/folder-drop-zone/folder-drop-zone.component';
 import { ProjectSettingsService } from './project-settings.service';
@@ -68,6 +69,7 @@ function plural(n: number, noun: string): string {
     TooltipModule,
     LabelledSwitchComponent,
     FormatTogglesComponent,
+    ImportProgressComponent,
     MicroscopyImportDialogComponent,
     FolderDropZoneComponent,
   ],

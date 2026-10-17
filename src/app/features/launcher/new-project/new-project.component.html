@@ -150,7 +150,10 @@
 
   <footer class="page-footer">
     @if (isLoading()) {
-      <p-progressbar mode="indeterminate" class="footer-progress"></p-progressbar>
+      <app-import-progress
+        class="footer-progress"
+        [progress]="projectService.importProgress()"
+      ></app-import-progress>
     }
     <p-button
       label="Start project"
