@@ -2,9 +2,10 @@
 
 export type PredictedMask = { labelId: number, 
 /**
- * Base64 of a native-resolution uint8 mask (1 where predicted).
+ * Base64 of a native-resolution uint8 mask (1 where predicted), encoded
+ * as `rle8` (see `storage::rle`): a few kilobytes, not a byte per pixel.
  */
-maskBase64: string, 
+rle8Base64: string, 
 /**
  * Fraction of the frame assigned to this label.
  */

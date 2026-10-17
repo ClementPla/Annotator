@@ -183,8 +183,9 @@ pub struct SegmentedLayer {
     #[ts(type = "number")]
     pub label_id: i64,
     pub additive: bool,
-    /// Base64 uint8 mask at native resolution, holding the values to write.
-    pub mask_base64: String,
+    /// Base64 uint8 mask at native resolution, holding the values to write,
+    /// encoded as `rle8` (see `storage::rle`).
+    pub rle8_base64: String,
 }
 
 #[derive(Serialize, TS)]
@@ -233,7 +234,7 @@ pub async fn python_segment_frame(
                 Ok(SegmentedLayer {
                     label_id: layer.label_id,
                     additive: layer.additive,
-                    mask_base64: BASE64_STANDARD.encode(&layer.mask),
+                    rle8_base64: BASE64_STANDARD.encode(crate::storage::rle::encode8(&layer.mask)),
                 })
             })
             .collect::<Result<_>>()?;

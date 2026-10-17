@@ -15,6 +15,7 @@ const MAX_TRACED_SHAPES = 64;
 import { VectorEditorService } from './vector-editor.service';
 import { OrchestratorService } from './orchestrator.service';
 import { base64ToUint8 } from '../../../../core/misc/base64';
+import { decodeRle8 } from '../../../../lib/rle8';
 import { tracedShape } from '../vector/vector.model';
 
 /**
@@ -106,7 +107,7 @@ export class PredictionService {
       const shapes: VectorShape[] = [];
       for (const m of result.masks) {
         if (!labels.some((l) => l.id === m.labelId)) continue;
-        const mask = base64ToUint8(m.maskBase64);
+        const mask = decodeRle8(base64ToUint8(m.rle8Base64), frame.width * frame.height);
         const traced =
           mode === 'regions'
             ? await api.vectorizeMask(
@@ -184,7 +185,7 @@ export class PredictionService {
         const index = labels.findIndex((l) => l.id === m.labelId);
         if (index < 0) continue;
         touched.push(index);
-        applied.push({ index, mask: base64ToUint8(m.maskBase64) });
+        applied.push({ index, mask: decodeRle8(base64ToUint8(m.rle8Base64), frame.width * frame.height) });
       }
 
       if (!applied.length) {

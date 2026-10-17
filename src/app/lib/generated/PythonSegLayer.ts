@@ -2,6 +2,7 @@
 
 export type PythonSegLayer = { labelId: number, additive: boolean, 
 /**
- * Base64 uint8 mask at native resolution, holding the values to write.
+ * Base64 uint8 mask at native resolution, holding the values to write,
+ * encoded as `rle8` (see `storage::rle`).
  */
-maskBase64: string, };
+rle8Base64: string, };

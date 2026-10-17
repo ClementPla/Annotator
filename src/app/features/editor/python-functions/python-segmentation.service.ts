@@ -13,6 +13,7 @@ import { CanvasManagerService } from '../drawable-canvas/service/canvas-manager.
 import { OrchestratorService } from '../drawable-canvas/service/orchestrator.service';
 import { UndoRedoService } from '../drawable-canvas/service/undo-redo.service';
 import { base64ToUint8 } from '../../../core/misc/base64';
+import { decodeRle8 } from '../../../lib/rle8';
 
 /** Which frames a sequence function is given. */
 export type SequenceRunScope = 'all' | 'fromCurrent';
@@ -124,7 +125,7 @@ export class PythonSegmentationService {
         .map((layer) => ({
           index: labels.findIndex((l) => l.id === layer.labelId),
           additive: layer.additive,
-          mask: base64ToUint8(layer.maskBase64),
+          mask: decodeRle8(base64ToUint8(layer.rle8Base64), frame.width * frame.height),
         }))
         .filter((layer) => layer.index >= 0);
 

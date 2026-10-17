@@ -64,8 +64,9 @@ pub struct ScribbleInput {
 pub struct PredictedMask {
     #[ts(type = "number")]
     pub label_id: i64,
-    /// Base64 of a native-resolution uint8 mask (1 where predicted).
-    pub mask_base64: String,
+    /// Base64 of a native-resolution uint8 mask (1 where predicted), encoded
+    /// as `rle8` (see `storage::rle`): a few kilobytes, not a byte per pixel.
+    pub rle8_base64: String,
     /// Fraction of the frame assigned to this label.
     pub coverage: f32,
 }
@@ -184,7 +185,7 @@ pub fn predict_frame(
             let hits = mask.iter().filter(|&&v| v > 0).count();
             PredictedMask {
                 label_id,
-                mask_base64: BASE64_STANDARD.encode(&mask),
+                rle8_base64: BASE64_STANDARD.encode(crate::storage::rle::encode8(&mask)),
                 coverage: hits as f32 / n_full as f32,
             }
         })
