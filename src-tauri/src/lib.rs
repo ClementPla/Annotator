@@ -158,6 +158,7 @@ pub fn run() {
             commands::frame::get_frame_image,
             commands::frame::get_frame_overview,
             commands::frame::get_frame_tile,
+            commands::pixels::load_frame_display,
             commands::pixels::frame_pixel_info,
             commands::pixels::frame_histogram,
             commands::pixels::pixel_values,

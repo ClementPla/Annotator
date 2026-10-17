@@ -20,6 +20,8 @@ import { TooltipModule } from 'primeng/tooltip';
 
 import { CommonModule } from '@angular/common';
 import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/image-adjustments.component";
+import { ChannelsPanelComponent } from "./channels-panel/channels-panel.component";
+import { SequenceService } from "../../../services/sequence.service";
 
 @Component({
     selector: 'app-tool-setting',
@@ -33,7 +35,8 @@ import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/
     TooltipModule,
     FormsModule,
     AccordionModule,
-    ImageAdjustmentsComponent
+    ImageAdjustmentsComponent,
+    ChannelsPanelComponent,
 ],
     templateUrl: './tool-setting.component.html',
     styleUrl: './tool-setting.component.scss',
@@ -42,6 +45,7 @@ import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/
 })
 export class ToolSettingComponent {
   editorService = inject(EditorService);
+  sequenceService = inject(SequenceService);
   projectService = inject(ProjectService);
   flags = inject(FeatureFlagsService);
 

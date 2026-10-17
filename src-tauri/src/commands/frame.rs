@@ -273,6 +273,12 @@ pub fn get_frame_image(db: State<DbState>, frame_id: i64) -> Result<FrameImage> 
 #[tauri::command]
 pub fn get_frame_overview(db: State<DbState>, frame_id: i64, max_dim: u32) -> Result<FrameImage> {
     let (meta, bytes) = read_frame_bytes(&db, frame_id)?;
+    overview_from_bytes(meta, bytes, max_dim)
+}
+
+/// The stored bytes when the frame fits within `max_dim`, otherwise a PNG
+/// downsampled to it. `frame.width` / `frame.height` stay native.
+pub(crate) fn overview_from_bytes(meta: FrameMeta, bytes: Vec<u8>, max_dim: u32) -> Result<FrameImage> {
     let nw = meta.frame.width.max(0) as u32;
     let nh = meta.frame.height.max(0) as u32;
 

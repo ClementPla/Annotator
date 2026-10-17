@@ -95,6 +95,11 @@ impl RawFrameCache {
         })
     }
 
+    /// The frame, decoded from `bytes` on a miss (the caller already read them).
+    pub fn get_from_bytes(&self, frame_id: i64, bytes: &[u8]) -> Result<Arc<Decoded>> {
+        self.get_with(frame_id, || raw::decode(bytes))
+    }
+
     fn get_with(
         &self,
         frame_id: i64,

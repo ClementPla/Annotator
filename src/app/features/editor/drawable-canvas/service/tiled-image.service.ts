@@ -37,6 +37,11 @@ export class TiledImageService implements ProjectScoped {
   private frameId: number | null = null;
   private nativeW = 0;
   private nativeH = 0;
+  /** Tiles are renders of raw pixels (`render_frame_tile`), not stored ones. */
+  private rendered = false;
+  /** Bumped whenever cached tiles become stale; a fetch from an older
+   *  generation is dropped. */
+  private generation = 0;
 
   private readonly cache = new Map<string, ImageBitmap>();
   private readonly order: string[] = []; // LRU key order (oldest first)
@@ -47,14 +52,26 @@ export class TiledImageService implements ProjectScoped {
   private readonly processedOrder: string[] = [];
   private processedVersion = -1;
 
-  setFrame(frameId: number, nativeW: number, nativeH: number): void {
-    if (this.frameId === frameId && this.nativeW === nativeW && this.nativeH === nativeH) {
+  setFrame(frameId: number, nativeW: number, nativeH: number, rendered = false): void {
+    if (
+      this.frameId === frameId &&
+      this.nativeW === nativeW &&
+      this.nativeH === nativeH &&
+      this.rendered === rendered
+    ) {
       return;
     }
     this.clear();
     this.frameId = frameId;
     this.nativeW = nativeW;
     this.nativeH = nativeH;
+    this.rendered = rendered;
+  }
+
+  /** Drop the tiles of the current frame, keeping the frame: its render
+   *  changed (new display settings). */
+  refresh(): void {
+    this.dropTiles();
   }
 
   /** @see ProjectScoped */
@@ -63,12 +80,17 @@ export class TiledImageService implements ProjectScoped {
   }
 
   clear(): void {
+    this.dropTiles();
+    this.frameId = null;
+  }
+
+  private dropTiles(): void {
+    this.generation++;
     for (const bm of this.cache.values()) bm.close();
     this.cache.clear();
     this.order.length = 0;
     this.inflight.clear();
     this.clearProcessed();
-    this.frameId = null;
   }
 
   /**
@@ -164,13 +186,17 @@ export class TiledImageService implements ProjectScoped {
       return;
     }
 
-    api
-      .getFrameTile(frameId, x, y, w, h)
+    const generation = this.generation;
+    const request = this.rendered
+      ? api.renderFrameTile(frameId, x, y, w, h)
+      : api.getFrameTile(frameId, x, y, w, h);
+    request
       .then(async (buf) => {
-        if (this.frameId !== frameId) return; // frame changed while loading
+        // The frame changed, or its tiles went stale, while loading.
+        if (this.frameId !== frameId || this.generation !== generation) return;
         const data = new Uint8ClampedArray(buf);
         const bitmap = await createImageBitmap(new ImageData(data, w, h));
-        if (this.frameId !== frameId) {
+        if (this.frameId !== frameId || this.generation !== generation) {
           bitmap.close();
           return;
         }
@@ -178,7 +204,10 @@ export class TiledImageService implements ProjectScoped {
         this.tileLoaded$.next();
       })
       .catch((e) => console.error('[TiledImage] tile fetch failed:', e))
-      .finally(() => this.inflight.delete(key));
+      .finally(() => {
+        // A refresh meanwhile cleared the set, and may have refetched the key.
+        if (this.generation === generation) this.inflight.delete(key);
+      });
   }
 
   private store(key: string, bitmap: ImageBitmap): void {

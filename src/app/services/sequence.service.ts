@@ -1,15 +1,21 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Sequence, Frame, FrameImage, api } from '../lib/api';
+import { Sequence, Frame, FrameImage, PixelInfo, api } from '../lib/api';
 import { ProjectScoped } from '../core/project-scoped';
 
 @Injectable({ providedIn: 'root' })
 export class SequenceService implements ProjectScoped {
+  /** Longest side of the image sent to the editor; larger frames add tiles. */
+  static readonly DISPLAY_MAX_DIM = 4096;
+
 
   private readonly _sequences = signal<Sequence[]>([]);
   private readonly _currentSequence = signal<Sequence | null>(null);
   private readonly _frames = signal<Frame[]>([]);
   private readonly _currentFrameIndex = signal(0);
   private readonly _currentFrameImage = signal<FrameImage | null>(null);
+  /** Set when the current frame is a render of raw pixels (deeper than 8 bits,
+   *  or several channels); null for an ordinary 8-bit image. */
+  private readonly _currentPixelInfo = signal<PixelInfo | null>(null);
   private readonly _loading = signal(false);
 
   readonly sequences = this._sequences.asReadonly();
@@ -17,6 +23,7 @@ export class SequenceService implements ProjectScoped {
   readonly frames = this._frames.asReadonly();
   readonly currentFrameIndex = this._currentFrameIndex.asReadonly();
   readonly currentFrameImage = this._currentFrameImage.asReadonly();
+  readonly currentPixelInfo = this._currentPixelInfo.asReadonly();
   readonly loading = this._loading.asReadonly();
 
   readonly currentFrame = computed(() => {
@@ -110,6 +117,7 @@ export class SequenceService implements ProjectScoped {
   async loadCurrentFrameImage(): Promise<void> {
     const frame = this.currentFrame();
     if (!frame) {
+      this._currentPixelInfo.set(null);
       this._currentFrameImage.set(null);
       return;
     }
@@ -117,17 +125,16 @@ export class SequenceService implements ProjectScoped {
     this._loading.set(true);
 
     try {
-      // Images too large for the browser to decode are fetched as a downsampled
-      // overview; native detail comes from tiles.
-      const OVERVIEW_MAX_DIM = 4096;
-      const large =
-        Math.max(frame.width, frame.height) > OVERVIEW_MAX_DIM;
-      const frameImage = large
-        ? await api.getFrameOverview(frame.id, OVERVIEW_MAX_DIM)
-        : await api.getFrameImage(frame.id);
-      this._currentFrameImage.set(frameImage);
+      // Images too large for the browser to decode come as a downsampled
+      // overview, native detail from tiles. Deeper than 8 bits, Rust renders
+      // them through the sequence's display settings.
+      const display = await api.loadFrameDisplay(frame.id, SequenceService.DISPLAY_MAX_DIM);
+      // Before the image: loading it reads whether tiles are rendered.
+      this._currentPixelInfo.set(display.raw ?? null);
+      this._currentFrameImage.set({ frame: display.frame, imageBase64: display.imageBase64 });
     } catch (error) {
       console.error('Failed to load frame image:', error);
+      this._currentPixelInfo.set(null);
       this._currentFrameImage.set(null);
     } finally {
       this._loading.set(false);
@@ -185,6 +192,7 @@ export class SequenceService implements ProjectScoped {
     this._currentSequence.set(null);
     this._frames.set([]);
     this._currentFrameIndex.set(0);
+    this._currentPixelInfo.set(null);
     this._currentFrameImage.set(null);
     this._loading.set(false);
   }

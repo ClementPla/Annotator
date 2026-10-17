@@ -131,6 +131,18 @@ export class OrchestratorService {
     }
   }
 
+  /**
+   * Swap the backdrop for a new render of the same frame (same native size),
+   * after its display settings changed. Masks, history and the view are kept;
+   * the display pyramid is rebuilt, the old one showing meanwhile.
+   */
+  public async replaceImage(imgSrc: string): Promise<void> {
+    const img = await this.preloadImage(imgSrc);
+    this.loadedImage = img;
+    this.imageProc.setImage(img); // its output rebuilds the pyramid
+    this.redrawRequest.next();
+  }
+
   public resetHistory(): void {
     this.undoRedo.empty();
   }

@@ -1,5 +1,14 @@
 <p-panel header="Settings">
-  <p-accordion [value]="['1', '2', '3', '4']" [multiple]="true">
+  <p-accordion [value]="['0', '1', '2', '3', '4']" [multiple]="true">
+    @if (sequenceService.currentPixelInfo()) {
+      <p-accordion-panel value="0">
+        <p-accordion-header>Channels</p-accordion-header>
+        <p-accordion-content>
+          <app-channels-panel></app-channels-panel>
+        </p-accordion-content>
+      </p-accordion-panel>
+    }
+
     @if (editorService.useProcessing) {
       <p-accordion-panel value="3">
         <p-accordion-header>Image adjustments</p-accordion-header>

@@ -219,7 +219,8 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
       await this.orchestrator.loadImage(imageSrc, nativeWidth, nativeHeight);
       const frameId = this.sequenceService.currentFrame()?.id;
       if (frameId != null && nativeWidth && nativeHeight) {
-        this.tiledImage.setFrame(frameId, nativeWidth, nativeHeight);
+        const rendered = this.sequenceService.currentPixelInfo() !== null;
+        this.tiledImage.setFrame(frameId, nativeWidth, nativeHeight, rendered);
       }
       this.svg().setViewBox(this.orchestrator.getSVGViewBox());
       this.vectorLayer()?.setViewBox(this.orchestrator.getSVGViewBox());

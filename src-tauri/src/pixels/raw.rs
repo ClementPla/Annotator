@@ -93,6 +93,27 @@ pub fn decode(bytes: &[u8]) -> Result<RawFrame> {
     Ok(from_dynamic(img))
 }
 
+/// Whether stored bytes need a Rust render to be displayed: deeper than 8 bits,
+/// or several channels in pages. Reads headers only. An ordinary 8-bit image is
+/// shown by the webview as stored.
+pub fn needs_render(bytes: &[u8]) -> bool {
+    use image::ColorType as C;
+    if is_tiff(bytes) {
+        if let Ok(dec) = tiff::decoder::Decoder::new(Cursor::new(bytes)) {
+            if dec.more_images() {
+                return true;
+            }
+        }
+    }
+    let Ok(reader) = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format() else {
+        return false;
+    };
+    matches!(
+        reader.into_decoder().map(|d| image::ImageDecoder::color_type(&d)),
+        Ok(C::L16 | C::La16 | C::Rgb16 | C::Rgba16 | C::Rgb32F | C::Rgba32F)
+    )
+}
+
 fn is_tiff(bytes: &[u8]) -> bool {
     bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*")
 }
@@ -279,5 +300,23 @@ mod tests {
         let f = decode(&out).unwrap();
         assert_eq!(f.channels, 1);
         assert_eq!(f.samples, Samples::U16(vec![7, 4095]));
+    }
+
+    #[test]
+    fn only_deep_or_multipage_images_need_a_render() {
+        use tiff::encoder::{colortype, TiffEncoder};
+        let rgb8 = ImageBuffer::<Rgb<u8>, _>::from_pixel(2, 2, Rgb([1, 2, 3]));
+        assert!(!needs_render(&png(image::DynamicImage::ImageRgb8(rgb8))));
+        let grey16 = ImageBuffer::<Luma<u16>, _>::from_pixel(2, 2, Luma([4095]));
+        assert!(needs_render(&png(image::DynamicImage::ImageLuma16(grey16))));
+
+        let mut pages = Vec::new();
+        {
+            let mut enc = TiffEncoder::new(Cursor::new(&mut pages)).unwrap();
+            enc.write_image::<colortype::Gray8>(1, 1, &[1]).unwrap();
+            enc.write_image::<colortype::Gray8>(1, 1, &[2]).unwrap();
+        }
+        assert!(needs_render(&pages));
+        assert!(!needs_render(b"not an image"));
     }
 }

@@ -1,0 +1,134 @@
+@if (channels.settings(); as settings) {
+  <div class="channels-panel">
+    @if (channels.info(); as info) {
+      <p class="pixel-format">
+        {{ info.channels }} channel{{ info.channels === 1 ? '' : 's' }} ·
+        {{ info.sampleType === 'f32' ? '32-bit float' : info.sampleType === 'u8' ? '8-bit' : (info.significantBits ?? 16) + '-bit' }}
+      </p>
+    }
+
+    @for (ch of settings.channels; track $index; let i = $index) {
+      <div class="channel" [class.channel--hidden]="!ch.visible">
+        <div class="channel__head">
+          <p-checkbox
+            [binary]="true"
+            [inputId]="'ch-visible-' + i"
+            [ngModel]="ch.visible"
+            (ngModelChange)="channels.update(i, { visible: $event })"
+            [ariaLabel]="'Show ' + label(i)"
+          />
+          <input
+            type="color"
+            class="channel__color"
+            [id]="'ch-color-' + i"
+            [value]="ch.color"
+            (input)="channels.update(i, { color: $any($event.target).value })"
+            [attr.aria-label]="'Colour of ' + label(i)"
+          />
+          <label class="channel__name" [for]="'ch-visible-' + i">{{ label(i) }}</label>
+          <p-button
+            label="Auto"
+            size="small"
+            [text]="true"
+            (onClick)="channels.auto(i)"
+            pTooltip="Fit the window to this channel (0.5–99.5 %)"
+            tooltipPosition="left"
+          />
+        </div>
+
+        <div class="histogram">
+          <svg
+            [attr.viewBox]="'0 0 ' + histWidth + ' ' + histHeight"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path [attr.d]="histogramPath(i)" [attr.fill]="ch.color" />
+          </svg>
+          <span class="histogram__shade histogram__shade--low" [style.width.%]="markerPercent(i, ch.min)"></span>
+          <span
+            class="histogram__shade histogram__shade--high"
+            [style.width.%]="100 - markerPercent(i, ch.max)"
+          ></span>
+        </div>
+
+        @if (channels.ranges()[i]; as range) {
+          <p-slider
+            [range]="true"
+            [min]="range.min"
+            [max]="range.max"
+            [step]="range.step"
+            [ngModel]="[ch.min, ch.max]"
+            (ngModelChange)="onWindow(i, $event)"
+            [ariaLabel]="'Display range of ' + label(i)"
+          />
+        }
+
+        <div class="window-values">
+          <label class="value-field">
+            <span>Min</span>
+            <input
+              pInputText
+              type="number"
+              [id]="'ch-min-' + i"
+              [ngModel]="ch.min"
+              (ngModelChange)="onMin(i, $event)"
+              [ngModelOptions]="{ updateOn: 'blur' }"
+            />
+          </label>
+          <label class="value-field">
+            <span>Max</span>
+            <input
+              pInputText
+              type="number"
+              [id]="'ch-max-' + i"
+              [ngModel]="ch.max"
+              (ngModelChange)="onMax(i, $event)"
+              [ngModelOptions]="{ updateOn: 'blur' }"
+            />
+          </label>
+          <label class="value-field">
+            <span>Gamma</span>
+            <input
+              pInputText
+              type="number"
+              step="0.05"
+              min="0.1"
+              max="5"
+              [id]="'ch-gamma-' + i"
+              [ngModel]="ch.gamma"
+              (ngModelChange)="onGamma(i, $event)"
+              [ngModelOptions]="{ updateOn: 'blur' }"
+            />
+          </label>
+        </div>
+      </div>
+    }
+
+    <div class="cursor-readout" aria-live="polite">
+      @if (channels.cursor(); as cursor) {
+        <span class="cursor-readout__pos">x {{ cursor.x }}, y {{ cursor.y }}</span>
+        @for (v of cursor.values; track $index; let i = $index) {
+          <span class="cursor-readout__value">
+            <span class="cursor-readout__swatch" [style.background]="colorOf(i)"></span>
+            {{ v | number: valueFormat() }}
+          </span>
+        }
+      } @else {
+        <span class="cursor-readout__hint">Point at the image to read its values.</span>
+      }
+    </div>
+
+    <div class="panel-actions">
+      <p-button label="Auto all" size="small" severity="secondary" [outlined]="true" (onClick)="channels.auto()" />
+      <p-button
+        label="Reset to automatic"
+        size="small"
+        severity="secondary"
+        [text]="true"
+        (onClick)="channels.resetToAutomatic()"
+        pTooltip="Forget this sequence's settings"
+        tooltipPosition="top"
+      />
+    </div>
+  </div>
+}

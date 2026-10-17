@@ -7,7 +7,9 @@ use tauri::ipc::Response;
 use tauri::State;
 use ts_rs::TS;
 
+use crate::commands::frame::{overview_from_bytes, read_frame_bytes, Frame};
 use crate::pixels::cache::{Decoded, RawFrameCache};
+use crate::pixels::raw;
 use crate::pixels::display::{render_rgb, step_for, DisplaySettings, Region};
 use crate::pixels::stats;
 use crate::storage::{queries, DbState};
@@ -220,6 +222,47 @@ pub fn render_frame_tile(
         d.frame.width,
         d.frame.height,
     )))
+}
+
+/// What the editor shows for a frame.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
+pub struct FrameDisplay {
+    pub frame: Frame,
+    /// A data URL. Native size, or downsampled to `max_dim` for a larger frame.
+    pub image_base64: String,
+    /// Set when the image is a render of raw pixels (deeper than 8 bits, or
+    /// several channels): tiles then come from `render_frame_tile`, and the
+    /// display settings apply.
+    pub raw: Option<PixelInfo>,
+}
+
+/// The image the editor shows for a frame. An ordinary 8-bit image is sent as
+/// stored (or as a downsampled overview when larger than `max_dim`), exactly as
+/// before; anything deeper is decoded and rendered with its display settings.
+#[tauri::command]
+pub fn load_frame_display(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+    max_dim: u32,
+) -> Result<FrameDisplay> {
+    let (meta, bytes) = read_frame_bytes(&db, frame_id)?;
+    if !raw::needs_render(&bytes) {
+        let image = overview_from_bytes(meta, bytes, max_dim)?;
+        return Ok(FrameDisplay { frame: image.frame, image_base64: image.image_base64, raw: None });
+    }
+    let d = cache.get_from_bytes(frame_id, &bytes)?;
+    drop(bytes);
+    let settings = effective_settings(&db, &d, frame_id)?;
+    let region = Region::full(&d.frame);
+    let (w, h, rgb) = render_rgb(&d.frame, &settings, region, step_for(region, max_dim));
+    Ok(FrameDisplay {
+        frame: meta.frame,
+        image_base64: format!("data:image/png;base64,{}", BASE64.encode(encode_png(w, h, &rgb)?)),
+        raw: Some(pixel_info(&d)),
+    })
 }
 
 /// RGBA from RGB, with alpha 0 where the region lies outside the frame.

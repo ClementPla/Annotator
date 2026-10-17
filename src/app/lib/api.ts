@@ -34,6 +34,7 @@ import type { VectorNode } from './generated/VectorNode';
 import type { VectorShape } from './generated/VectorShape';
 import type { ChannelDisplay } from './generated/ChannelDisplay';
 import type { DisplaySettings } from './generated/DisplaySettings';
+import type { FrameDisplay } from './generated/FrameDisplay';
 import type { PixelInfo } from './generated/PixelInfo';
 import type { RenderedImage } from './generated/RenderedImage';
 import type { ValueRange } from './generated/ValueRange';
@@ -143,6 +144,7 @@ export type {
   PixelInfo,
   RenderedImage,
   ValueRange,
+  FrameDisplay,
 };
 // ── Pluggable dataset formats (COCO, YOLO, NIfTI, …) ──────────────────────────
 
@@ -206,6 +208,11 @@ export const api = {
   ) =>
     invoke<ArrayBuffer>('get_frame_tile', { frameId, x, y, width, height }),
   // ── Raw pixels (native bit depth) ──────────────────────────────────────────
+
+  /** The image the editor shows for a frame: the stored 8-bit image (or an
+   *  overview ≤ `maxDim`), or a render of deeper pixels with `raw` set. */
+  loadFrameDisplay: (frameId: number, maxDim: number) =>
+    invoke<FrameDisplay>('load_frame_display', { frameId, maxDim }),
 
   /** What a frame's pixels are: size, channels, sample type, value ranges. */
   framePixelInfo: (frameId: number) =>
