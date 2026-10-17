@@ -16,6 +16,7 @@ mod connection;
 
 #[cfg(not(target_os = "android"))]
 mod dl;
+mod pixels;
 
 mod utils;
 mod storage;
@@ -112,6 +113,7 @@ pub fn run() {
     let app = app.manage(DbState::new())
         .manage(commands::superpixel::SuperpixelState::default())
         .manage(commands::frame::FrameImageCache::default())
+        .manage(pixels::cache::RawFrameCache::default())
         .manage(commands::frame::ThumbnailCache::default())
         .manage(commands::ml::predict::MlState::default())
         .setup(|app| {
@@ -156,6 +158,14 @@ pub fn run() {
             commands::frame::get_frame_image,
             commands::frame::get_frame_overview,
             commands::frame::get_frame_tile,
+            commands::pixels::frame_pixel_info,
+            commands::pixels::frame_histogram,
+            commands::pixels::pixel_values,
+            commands::pixels::get_display_settings,
+            commands::pixels::auto_display_settings,
+            commands::pixels::set_display_settings,
+            commands::pixels::render_frame_image,
+            commands::pixels::render_frame_tile,
             commands::frame::get_frame_thumbnail,
             commands::frame::set_frames_reviewed,
             commands::frame::set_frame_reviewed,

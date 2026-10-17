@@ -1,0 +1,303 @@
+//! Raw frame pixels: their description, statistics, values, and 8-bit renders
+//! through a sequence's display settings. See `crate::pixels`.
+
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use serde::Serialize;
+use tauri::ipc::Response;
+use tauri::State;
+use ts_rs::TS;
+
+use crate::pixels::cache::{Decoded, RawFrameCache};
+use crate::pixels::display::{render_rgb, step_for, DisplaySettings, Region};
+use crate::pixels::stats;
+use crate::storage::{queries, DbState};
+use crate::utils::error::{AppError, Result};
+
+/// One channel's smallest and largest value.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
+pub struct ValueRange {
+    pub min: f64,
+    pub max: f64,
+}
+
+/// What a frame's pixels are.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
+pub struct PixelInfo {
+    pub width: u32,
+    pub height: u32,
+    pub channels: u32,
+    #[ts(type = "\"u8\" | \"u16\" | \"f32\"")]
+    pub sample_type: String,
+    /// Bits used by 16-bit data, e.g. 12 for a 12-bit camera; null otherwise.
+    pub significant_bits: Option<u8>,
+    /// 8-bit with three channels: shown as stored, the image adjustments apply.
+    pub is_rgb8: bool,
+    pub ranges: Vec<ValueRange>,
+}
+
+/// An 8-bit render of a frame for display.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../src/app/lib/generated/")]
+pub struct RenderedImage {
+    /// Size of the render; at most the requested `max_dim` per side.
+    pub width: u32,
+    pub height: u32,
+    pub native_width: u32,
+    pub native_height: u32,
+    /// A data URL: `data:image/png;base64,...`.
+    pub image_base64: String,
+}
+
+fn pixel_info(d: &Decoded) -> PixelInfo {
+    let f = &d.frame;
+    PixelInfo {
+        width: f.width,
+        height: f.height,
+        channels: f.channels as u32,
+        sample_type: f.sample_type().as_str().to_string(),
+        significant_bits: stats::significant_bits(f, &d.stats),
+        is_rgb8: f.is_rgb8(),
+        ranges: d
+            .stats
+            .iter()
+            .map(|s| ValueRange {
+                min: s.min as f64,
+                max: s.max as f64,
+            })
+            .collect(),
+    }
+}
+
+/// The settings a frame is displayed with: its sequence's, when they fit the
+/// frame, otherwise the automatic ones.
+fn effective_settings(db: &DbState, d: &Decoded, frame_id: i64) -> Result<DisplaySettings> {
+    let stored = db.with_conn(|conn| {
+        let sequence_id = queries::frame_sequence_id(conn, frame_id)?;
+        queries::load_display_settings(conn, sequence_id)
+    })?;
+    Ok(stored
+        .and_then(|json| serde_json::from_str::<DisplaySettings>(&json).ok())
+        .filter(|s| s.fits(&d.frame))
+        .unwrap_or_else(|| DisplaySettings::auto(&d.frame, &d.stats)))
+}
+
+#[tauri::command]
+pub fn frame_pixel_info(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+) -> Result<PixelInfo> {
+    let d = cache.get(&db, frame_id)?;
+    Ok(pixel_info(&d))
+}
+
+/// A channel's histogram in `bins` bins over `[min, max]`.
+#[tauri::command]
+pub fn frame_histogram(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+    channel: u32,
+    bins: u32,
+    min: f64,
+    max: f64,
+) -> Result<Vec<u32>> {
+    let d = cache.get(&db, frame_id)?;
+    let s = d
+        .stats
+        .get(channel as usize)
+        .ok_or_else(|| AppError::Generic(format!("The frame has no channel {channel}")))?;
+    Ok(s.rebin(bins.clamp(1, 4096) as usize, min as f32, max as f32))
+}
+
+/// The raw value of every channel at native pixel (x, y); empty outside the
+/// frame.
+#[tauri::command]
+pub fn pixel_values(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+    x: i64,
+    y: i64,
+) -> Result<Vec<f64>> {
+    let d = cache.get(&db, frame_id)?;
+    let f = &d.frame;
+    if x < 0 || y < 0 || x >= f.width as i64 || y >= f.height as i64 {
+        return Ok(Vec::new());
+    }
+    let i = y as usize * f.width as usize + x as usize;
+    Ok((0..f.channels).map(|c| f.value(c, i) as f64).collect())
+}
+
+/// The settings a frame is displayed with (its sequence's, or automatic).
+#[tauri::command]
+pub fn get_display_settings(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+) -> Result<DisplaySettings> {
+    let d = cache.get(&db, frame_id)?;
+    effective_settings(&db, &d, frame_id)
+}
+
+/// The automatic settings for a frame, whatever is stored.
+#[tauri::command]
+pub fn auto_display_settings(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+) -> Result<DisplaySettings> {
+    let d = cache.get(&db, frame_id)?;
+    Ok(DisplaySettings::auto(&d.frame, &d.stats))
+}
+
+/// Store the display of a sequence's frames; `None` returns to automatic.
+#[tauri::command]
+pub fn set_display_settings(
+    db: State<DbState>,
+    sequence_id: i64,
+    settings: Option<DisplaySettings>,
+) -> Result<()> {
+    let json = settings.map(|s| serde_json::to_string(&s)).transpose()?;
+    db.with_conn(|conn| queries::save_display_settings(conn, sequence_id, json.as_deref()))
+}
+
+/// The whole frame, rendered with its display settings and downsampled so its
+/// longest side is at most `max_dim` (0: native size).
+#[tauri::command]
+pub fn render_frame_image(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+    max_dim: u32,
+) -> Result<RenderedImage> {
+    let d = cache.get(&db, frame_id)?;
+    let settings = effective_settings(&db, &d, frame_id)?;
+    let region = Region::full(&d.frame);
+    let (w, h, rgb) = render_rgb(&d.frame, &settings, region, step_for(region, max_dim));
+    Ok(RenderedImage {
+        width: w,
+        height: h,
+        native_width: d.frame.width,
+        native_height: d.frame.height,
+        image_base64: format!(
+            "data:image/png;base64,{}",
+            BASE64.encode(encode_png(w, h, &rgb)?)
+        ),
+    })
+}
+
+/// A native-resolution RGBA tile, rendered with the frame's display settings:
+/// `width*height*4` bytes, transparent outside the frame. Same layout as
+/// `get_frame_tile`.
+#[tauri::command]
+pub fn render_frame_tile(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<Response> {
+    let d = cache.get(&db, frame_id)?;
+    let settings = effective_settings(&db, &d, frame_id)?;
+    let region = Region {
+        x,
+        y,
+        width,
+        height,
+    };
+    let (_, _, rgb) = render_rgb(&d.frame, &settings, region, 1);
+    Ok(Response::new(rgb_to_tile_rgba(
+        &rgb,
+        region,
+        d.frame.width,
+        d.frame.height,
+    )))
+}
+
+/// RGBA from RGB, with alpha 0 where the region lies outside the frame.
+fn rgb_to_tile_rgba(rgb: &[u8], region: Region, frame_w: u32, frame_h: u32) -> Vec<u8> {
+    let mut out = vec![0u8; region.width as usize * region.height as usize * 4];
+    for ty in 0..region.height {
+        for tx in 0..region.width {
+            let i = (ty * region.width + tx) as usize;
+            let inside = region.x + tx < frame_w && region.y + ty < frame_h;
+            out[i * 4..i * 4 + 3].copy_from_slice(&rgb[i * 3..i * 3 + 3]);
+            out[i * 4 + 3] = if inside { 255 } else { 0 };
+        }
+    }
+    out
+}
+
+/// PNG with fast compression: renders are recomputed whenever the window
+/// changes, so speed matters more than size.
+fn encode_png(w: u32, h: u32, rgb: &[u8]) -> Result<Vec<u8>> {
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+    use image::ImageEncoder;
+    let mut out = Vec::new();
+    PngEncoder::new_with_quality(&mut out, CompressionType::Fast, FilterType::Adaptive)
+        .write_image(rgb, w, h, image::ExtendedColorType::Rgb8)
+        .map_err(|e| AppError::Generic(format!("Failed to encode render: {e}")))?;
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn tiles_are_transparent_outside_the_frame() {
+        let rgb = vec![10, 20, 30, 40, 50, 60];
+        let rgba = rgb_to_tile_rgba(
+            &rgb,
+            Region {
+                x: 1,
+                y: 0,
+                width: 2,
+                height: 1,
+            },
+            2,
+            1,
+        );
+        assert_eq!(rgba, vec![10, 20, 30, 255, 40, 50, 60, 0]);
+    }
+
+    #[test]
+    fn display_settings_are_stored_per_sequence() {
+        let conn = queries::create_database(Path::new(":memory:")).unwrap();
+        conn.execute_batch(
+            "INSERT INTO sequences (id, name) VALUES (1, 's'), (2, 't');
+             INSERT INTO frames (id, sequence_id, frame_index, width, height) VALUES (7, 2, 0, 4, 4);",
+        )
+        .unwrap();
+        assert_eq!(queries::frame_sequence_id(&conn, 7).unwrap(), 2);
+        assert_eq!(queries::load_display_settings(&conn, 2).unwrap(), None);
+
+        queries::save_display_settings(&conn, 2, Some("{\"channels\":[]}")).unwrap();
+        queries::save_display_settings(&conn, 2, Some("{\"channels\":[1]}")).unwrap();
+        assert_eq!(
+            queries::load_display_settings(&conn, 2).unwrap().as_deref(),
+            Some("{\"channels\":[1]}")
+        );
+        assert_eq!(queries::load_display_settings(&conn, 1).unwrap(), None);
+
+        queries::save_display_settings(&conn, 2, None).unwrap();
+        assert_eq!(queries::load_display_settings(&conn, 2).unwrap(), None);
+    }
+
+    #[test]
+    fn a_rendered_png_decodes_to_the_same_pixels() {
+        let rgb = vec![255, 0, 0, 0, 128, 255];
+        let png = encode_png(2, 1, &rgb).unwrap();
+        let back = image::load_from_memory(&png).unwrap().to_rgb8();
+        assert_eq!(back.into_raw(), rgb);
+    }
+}

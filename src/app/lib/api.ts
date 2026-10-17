@@ -32,6 +32,11 @@ import type { SkipReason } from './generated/SkipReason';
 import type { SkippedFrame } from './generated/SkippedFrame';
 import type { VectorNode } from './generated/VectorNode';
 import type { VectorShape } from './generated/VectorShape';
+import type { ChannelDisplay } from './generated/ChannelDisplay';
+import type { DisplaySettings } from './generated/DisplaySettings';
+import type { PixelInfo } from './generated/PixelInfo';
+import type { RenderedImage } from './generated/RenderedImage';
+import type { ValueRange } from './generated/ValueRange';
 import type { AnnotationResponse } from './generated/AnnotationResponse';
 import type { BatchClassificationPayload } from './generated/BatchClassificationPayload';
 import type { ClassificationData } from './generated/ClassificationData';
@@ -133,6 +138,11 @@ export type {
   TrainSummary,
   TrainTick,
   VectorAnnotationsWire,
+  ChannelDisplay,
+  DisplaySettings,
+  PixelInfo,
+  RenderedImage,
+  ValueRange,
 };
 // ── Pluggable dataset formats (COCO, YOLO, NIfTI, …) ──────────────────────────
 
@@ -195,6 +205,42 @@ export const api = {
     height: number,
   ) =>
     invoke<ArrayBuffer>('get_frame_tile', { frameId, x, y, width, height }),
+  // ── Raw pixels (native bit depth) ──────────────────────────────────────────
+
+  /** What a frame's pixels are: size, channels, sample type, value ranges. */
+  framePixelInfo: (frameId: number) =>
+    invoke<PixelInfo>('frame_pixel_info', { frameId }),
+
+  /** A channel's histogram in `bins` bins over `[min, max]`. */
+  frameHistogram: (frameId: number, channel: number, bins: number, min: number, max: number) =>
+    invoke<number[]>('frame_histogram', { frameId, channel, bins, min, max }),
+
+  /** The raw value of every channel at a native pixel; empty outside the frame. */
+  pixelValues: (frameId: number, x: number, y: number) =>
+    invoke<number[]>('pixel_values', { frameId, x, y }),
+
+  /** The display a frame is shown with: its sequence's, or the automatic one. */
+  getDisplaySettings: (frameId: number) =>
+    invoke<DisplaySettings>('get_display_settings', { frameId }),
+
+  /** The automatic display for a frame, whatever is stored. */
+  autoDisplaySettings: (frameId: number) =>
+    invoke<DisplaySettings>('auto_display_settings', { frameId }),
+
+  /** Store the display of a sequence's frames; `null` returns to automatic. */
+  setDisplaySettings: (sequenceId: number, settings: DisplaySettings | null) =>
+    invoke<void>('set_display_settings', { sequenceId, settings }),
+
+  /** The frame rendered to 8-bit with its display, longest side ≤ `maxDim`
+   *  (0: native size). */
+  renderFrameImage: (frameId: number, maxDim: number) =>
+    invoke<RenderedImage>('render_frame_image', { frameId, maxDim }),
+
+  /** A native-resolution RGBA tile rendered with the frame's display, laid out
+   *  like `getFrameTile`. */
+  renderFrameTile: (frameId: number, x: number, y: number, width: number, height: number) =>
+    invoke<ArrayBuffer>('render_frame_tile', { frameId, x, y, width, height }),
+
   /** Erase every annotation on every frame of a sequence, returning how many
    *  frames carried one. Not undoable. */
   clearSequenceAnnotations: (sequenceId: number) =>

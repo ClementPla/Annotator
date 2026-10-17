@@ -142,6 +142,14 @@ CREATE TABLE IF NOT EXISTS frame_reviews (
     reviewed_at TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (frame_id, user_id)
 ) WITHOUT ROWID;
+-- How a sequence's frames are displayed: per channel, a window, colour and
+-- gamma (`crate::pixels::display::DisplaySettings` as JSON). Shared by every
+-- account. A sequence without a row is shown with the automatic window.
+CREATE TABLE IF NOT EXISTS sequence_display (
+    sequence_id INTEGER PRIMARY KEY REFERENCES sequences(id) ON DELETE CASCADE,
+    settings TEXT NOT NULL,
+    modified_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS registrations (
     id INTEGER PRIMARY KEY,
     sequence_id INTEGER NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,

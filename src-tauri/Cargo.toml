@@ -29,6 +29,8 @@ tauri = { version = "2.11.2", features = [ "rustls-tls"] }
 tauri-plugin-log = "2.8.0"
 tauri-plugin-dialog = "2.7.1"
 image = "0.25.10"
+# Multi-page TIFF (one channel per page), which `image` reads only the first page of.
+tiff = "0.11"
 # DCT scale-on-decode of JPEG thumbnails. Already in the tree via `image`.
 jpeg-decoder = "0.3"
 regex = "1.12.3"

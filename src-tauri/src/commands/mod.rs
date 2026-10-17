@@ -13,6 +13,7 @@ pub mod project_edit;
 pub mod classification;
 pub mod text_description;
 pub mod frame;
+pub mod pixels;
 pub mod inspect;
 pub mod sequences;
 pub mod formats;

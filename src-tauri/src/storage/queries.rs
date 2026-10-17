@@ -361,6 +361,45 @@ pub fn save_annotation(
     Ok(())
 }
 
+/// A sequence's stored display settings (JSON), if any.
+pub fn load_display_settings(conn: &Connection, sequence_id: i64) -> Result<Option<String>> {
+    use rusqlite::OptionalExtension;
+    Ok(conn
+        .query_row(
+            "SELECT settings FROM main.sequence_display WHERE sequence_id = ?1",
+            params![sequence_id],
+            |row| row.get(0),
+        )
+        .optional()?)
+}
+
+/// Store a sequence's display settings (JSON), or forget them with `None`.
+pub fn save_display_settings(conn: &Connection, sequence_id: i64, settings: Option<&str>) -> Result<()> {
+    match settings {
+        Some(json) => conn.execute(
+            "INSERT INTO main.sequence_display (sequence_id, settings, modified_at)
+             VALUES (?1, ?2, CURRENT_TIMESTAMP)
+             ON CONFLICT(sequence_id) DO UPDATE SET settings = excluded.settings,
+                                                    modified_at = CURRENT_TIMESTAMP",
+            params![sequence_id, json],
+        )?,
+        None => conn.execute(
+            "DELETE FROM main.sequence_display WHERE sequence_id = ?1",
+            params![sequence_id],
+        )?,
+    };
+    Ok(())
+}
+
+/// The sequence a frame belongs to.
+pub fn frame_sequence_id(conn: &Connection, frame_id: i64) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT sequence_id FROM main.frames WHERE id = ?1",
+        params![frame_id],
+        |row| row.get(0),
+    )?)
+}
+
 /// Replace the current user's vector shapes of one (frame, label).
 pub fn upsert_vector_shapes(
     conn: &Connection,

@@ -8,14 +8,16 @@ use crate::utils::error::{AppError, Result};
 use crate::storage::{DbState, queries};
 use crate::types::project::ProjectConfig;
 use crate::commands::frame::{FrameImageCache, ThumbnailCache};
+use crate::pixels::cache::RawFrameCache;
 use crate::commands::ml::predict::MlState;
 
 /// Forget everything derived from the project being left: frame and label
 /// ids restart from 1 in every project. Every command that changes the open
 /// database goes through here.
-fn forget_project(thumbnails: &ThumbnailCache, tiles: &FrameImageCache, ml: &MlState) {
+fn forget_project(thumbnails: &ThumbnailCache, tiles: &FrameImageCache, raw: &RawFrameCache, ml: &MlState) {
     thumbnails.clear();
     tiles.clear();
+    raw.clear();
     *ml.model.lock() = None;
     *ml.features.lock() = None;
 }
@@ -90,6 +92,7 @@ pub fn set_image_folder(
     db: State<DbState>,
     thumbnails: State<ThumbnailCache>,
     tiles: State<FrameImageCache>,
+    raw: State<RawFrameCache>,
     path: String,
 ) -> Result<ImageFolderStatus> {
     let folder = PathBuf::from(&path);
@@ -123,6 +126,7 @@ pub fn set_image_folder(
     db.set_image_root(Some(folder));
     thumbnails.clear();
     tiles.clear();
+    raw.clear();
     image_folder_status(&db)
 }
 
@@ -132,11 +136,12 @@ pub fn create_project(
     ml: State<MlState>,
     thumbnails: State<ThumbnailCache>,
     tiles: State<FrameImageCache>,
+    raw: State<RawFrameCache>,
     path: String,
     config: ProjectConfig,
 ) -> Result<()> {
     log::info!("[project] creating at {}", path);
-    forget_project(&thumbnails, &tiles, &ml);
+    forget_project(&thumbnails, &tiles, &raw, &ml);
     
     let conn = queries::create_database(Path::new(&path))?;
     queries::insert_project(&conn, &config)?;
@@ -158,13 +163,14 @@ pub fn open_project(
     ml: State<MlState>,
     thumbnails: State<ThumbnailCache>,
     tiles: State<FrameImageCache>,
+    raw: State<RawFrameCache>,
     path: String,
 ) -> Result<ProjectConfig> {
     if db.is_open() {
         log::info!("[project] closing the open project first");
         db.close();
     }
-    forget_project(&thumbnails, &tiles, &ml);
+    forget_project(&thumbnails, &tiles, &raw, &ml);
 
     let conn = queries::open_database(Path::new(&path))?;
     let config = queries::get_project_config(&conn)?;
@@ -188,9 +194,10 @@ pub fn close_project(
     ml: State<MlState>,
     thumbnails: State<ThumbnailCache>,
     tiles: State<FrameImageCache>,
+    raw: State<RawFrameCache>,
 ) -> Result<()> {
     db.close();
-    forget_project(&thumbnails, &tiles, &ml);
+    forget_project(&thumbnails, &tiles, &raw, &ml);
     Ok(())
 }
 
