@@ -363,6 +363,38 @@ export const api = {
     } & RefineOptions,
   ) => invoke<ArrayBufferLike>('otsu_segmentation', { ...args }),
 
+  /** Otsu on the raw pixels of a frame deeper than 8 bits, read from the Rust
+   *  cache through the display window. `mask` is the stroke region as RGBA;
+   *  `source` null reads the brightest visible channel. */
+  otsuSegmentationRaw: (
+    args: {
+      frameId: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      mask: ArrayBufferLike;
+      source: number | null;
+      denoiseSigma: number;
+    } & RefineOptions,
+  ) => invoke<ArrayBufferLike>('otsu_segmentation_raw', { ...args }),
+
+  /** Flood fill on raw pixels, within `tolerance` % of the display range of
+   *  the clicked pixel. (startX, startY) are relative to the region. */
+  floodFillRaw: (
+    args: {
+      frameId: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      startX: number;
+      startY: number;
+      source: number | null;
+      tolerance: number;
+    } & RefineOptions,
+  ) => invoke<ArrayBufferLike>('flood_fill_raw', { ...args }),
+
   /** Flood fill by colour from (startX, startY), within `tolerance`. */
   floodFillMask: (
     args: {

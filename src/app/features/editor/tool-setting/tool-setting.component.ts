@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, computed, ChangeDetectionStrategy } from '@angular/core';
 import { PanelModule } from 'primeng/panel';
 import { AccordionModule } from 'primeng/accordion';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { SliderModule } from 'primeng/slider';
 import { ProjectService } from '../../../services/project/project.service';
 import { SelectButtonModule } from 'primeng/selectbutton';
+import { SelectModule } from 'primeng/select';
 import {
   PostProcessOption,
   REFINABLE_POST_PROCESS,
@@ -22,6 +23,7 @@ import { CommonModule } from '@angular/common';
 import { ImageAdjustmentsComponent } from "./image-processing/image-adjustments/image-adjustments.component";
 import { ChannelsPanelComponent } from "./channels-panel/channels-panel.component";
 import { SequenceService } from "../../../services/sequence.service";
+import { ChannelsService } from "../services/channels.service";
 
 @Component({
     selector: 'app-tool-setting',
@@ -31,6 +33,7 @@ import { SequenceService } from "../../../services/sequence.service";
     SliderModule,
     ToggleSwitchModule,
     SelectButtonModule,
+    SelectModule,
     InputTextModule,
     TooltipModule,
     FormsModule,
@@ -46,6 +49,22 @@ import { SequenceService } from "../../../services/sequence.service";
 export class ToolSettingComponent {
   editorService = inject(EditorService);
   sequenceService = inject(SequenceService);
+  private channels = inject(ChannelsService);
+
+  /** What Otsu and flood fill can read on a multi-channel frame deeper than 8
+   *  bits; empty otherwise (the picker is hidden). */
+  readonly operatorSources = computed(() => {
+    const info = this.sequenceService.currentPixelInfo();
+    if (!info || info.channels < 2) return [];
+    const names = this.channels.settings()?.channels ?? [];
+    return [
+      { label: 'Brightest visible channel', value: null as number | null },
+      ...Array.from({ length: info.channels }, (_, c) => ({
+        label: names[c]?.name || `Channel ${c + 1}`,
+        value: c as number | null,
+      })),
+    ];
+  });
   projectService = inject(ProjectService);
   flags = inject(FeatureFlagsService);
 

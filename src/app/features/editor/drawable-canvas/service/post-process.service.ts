@@ -13,6 +13,7 @@ import { PostProcessOption } from '../../../../core/tools';
 import { LabelsService } from '../../../../services/labels/labels.service';
 import { ProjectService } from '../../../../services/project/project.service';
 import { ZoomPanService } from './zoom-pan.service';
+import { SequenceService } from '../../../../services/sequence.service';
 import { findExperimentalPostProcess } from '../../../../experimental/registry';
 
 /** Runs the Rust post-process commands and writes their results into the
@@ -28,6 +29,7 @@ export class PostProcessService {
   private labelService = inject(LabelsService);
   private projectService = inject(ProjectService);
   private zoomPanService = inject(ZoomPanService);
+  private sequenceService = inject(SequenceService);
   private injector = inject(Injector);
 
   private imageContext(): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null {
@@ -52,10 +54,47 @@ export class PostProcessService {
     };
   }
 
+  /** The open frame when it is a render of raw pixels, and the channel the
+   *  operators read (null: the brightest visible). Null for an 8-bit image,
+   *  which the operators read from the canvas. */
+  private rawTarget(): { frameId: number; source: number | null } | null {
+    const info = this.sequenceService.currentPixelInfo();
+    const frameId = this.sequenceService.currentFrame()?.id;
+    if (!info || frameId == null) return null;
+    const channel = this.editorService.operatorChannel;
+    return { frameId, source: channel !== null && channel < info.channels ? channel : null };
+  }
+
+  private applyResult(result: ArrayBufferLike, rect: { x: number; y: number; width: number; height: number }) {
+    const mask = this.canvasManagerService.getActiveMask();
+    if (mask) {
+      applyRegionResult(
+        mask,
+        this.stateService.width,
+        new Uint8Array(result),
+        rect,
+        this.labelService.paintValue(this.projectService.isInstanceSegmentation()),
+      );
+    }
+  }
+
   async otsu_post_process() {
-    const w = this.stateService.width;
     const rect = this.stateService.strokeRect();
     if (!rect) return;
+
+    const raw = this.rawTarget();
+    if (raw) {
+      const maskData = this.canvasManagerService.readBufferRegion(rect);
+      const result = await api.otsuSegmentationRaw({
+        ...raw,
+        ...rect,
+        mask: maskData.buffer,
+        denoiseSigma: this.editorService.denoise,
+        ...this.refinement(),
+      });
+      this.applyResult(result, rect);
+      return;
+    }
 
     const imgCtx = this.imageContext();
     if (!imgCtx) return;
@@ -70,22 +109,33 @@ export class PostProcessService {
       width: rect.width,
       height: rect.height,
     });
-
-    const mask = this.canvasManagerService.getActiveMask();
-    if (mask) applyRegionResult(mask, w, new Uint8Array(result), rect, this.labelService.paintValue(this.projectService.isInstanceSegmentation()));
+    this.applyResult(result, rect);
   }
 
   async flood_fill_post_process() {
-    const w = this.stateService.width;
     const rect = this.stateService.strokeRect();
     if (!rect) return;
+
+    const clickX = Math.floor(this.zoomPanService.currentPixel.x - rect.x);
+    const clickY = Math.floor(this.zoomPanService.currentPixel.y - rect.y);
+
+    const raw = this.rawTarget();
+    if (raw) {
+      const result = await api.floodFillRaw({
+        ...raw,
+        ...rect,
+        startX: clickX,
+        startY: clickY,
+        tolerance: this.editorService.floodFillTolerance,
+        ...this.refinement(),
+      });
+      this.applyResult(result, rect);
+      return;
+    }
 
     const imgCtx = this.imageContext();
     if (!imgCtx) return;
     const imageData = imgCtx.getImageData(rect.x, rect.y, rect.width, rect.height).data;
-
-    const clickX = Math.floor(this.zoomPanService.currentPixel.x - rect.x);
-    const clickY = Math.floor(this.zoomPanService.currentPixel.y - rect.y);
 
     const result = await api.floodFillMask({
       image: imageData.buffer,
@@ -96,9 +146,7 @@ export class PostProcessService {
       tolerance: this.editorService.floodFillTolerance,
       ...this.refinement(),
     });
-
-    const mask = this.canvasManagerService.getActiveMask();
-    if (mask) applyRegionResult(mask, w, new Uint8Array(result), rect, this.labelService.paintValue(this.projectService.isInstanceSegmentation()));
+    this.applyResult(result, rect);
   }
 
   /** Erase the connected components the eraser stroke touched, in the active

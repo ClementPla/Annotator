@@ -123,6 +123,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::segmentation::otsu_segmentation,
             commands::flood_fill::flood_fill_mask,
+            commands::flood_fill::flood_fill_raw,
+            commands::segmentation::otsu_segmentation_raw,
             commands::superpixel::superpixel_refine,
             commands::superpixel::superpixel_overlay,
             #[cfg(not(target_os = "android"))]

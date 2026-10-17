@@ -4,5 +4,6 @@
 
 pub mod cache;
 pub mod display;
+pub mod intensity;
 pub mod raw;
 pub mod stats;

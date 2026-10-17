@@ -46,6 +46,20 @@ pub fn smooth_mask(mask: &Array2<bool>, sigma: f32) -> Array2<bool> {
 }
 
 /// Blur an 8-bit image, to threshold it without its pixel noise.
+/// [`denoise`] for float intensities.
+pub fn denoise_f32(image: &Array2<f32>, sigma: f32) -> Array2<f32> {
+    if sigma < MIN_SIGMA {
+        return image.clone();
+    }
+    blur(image, sigma)
+}
+
+/// A selection as a single-channel presence mask (255 = selected), row-major:
+/// what the operators send back.
+pub fn presence_bytes(mask: &Array2<bool>) -> Vec<u8> {
+    mask.iter().map(|&on| if on { 255u8 } else { 0 }).collect()
+}
+
 pub fn denoise(image: &Array2<u8>, sigma: f32) -> Array2<u8> {
     if sigma < MIN_SIGMA {
         return image.clone();

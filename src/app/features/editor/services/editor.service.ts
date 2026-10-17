@@ -92,6 +92,12 @@ export class EditorService {
   get incrementAfterStroke(): boolean { return this._incrementAfterStroke(); }
   set incrementAfterStroke(v: boolean) { this._incrementAfterStroke.set(v); }
 
+  /** What Otsu and flood fill read on a frame deeper than 8 bits: null for the
+   *  brightest visible channel, or one channel index. */
+  private readonly _operatorChannel = signal<number | null>(null);
+  get operatorChannel(): number | null { return this._operatorChannel(); }
+  set operatorChannel(v: number | null) { this._operatorChannel.set(v); }
+
   private readonly _floodFillTolerance = signal(3.0);
   get floodFillTolerance(): number { return this._floodFillTolerance(); }
   set floodFillTolerance(v: number) { this._floodFillTolerance.set(v); }

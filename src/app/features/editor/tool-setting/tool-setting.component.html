@@ -37,7 +37,11 @@
                 @case (ppOption.FLOODFILL) {
                   <div
                     class="setting-row"
-                    pTooltip="Largest colour difference from the pixel you clicked that still gets filled (CIEDE2000 ΔE)."
+                    [pTooltip]="
+                      sequenceService.currentPixelInfo()
+                        ? 'Largest difference from the pixel you clicked that still gets filled, in % of the display range.'
+                        : 'Largest colour difference from the pixel you clicked that still gets filled (CIEDE2000 ΔE).'
+                    "
                   >
                     <label class="setting-row__label" for="flood-tolerance"
                       >Tolerance</label
@@ -73,6 +77,24 @@
               <!-- Shared by Otsu and flood fill. -->
               @if (isRefinable()) {
                 <div class="setting-block">
+                  @if (operatorSources().length) {
+                    <div
+                      class="setting-row setting-row--select"
+                      pTooltip="Which intensity Otsu and flood fill work on, through each channel's display range."
+                    >
+                      <label class="setting-row__label" for="pp-source">Read from</label>
+                      <p-select
+                        inputId="pp-source"
+                        [options]="operatorSources()"
+                        optionLabel="label"
+                        optionValue="value"
+                        [(ngModel)]="editorService.operatorChannel"
+                        appendTo="body"
+                        size="small"
+                      ></p-select>
+                    </div>
+                  }
+
                   <div
                     class="switch-row"
                     pTooltip="Take the other side: the darker structure for Otsu, everything but the filled region for flood fill."

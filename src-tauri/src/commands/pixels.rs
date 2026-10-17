@@ -77,7 +77,7 @@ fn pixel_info(d: &Decoded) -> PixelInfo {
 
 /// The settings a frame is displayed with: its sequence's, when they fit the
 /// frame, otherwise the automatic ones.
-fn effective_settings(db: &DbState, d: &Decoded, frame_id: i64) -> Result<DisplaySettings> {
+pub(crate) fn effective_settings(db: &DbState, d: &Decoded, frame_id: i64) -> Result<DisplaySettings> {
     let stored = db.with_conn(|conn| {
         let sequence_id = queries::frame_sequence_id(conn, frame_id)?;
         queries::load_display_settings(conn, sequence_id)
