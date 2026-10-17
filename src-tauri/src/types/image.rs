@@ -43,9 +43,11 @@ pub struct AnnotationResponse {
     pub label_id: i64,
     pub label_name: String,
     pub color: String,
-    /// Base64 of the raw `width*height` uint8 value mask (row-major).
-    /// 0 = background, 1 = semantic label, 1..=255 = instance id.
-    pub mask_base64: String,
+    /// Base64 of the mask encoded as `rle8` (see `storage::rle`): decoded, a
+    /// `width*height` uint8 value mask, row-major, 0 = background,
+    /// 1 = semantic label, 1..=255 = instance id. Encoded, it is a few
+    /// kilobytes where the mask would be one byte per pixel.
+    pub rle8_base64: String,
     pub width: u32,
     pub height: u32,
 }

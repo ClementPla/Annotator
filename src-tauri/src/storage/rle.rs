@@ -81,6 +81,19 @@ pub fn encode8(mask: &[u8]) -> Vec<u8> {
     out
 }
 
+/// Pixels an `rle8` stream covers, without decoding it; None when it is not
+/// whole runs.
+pub fn pixel_count8(data: &[u8]) -> Option<u64> {
+    if data.len() % 5 != 0 {
+        return None;
+    }
+    Some(
+        data.chunks_exact(5)
+            .map(|r| u32::from_le_bytes(r[1..5].try_into().unwrap()) as u64)
+            .sum(),
+    )
+}
+
 pub fn decode8(data: &[u8], width: usize, height: usize) -> Vec<u8> {
     let total = width * height;
     let mut mask = vec![0u8; total];
@@ -114,6 +127,13 @@ mod tests {
     fn assert_roundtrip(mask: &[u8], w: usize, h: usize) {
         let decoded = decode(&encode(mask, w, h), w, h);
         assert_eq!(decoded, normalized(mask), "roundtrip failed ({}x{})", w, h);
+    }
+
+    #[test]
+    fn pixel_count8_sums_the_runs() {
+        assert_eq!(pixel_count8(&encode8(&[0, 0, 1, 1, 1, 7])), Some(6));
+        assert_eq!(pixel_count8(&[]), Some(0));
+        assert_eq!(pixel_count8(&[1, 2, 0]), None);
     }
 
     #[test]

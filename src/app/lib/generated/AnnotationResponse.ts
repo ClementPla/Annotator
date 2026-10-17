@@ -2,7 +2,9 @@
 
 export type AnnotationResponse = { labelId: number, labelName: string, color: string, 
 /**
- * Base64 of the raw `width*height` uint8 value mask (row-major).
- * 0 = background, 1 = semantic label, 1..=255 = instance id.
+ * Base64 of the mask encoded as `rle8` (see `storage::rle`): decoded, a
+ * `width*height` uint8 value mask, row-major, 0 = background,
+ * 1 = semantic label, 1..=255 = instance id. Encoded, it is a few
+ * kilobytes where the mask would be one byte per pixel.
  */
-maskBase64: string, width: number, height: number, };
+rle8Base64: string, width: number, height: number, };

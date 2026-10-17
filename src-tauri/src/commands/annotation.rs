@@ -3,23 +3,39 @@ use base64::prelude::BASE64_STANDARD;
 use serde::{Serialize, Deserialize};
 use ts_rs::TS;
 use std::collections::HashMap;
+use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
-use crate::utils::error::Result;
+use crate::utils::error::{AppError, Result};
 use crate::storage::{DbState, queries, rle};
 use crate::types::image::{AnnotationResponse, MaskEncoding, LabelId};
 
+/// Store one label's mask on a frame. The body is the mask already encoded as
+/// `rle8` by the frontend (a full-size mask would cross the IPC as one JSON
+/// number per pixel); `Frame-Id` and `Label-Id` headers say where it goes.
+/// The legacy encodings (`rle`, instance `png`) are still read.
 #[tauri::command]
-pub fn save_annotation(
-    db: State<DbState>,
-    frame_id: i64,
-    label_id: i64,
-    mask_data: Vec<u8>,
-) -> Result<()> {
-    // Always written as `rle8`. The legacy encodings (`rle`, instance `png`) are
-    // still read.
+pub fn save_annotation(db: State<DbState>, request: Request<'_>) -> Result<()> {
+    let InvokeBody::Raw(encoded) = request.body() else {
+        return Err(AppError::Other("save_annotation expects the encoded mask as raw bytes".into()));
+    };
+    let header = |name: &str| -> Result<i64> {
+        request
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse().ok())
+            .ok_or_else(|| AppError::Other(format!("save_annotation needs a numeric {name} header")))
+    };
+    let (frame_id, label_id) = (header("frame-id")?, header("label-id")?);
     db.with_conn(|conn| {
-        let encoded = rle::encode8(&mask_data);
-        queries::save_annotation(conn, frame_id, label_id, &encoded, MaskEncoding::Rle8)
+        let (width, height) = queries::get_frame_dimensions(conn, frame_id)?;
+        let pixels = width as u64 * height as u64;
+        if rle::pixel_count8(encoded) != Some(pixels) {
+            return Err(AppError::Other(format!(
+                "The mask does not cover the {width}x{height} frame {frame_id}"
+            )));
+        }
+        queries::save_annotation(conn, frame_id, label_id, encoded, MaskEncoding::Rle8)
     })
 }
 
@@ -39,12 +55,16 @@ pub fn load_annotations(db: State<DbState>, frame_id: i64) -> Result<Vec<Annotat
         annotations
             .into_iter()
             .map(|a| {
-                let mask = decode_to_uint8(&a.mask_data, &a.encoding, width, height);
+                // Stored as `rle8` already, except in older projects.
+                let rle8 = match a.encoding {
+                    MaskEncoding::Rle8 => a.mask_data,
+                    ref legacy => rle::encode8(&decode_to_uint8(&a.mask_data, legacy, width, height)),
+                };
                 Ok(AnnotationResponse {
                     label_id: a.label_id,
                     label_name: a.label_name,
                     color: a.color,
-                    mask_base64: BASE64_STANDARD.encode(&mask),
+                    rle8_base64: BASE64_STANDARD.encode(&rle8),
                     width,
                     height,
                 })

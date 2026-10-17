@@ -12,6 +12,7 @@ import { NotificationService } from './notification.service';
 import { MaskVolumeService } from './mask-volume.service';
 import { ProjectScoped } from '../core/project-scoped';
 import { base64ToUint8 } from '../core/misc/base64';
+import { decodeRle8 } from '../lib/rle8';
 
 /**
  * Loading and saving of a frame's annotations.
@@ -149,7 +150,8 @@ export class IOService implements OnDestroy, ProjectScoped {
         for (const annotation of annotations) {
           const index = labels.findIndex((l) => l.id === annotation.labelId);
           if (index < 0) continue;
-          this.canvasManagerService.setMask(index, base64ToUint8(annotation.maskBase64));
+          const rle8 = base64ToUint8(annotation.rle8Base64);
+          this.canvasManagerService.setMask(index, decodeRle8(rle8, annotation.width * annotation.height));
         }
         // The label list changed since the volume was built: rebuild it.
         if (this.volume.status() === 'ready' && !this.volume.matchesLabels()) {

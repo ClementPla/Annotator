@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
+import { encodeRle8 } from './rle8';
+
 // Generated from the Rust structs by ts-rs: IPC types are not mirrored by
 // hand.
 import type { ScanOptions } from './generated/ScanOptions';
@@ -299,15 +301,13 @@ export const api = {
   loadAnnotations: (frameId: number) =>
     invoke<AnnotationResponse[]>('load_annotations', { frameId }),
 
-  saveAnnotation: (frameId: number, labelId: number, maskData: Uint8Array) => {
-    // Raw bytes (Rust receives Vec<u8>), not a JSON number array. A copy, in case
-    // the IPC layer transfers the buffer.
-    return invoke<void>('save_annotation', {
-      frameId,
-      labelId,
-      maskData: maskData.slice().buffer,
-    });
-  },
+  /** Store one label's mask, encoded here: the encoding is a few kilobytes
+   *  and goes as a raw body, where the mask itself would go as one JSON number
+   *  per pixel. */
+  saveAnnotation: (frameId: number, labelId: number, maskData: Uint8Array) =>
+    invoke<void>('save_annotation', encodeRle8(maskData), {
+      headers: { 'Frame-Id': String(frameId), 'Label-Id': String(labelId) },
+    }),
 
   loadVectorAnnotations: (frameId: number) =>
     invoke<VectorAnnotationsWire[]>('load_vector_annotations', { frameId }),
