@@ -75,6 +75,7 @@ nav:
       - Annotating: guide/annotating.md
       - Assisted labelling: guide/assistance.md
       - Your own Python functions: guide/python-functions.md
+      - "Example: DNA fibers with DNAi": guide/dnai.md
       - Very large images: guide/large-images.md
       - The gallery and review: guide/gallery.md
       - Several annotators: guide/multi-user.md

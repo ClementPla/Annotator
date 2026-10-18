@@ -51,6 +51,10 @@ fills the **OD** and **Macula** labels.
        autoplay loop muted playsinline controls preload="metadata" style="width: 100%"
        aria-label="The Python functions panel in the editor: a registered function is run on a fundus image and draws the optic disc and the macula."></video>
 
+For a microscopy example, where a two-channel image goes to DNAi and the
+detected DNA fibers come back to be corrected, see
+[Example: DNA fibers with DNAi](dnai.md).
+
 The code is also available as a notebook:
 [`examples/registering_python_functions.ipynb`](https://github.com/ClementPla/Didascalie/blob/release/examples/registering_python_functions.ipynb).
 
