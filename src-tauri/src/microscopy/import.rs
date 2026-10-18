@@ -197,12 +197,11 @@ fn save(conn: &Connection, sequence_id: i64, settings: &DisplaySettings) -> Resu
     queries::save_display_settings(conn, sequence_id, Some(&serde_json::to_string(settings)?))
 }
 
-/// The file name without its extension, `.ome.tif` counting as one.
+/// The file name without its extension, `.ome.tif` counting as one. Both `/`
+/// and `\` separate folders, whatever the system: a path recorded on Windows
+/// is read on Linux too.
 fn file_stem(source_path: &str) -> String {
-    let name = Path::new(source_path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(source_path);
+    let name = source_path.rsplit(['/', '\\']).next().unwrap_or(source_path);
     let lower = name.to_ascii_lowercase();
     for suffix in [".ome.tiff", ".ome.tif"] {
         if lower.ends_with(suffix) {
@@ -251,6 +250,8 @@ mod tests {
         assert_eq!(file_stem("cells.OME.TIFF"), "cells");
         assert_eq!(file_stem("x.ome.tif"), "x");
         assert_eq!(file_stem("C:\\data\\run 1.nd2"), "run 1");
+        assert_eq!(file_stem("scans/2026\\run.2.lif"), "run.2");
+        assert_eq!(file_stem("plain"), "plain");
     }
 
     fn u16_frame(pages: &[[u16; 4]]) -> Vec<u8> {
