@@ -126,6 +126,40 @@ with DidascalieProject.create("dataset.dida", name="My Dataset") as project:
 
 It requires `numpy` and `Pillow`, plus `pyzmq` and `msgpack` for the Python bridge.
 
+## Microscopy files
+
+CZI, LIF, ND2, OME-TIFF and other microscopy formats are read by
+[**didascalie-bioformats**](https://github.com/ClementPla/didascalie-bioformats),
+a small companion program installed with Didascalie on Windows, macOS and Linux.
+At import, Didascalie asks it what a file holds (series, channels, slices, time
+points, resolutions, channel names and colours), then has it write the planes you
+pick as lossless TIFF frames at their own bit depth. These frames are stored in the
+project, so the original files are not needed afterwards.
+
+didascalie-bioformats is built on
+[**bioformats-rs**](https://github.com/henriksson-lab/bioformats-rs), by Johan
+Henriksson: a Rust translation of [**Bio-Formats**](https://www.openmicroscopy.org/bio-formats/),
+the Java library of the [Open Microscopy Environment](https://www.openmicroscopy.org/)
+(OME) that reads more than a hundred microscopy formats. All the format knowledge
+comes from Bio-Formats and its authors; bioformats-rs makes it usable from Rust
+without Java. If you publish work that used microscopy files imported this way,
+please cite Bio-Formats:
+
+> Linkert M, Rueden CT, Allan C, et al. Metadata matters: access to image data in
+> the real world. *J Cell Biol.* 2010;189(5):777–782.
+> [doi:10.1083/jcb.201004104](https://doi.org/10.1083/jcb.201004104)
+
+and, for the translation, J. Henriksson, *Static analysis-guided agentic AI
+translation enables Rust as a full stack bioinformatics language*,
+[arXiv:2608.13029](https://doi.org/10.48550/arXiv.2608.13029) (2026).
+
+bioformats-rs is not made or endorsed by the OME team, so please report problems
+with microscopy files to [didascalie-bioformats](https://github.com/ClementPla/didascalie-bioformats/issues),
+not to Bio-Formats. Being derived from Bio-Formats' GPL readers, didascalie-bioformats
+is licensed under the GPL (version 2 or later). It runs as a separate program and
+only exchanges a command line and JSON with Didascalie, which stays under the
+BSD 3-Clause licence.
+
 ## Installing
 
 Download the installer for your platform from the [Releases page](https://github.com/ClementPla/Didascalie/releases). The application updates itself afterwards.
@@ -159,6 +193,10 @@ npm run tauri build    # build installers into src-tauri/target/release/
 
 Building with GPU support needs the CUDA Toolkit; `cargo build --no-default-features` skips it.
 
+A source build does not include didascalie-bioformats. To import microscopy files,
+download it from its [releases](https://github.com/ClementPla/didascalie-bioformats/releases)
+(or build it) and point the `DIDASCALIE_BIOFORMATS` environment variable at it.
+
 Didascalie is built with Tauri v2 and Rust, Angular 20 and PrimeNG, SQLite, WebGPU, ONNX Runtime, burn, three.js and ZeroMQ.
 
 ## AI-assisted development
@@ -178,5 +216,6 @@ Pull requests are welcome too, provided they come with a clear, documented ratio
 BSD 3-Clause. See [`LICENSE`](LICENSE).
 
 Microscopy files are read by [didascalie-bioformats](https://github.com/ClementPla/didascalie-bioformats),
-a separate GPL program shipped with the desktop installers; see
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+a separate GPL program shipped with the desktop installers (see
+[Microscopy files](#microscopy-files) and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)).

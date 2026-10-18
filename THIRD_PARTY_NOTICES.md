@@ -14,8 +14,12 @@ verbatim inside the application, where the licence asks for attribution.
 - Source: <https://github.com/ClementPla/didascalie-bioformats>; the version
   shipped is the release tag named in `.github/workflows/main.yml`
   (`READER_VERSION`)
-- Built on [bioformats-rs](https://github.com/henriksson-lab/bioformats-rs), a
-  Rust translation of [Bio-Formats](https://www.openmicroscopy.org/bio-formats/)
+- Built on [bioformats-rs](https://github.com/henriksson-lab/bioformats-rs), by
+  Johan Henriksson, a Rust translation of
+  [Bio-Formats](https://www.openmicroscopy.org/bio-formats/) by the Open
+  Microscopy Environment (OME) consortium. Citation: Linkert M, et al.
+  Metadata matters: access to image data in the real world. J Cell Biol.
+  2010;189(5):777–782. doi:10.1083/jcb.201004104
 - Licence: GNU General Public License, version 2 or later. The licence text is
   installed with it (`licenses/didascalie-bioformats-LICENSE.txt`).
 
