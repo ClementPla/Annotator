@@ -11,11 +11,16 @@ use crate::connection::{
 use crate::commands::frame::read_frame_bytes;
 use crate::storage::DbState;
 
+/// A frame as Python functions receive it: 8-bit RGB, as the editor shows
+/// it. A frame deeper than 8 bits or with several channels (a microscopy
+/// import) is rendered through the Channels panel's settings, so each channel
+/// lands in the colours set there; decoding its bytes as an ordinary image
+/// would give only the first channel, reduced to 8 bits.
 pub fn load_frame_as_payload(db: &DbState, frame_id: i64) -> Result<ImagePayload, ComError> {
   let (_meta, bytes) = read_frame_bytes(db, frame_id).map_err(|e| ComError::Other(e.to_string()))?;
 
-  let img = image
-    ::load_from_memory(&bytes)
+  let img = crate::commands::pixels
+    ::frame_picture(db, frame_id, &bytes, 0)
     .map_err(|e| ComError::Other(format!("decode failed: {e}")))?;
 
   let (w, h) = img.dimensions();
@@ -122,6 +127,48 @@ mod tests {
     let mut buf = vec![0u8; 2 * 3 * 3];
     buf[0] = red;
     ImagePayload { buf, shape: vec![2, 3, 3], dtype: "uint8".into() }
+  }
+
+  #[test]
+  fn a_multi_channel_frame_is_sent_as_the_editor_shows_it() {
+    use crate::pixels::display::{ ChannelDisplay, DisplaySettings };
+    use tiff::encoder::{ colortype::Gray16, TiffEncoder };
+
+    // Two 12-bit channels: the first shown in green, the second in red.
+    let mut tiff = std::io::Cursor::new(Vec::new());
+    {
+      let mut enc = TiffEncoder::new(&mut tiff).unwrap();
+      enc.write_image::<Gray16>(2, 1, &[4000, 0]).unwrap();
+      enc.write_image::<Gray16>(2, 1, &[0, 4000]).unwrap();
+    }
+    let conn = crate::storage::queries::create_database(std::path::Path::new(":memory:")).unwrap();
+    conn
+      .execute_batch(
+        "INSERT OR REPLACE INTO project (id, config) VALUES (1, json_object('input_folder', NULL));
+         INSERT INTO sequences (id, name) VALUES (1, 's');",
+      )
+      .unwrap();
+    conn
+      .execute(
+        "INSERT INTO frames (id, sequence_id, frame_index, width, height, embedded_data)
+         VALUES (7, 1, 0, 2, 1, ?1)",
+        [tiff.get_ref()],
+      )
+      .unwrap();
+    let channel = |color: &str| ChannelDisplay {
+      name: None, visible: true, color: color.into(), min: 0.0, max: 4000.0, gamma: 1.0,
+    };
+    let settings = DisplaySettings { channels: vec![channel("#00ff00"), channel("#ff0000")] };
+    crate::storage::queries
+      ::save_display_settings(&conn, 1, Some(&serde_json::to_string(&settings).unwrap()))
+      .unwrap();
+    let db = DbState::new();
+    db.set(conn);
+
+    let payload = load_frame_as_payload(&db, 7).unwrap();
+    assert_eq!(payload.shape, vec![1, 2, 3]);
+    // Pixel 0: channel 1 at full, in green. Pixel 1: channel 2, in red.
+    assert_eq!(payload.buf, vec![0, 255, 0, 255, 0, 0]);
   }
 
   /// Against a live `didascalie.com` server; see `DIDASCALIE_TEST_PORT`.
