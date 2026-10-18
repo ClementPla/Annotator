@@ -85,8 +85,13 @@ impl DisplaySettings {
 
 /// The automatic window of a channel: its 0.5–99.5 % percentiles.
 pub fn auto_window(stats: &ChannelStats) -> (f64, f64) {
-    let lo = stats.percentile(AUTO_LOW) as f64;
-    let hi = stats.percentile(AUTO_HIGH) as f64;
+    window_at(stats, AUTO_LOW, AUTO_HIGH)
+}
+
+/// The window from the `low` to the `high` percentile (0–1) of a channel.
+pub fn window_at(stats: &ChannelStats, low: f64, high: f64) -> (f64, f64) {
+    let lo = stats.percentile(low.min(high)) as f64;
+    let hi = stats.percentile(high.max(low)) as f64;
     if hi > lo {
         (lo, hi)
     } else {
@@ -265,6 +270,17 @@ mod tests {
             max,
             gamma: 1.0,
         }
+    }
+
+    #[test]
+    fn a_window_at_wider_percentiles_clips_more() {
+        let f = frame16(101, 1, 1, (0..=100).collect());
+        let s = stats::compute(&f);
+        assert_eq!(window_at(&s[0], 0.0, 1.0), (0.0, 100.0));
+        let (lo, hi) = window_at(&s[0], 0.1, 0.9);
+        assert!(lo >= 9.0 && lo <= 11.0 && hi >= 89.0 && hi <= 91.0, "{lo} {hi}");
+        // Swapped bounds still give a window.
+        assert_eq!(window_at(&s[0], 0.9, 0.1), (lo, hi));
     }
 
     #[test]

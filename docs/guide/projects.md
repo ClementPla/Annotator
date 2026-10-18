@@ -57,6 +57,16 @@ editor shows them through the **Channels** panel (a window, colour and gamma per
 channel, shared by the whole sequence), and Otsu and flood fill work on the
 values themselves, not on what the screen shows.
 
+#### The Channels panel
+
+Drag the window on a channel's histogram: its edges, or the whole window. The
+mouse wheel narrows or widens it, and **Shift** makes either finer. The axis
+spans the frame's values (**Data**) or everything the type holds (**Full**),
+on a **Linear** or **Log** scale.
+
+**Auto** fits the window, clipping a little more at each press. **Clip** sets
+every channel between two percentiles.
+
 DICOM and NIfTI are not supported. Convert them first; the
 [Python library](../python.md) can then build the project.
 

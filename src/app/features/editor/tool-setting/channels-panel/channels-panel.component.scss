@@ -47,35 +47,10 @@
   white-space: nowrap;
 }
 
-.histogram {
-  position: relative;
-  height: 2rem;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--surface-ground, rgba(255, 255, 255, 0.04));
-
-  svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-    opacity: 0.85;
-  }
-}
-
-// The parts of the histogram outside the window, dimmed.
-.histogram__shade {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.45);
-  pointer-events: none;
-
-  &--low {
-    left: 0;
-  }
-  &--high {
-    right: 0;
-  }
+.axis-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .window-values {
@@ -124,6 +99,13 @@
   width: 0.6rem;
   height: 0.6rem;
   border-radius: 2px;
+}
+
+.clip-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.4rem;
 }
 
 .panel-actions {

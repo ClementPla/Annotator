@@ -390,6 +390,14 @@ export class DrawableCanvasComponent implements AfterViewInit, OnDestroy {
   private drawImageLayer(processedImage: CanvasImageSource): void {
     if (!this.ctxImage) return;
 
+    const preview = this.orchestrator.preview;
+    if (preview) {
+      this.ctxImage.imageSmoothingEnabled = true;
+      this.ctxImage.imageSmoothingQuality = 'high';
+      this.ctxImage.drawImage(preview, 0, 0, this.orchestrator.width, this.orchestrator.height);
+      return;
+    }
+
     const pyramid = this.orchestrator.displayPyramid;
     const scale = this.zoomPanService.getScale();
     const vpW = this.viewportWidth * this.dpr;

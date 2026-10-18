@@ -10,7 +10,7 @@ use ts_rs::TS;
 use crate::commands::frame::{decode_downscaled, overview_from_bytes, read_frame_bytes, Frame, ThumbnailCache};
 use crate::pixels::cache::{Decoded, RawFrameCache};
 use crate::pixels::raw;
-use crate::pixels::display::{render_rgb, step_for, DisplaySettings, Region};
+use crate::pixels::display::{render_rgb, step_for, window_at, DisplaySettings, Region};
 use crate::pixels::stats;
 use crate::storage::{queries, DbState};
 use crate::utils::error::{AppError, Result};
@@ -136,13 +136,14 @@ pub fn frame_histogram(
     bins: u32,
     min: f64,
     max: f64,
+    log: Option<bool>,
 ) -> Result<Vec<u32>> {
     let d = cache.get(&db, frame_id)?;
     let s = d
         .stats
         .get(channel as usize)
         .ok_or_else(|| AppError::Generic(format!("The frame has no channel {channel}")))?;
-    Ok(s.rebin(bins.clamp(1, 4096) as usize, min as f32, max as f32))
+    Ok(s.rebin(bins.clamp(1, 4096) as usize, min as f32, max as f32, log.unwrap_or(false)))
 }
 
 /// The raw value of every channel at native pixel (x, y); empty outside the
@@ -175,15 +176,65 @@ pub fn get_display_settings(
     effective_settings(&db, &d, frame_id)
 }
 
-/// The automatic settings for a frame, whatever is stored.
+/// The automatic settings for a frame, whatever is stored. With `low` and
+/// `high` (percentiles, 0–1), every channel's window runs between them, 8-bit
+/// ones included; otherwise the default automatic window.
 #[tauri::command]
 pub fn auto_display_settings(
     db: State<DbState>,
     cache: State<RawFrameCache>,
     frame_id: i64,
+    low: Option<f64>,
+    high: Option<f64>,
 ) -> Result<DisplaySettings> {
     let d = cache.get(&db, frame_id)?;
-    Ok(DisplaySettings::auto(&d.frame, &d.stats))
+    let mut settings = DisplaySettings::auto(&d.frame, &d.stats);
+    if let (Some(low), Some(high)) = (low, high) {
+        for (ch, s) in settings.channels.iter_mut().zip(&d.stats) {
+            (ch.min, ch.max) = window_at(s, low, high);
+        }
+    }
+    Ok(settings)
+}
+
+/// The frame's raw values, box-averaged so its longest side is at most
+/// `max_dim`, for the panel to preview a display while a window is dragged:
+/// a header of four little-endian u32 (width, height, channels, 0), then
+/// every channel's plane as little-endian f32.
+#[tauri::command]
+pub fn preview_samples(
+    db: State<DbState>,
+    cache: State<RawFrameCache>,
+    frame_id: i64,
+    max_dim: u32,
+) -> Result<Response> {
+    let d = cache.get(&db, frame_id)?;
+    Ok(Response::new(preview_bytes(&d.frame, max_dim)))
+}
+
+fn preview_bytes(frame: &raw::RawFrame, max_dim: u32) -> Vec<u8> {
+    let step = step_for(Region::full(frame), max_dim) as usize;
+    let (fw, fh) = (frame.width as usize, frame.height as usize);
+    let (w, h) = (fw.div_ceil(step), fh.div_ceil(step));
+    let mut out = Vec::with_capacity(16 + w * h * frame.channels * 4);
+    for v in [w as u32, h as u32, frame.channels as u32, 0] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    for c in 0..frame.channels {
+        for oy in 0..h {
+            for ox in 0..w {
+                let (mut sum, mut n) = (0f32, 0u32);
+                for y in oy * step..((oy + 1) * step).min(fh) {
+                    for x in ox * step..((ox + 1) * step).min(fw) {
+                        sum += frame.value(c, y * fw + x);
+                        n += 1;
+                    }
+                }
+                out.extend_from_slice(&(sum / n.max(1) as f32).to_le_bytes());
+            }
+        }
+    }
+    out
 }
 
 /// Store the display of a sequence's frames; `None` returns to automatic.
@@ -327,6 +378,25 @@ fn encode_png(w: u32, h: u32, rgb: &[u8]) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn preview_bytes_average_blocks_per_channel() {
+        // 4x2, two channels; a step of 2 gives 2x1.
+        let frame = raw::RawFrame {
+            width: 4,
+            height: 2,
+            channels: 2,
+            samples: raw::Samples::U16(vec![
+                0, 2, 10, 10, 2, 4, 30, 30, // channel 0
+                1, 1, 1, 1, 1, 1, 1, 1, // channel 1
+            ]),
+        };
+        let bytes = preview_bytes(&frame, 2);
+        let word = |i: usize| u32::from_le_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap());
+        assert_eq!((word(0), word(1), word(2)), (2, 1, 2));
+        let value = |i: usize| f32::from_le_bytes(bytes[16 + i * 4..20 + i * 4].try_into().unwrap());
+        assert_eq!([value(0), value(1), value(2), value(3)], [2.0, 20.0, 1.0, 1.0]);
+    }
 
     #[test]
     fn tiles_are_transparent_outside_the_frame() {

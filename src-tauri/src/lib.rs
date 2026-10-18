@@ -170,6 +170,7 @@ pub fn run() {
             commands::pixels::pixel_values,
             commands::pixels::get_display_settings,
             commands::pixels::auto_display_settings,
+            commands::pixels::preview_samples,
             commands::pixels::set_display_settings,
             commands::pixels::render_frame_image,
             commands::pixels::render_frame_tile,

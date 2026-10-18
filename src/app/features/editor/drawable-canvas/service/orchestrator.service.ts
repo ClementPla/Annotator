@@ -53,6 +53,20 @@ export class OrchestratorService {
     return this.imagePyramid;
   }
 
+  /** A quick picture shown instead of the backdrop and its tiles, scaled to
+   *  the image: the Channels panel's preview while a window is dragged. */
+  private previewCanvas: CanvasImageSource | null = null;
+
+  public get preview(): CanvasImageSource | null {
+    return this.previewCanvas;
+  }
+
+  public setPreview(canvas: CanvasImageSource | null): void {
+    if (canvas === null && this.previewCanvas === null) return;
+    this.previewCanvas = canvas;
+    this.redrawRequest.next();
+  }
+
   // ── Redraw aggregation ───────────────────────────────────────────────────
 
   private initializeRedrawAggregation() {

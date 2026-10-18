@@ -4,13 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { InputTextModule } from 'primeng/inputtext';
-import { SliderModule } from 'primeng/slider';
+import { SelectButtonModule } from 'primeng/selectbutton';
 import { TooltipModule } from 'primeng/tooltip';
 
-import { ChannelsService, HISTOGRAM_BINS } from '../../services/channels.service';
-
-/** Height of a histogram strip, in SVG units (its width is the bin count). */
-const HIST_HEIGHT = 28;
+import { ChannelsService } from '../../services/channels.service';
+import { AUTO_LEVELS } from '../../services/channel-display';
+import { ChannelHistogramComponent } from './channel-histogram.component';
 
 /**
  * Window, colour and gamma of each channel of a frame deeper than 8 bits, with
@@ -20,53 +19,52 @@ const HIST_HEIGHT = 28;
   selector: 'app-channels-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, FormsModule, ButtonModule, CheckboxModule, InputTextModule, SliderModule, TooltipModule],
+  imports: [
+    DecimalPipe,
+    FormsModule,
+    ButtonModule,
+    CheckboxModule,
+    InputTextModule,
+    SelectButtonModule,
+    TooltipModule,
+    ChannelHistogramComponent,
+  ],
   templateUrl: './channels-panel.component.html',
   styleUrl: './channels-panel.component.scss',
 })
 export class ChannelsPanelComponent {
   readonly channels = inject(ChannelsService);
 
-  readonly histWidth = HISTOGRAM_BINS;
-  readonly histHeight = HIST_HEIGHT;
+  readonly rangeOptions = [
+    { label: 'Data', value: false },
+    { label: 'Full', value: true },
+  ];
+  readonly scaleOptions = [
+    { label: 'Linear', value: false },
+    { label: 'Log', value: true },
+  ];
 
-  /** One SVG path per channel: bars on a log scale, so faint signal shows. */
-  readonly histogramPaths = computed(() =>
-    this.channels.histograms().map((counts) => {
-      const peak = Math.log1p(Math.max(1, ...counts));
-      return counts
-        .map((c, i) => {
-          const h = (Math.log1p(c) / peak) * HIST_HEIGHT;
-          return `M${i} ${HIST_HEIGHT}v${-h.toFixed(2)}h1v${h.toFixed(2)}z`;
-        })
-        .join('');
-    }),
-  );
+  /** The percentiles typed for "Clip". */
+  clipLow = 0.5;
+  clipHigh = 99.5;
 
-  /** The histogram of a channel; empty until it has loaded. */
-  histogramPath(channel: number): string {
-    return this.histogramPaths().at(channel) ?? '';
-  }
+  readonly autoHint = `Each press clips more of both ends: ${AUTO_LEVELS.map((l) => `${l} %`).join(', ')}, then again`;
 
   colorOf(channel: number): string {
     return this.channels.settings()?.channels.at(channel)?.color ?? 'transparent';
-  }
-
-  /** Position (0–100 %) of the window edges over the histogram. */
-  markerPercent(channel: number, value: number): number {
-    const r = this.channels.ranges()[channel];
-    if (!r || r.max === r.min) return 0;
-    return Math.min(100, Math.max(0, ((value - r.min) / (r.max - r.min)) * 100));
   }
 
   label(channel: number): string {
     return this.channels.settings()?.channels[channel]?.name || `Channel ${channel + 1}`;
   }
 
-  onWindow(channel: number, value: number[] | number | null | undefined): void {
-    if (Array.isArray(value) && value.length === 2) {
-      this.channels.setWindow(channel, value[0], value[1]);
-    }
+  /** "Auto", or the clipping its last press applied. */
+  autoLabel(level: number): string {
+    return level < 0 ? 'Auto' : `Auto · ${AUTO_LEVELS[level]} %`;
+  }
+
+  autoAllLabel(level: number): string {
+    return level < 0 ? 'Auto all' : `Auto all · ${AUTO_LEVELS[level]} %`;
   }
 
   onMin(channel: number, value: number | string): void {
@@ -84,6 +82,15 @@ export class ChannelsPanelComponent {
     if (Number.isFinite(gamma) && gamma > 0) this.channels.update(channel, { gamma });
   }
 
+  applyClip(): void {
+    void this.channels.clip(Number(this.clipLow), Number(this.clipHigh));
+  }
+
   /** Digits shown for raw values: none for integers. */
   readonly valueFormat = computed(() => (this.channels.info()?.sampleType === 'f32' ? '1.0-3' : '1.0-0'));
+
+  /** The step of the Min and Max fields: a thousandth of the axis for floats. */
+  step(channel: number): number {
+    return this.channels.ranges()[channel]?.step ?? 1;
+  }
 }

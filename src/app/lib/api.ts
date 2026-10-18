@@ -225,8 +225,14 @@ export const api = {
     invoke<PixelInfo>('frame_pixel_info', { frameId }),
 
   /** A channel's histogram in `bins` bins over `[min, max]`. */
-  frameHistogram: (frameId: number, channel: number, bins: number, min: number, max: number) =>
-    invoke<number[]>('frame_histogram', { frameId, channel, bins, min, max }),
+  frameHistogram: (
+    frameId: number,
+    channel: number,
+    bins: number,
+    min: number,
+    max: number,
+    log = false,
+  ) => invoke<number[]>('frame_histogram', { frameId, channel, bins, min, max, log }),
 
   /** The raw value of every channel at a native pixel; empty outside the frame. */
   pixelValues: (frameId: number, x: number, y: number) =>
@@ -237,8 +243,14 @@ export const api = {
     invoke<DisplaySettings>('get_display_settings', { frameId }),
 
   /** The automatic display for a frame, whatever is stored. */
-  autoDisplaySettings: (frameId: number) =>
-    invoke<DisplaySettings>('auto_display_settings', { frameId }),
+  autoDisplaySettings: (frameId: number, low?: number, high?: number) =>
+    invoke<DisplaySettings>('auto_display_settings', { frameId, low, high }),
+
+  /** The frame's raw values, box-averaged to at most `maxDim` on a side, for
+   *  previews: four little-endian u32 (width, height, channels, 0), then
+   *  every channel's plane as little-endian f32. See `parsePreview`. */
+  previewSamples: (frameId: number, maxDim: number) =>
+    invoke<ArrayBuffer>('preview_samples', { frameId, maxDim }),
 
   /** Store the display of a sequence's frames; `null` returns to automatic. */
   setDisplaySettings: (sequenceId: number, settings: DisplaySettings | null) =>

@@ -7,6 +7,16 @@ use super::raw::{RawFrame, Samples};
 /// Bins of a float channel's histogram, spread over its value range.
 const FLOAT_BINS: usize = 4096;
 
+/// How many times finer a log axis is at its low end than a linear one: it
+/// spans three decades whatever the units. The panel maps values the same way.
+pub const LOG_SPREAD: f32 = 1000.0;
+
+/// Where `v` falls (0–1) on a log axis over `[lo, hi]`.
+pub fn log_position(v: f32, lo: f32, hi: f32) -> f32 {
+    let x = ((v - lo) / (hi - lo).max(f32::EPSILON)).clamp(0.0, 1.0);
+    (1.0 + LOG_SPREAD * x).ln() / (1.0 + LOG_SPREAD).ln()
+}
+
 /// One channel's range and histogram. Integer channels are counted exactly:
 /// one bin per value (256 or 65 536).
 #[derive(Debug, Clone, PartialEq)]
@@ -37,10 +47,12 @@ impl ChannelStats {
         self.max
     }
 
-    /// The counts regrouped into `bins` bins over `[lo, hi]`, for drawing.
-    /// Values outside the range are left out.
-    pub fn rebin(&self, bins: usize, lo: f32, hi: f32) -> Vec<u32> {
-        let mut out = vec![0u32; bins.max(1)];
+    /// The counts regrouped into `bins` bins over `[lo, hi]`, for drawing,
+    /// spaced evenly or, with `log`, along [`log_position`]. Values outside
+    /// the range are left out.
+    pub fn rebin(&self, bins: usize, lo: f32, hi: f32, log: bool) -> Vec<u32> {
+        let bins = bins.max(1);
+        let mut out = vec![0u32; bins];
         let span = (hi - lo).max(f32::EPSILON);
         for (i, &c) in self.counts.iter().enumerate() {
             if c == 0 {
@@ -50,8 +62,8 @@ impl ChannelStats {
             if v < lo || v > hi {
                 continue;
             }
-            let b = (((v - lo) / span) * bins as f32) as usize;
-            out[b.min(bins - 1)] += c;
+            let t = if log { log_position(v, lo, hi) } else { (v - lo) / span };
+            out[((t * bins as f32) as usize).min(bins - 1)] += c;
         }
         out
     }
@@ -177,8 +189,21 @@ mod tests {
     #[test]
     fn rebin_keeps_counts_in_range() {
         let s = compute(&frame16(vec![0, 10, 20, 30, 40], 1));
-        let bins = s[0].rebin(2, 0.0, 40.0);
+        let bins = s[0].rebin(2, 0.0, 40.0, false);
         assert_eq!(bins.iter().sum::<u32>(), 5);
-        assert_eq!(s[0].rebin(4, 10.0, 30.0).iter().sum::<u32>(), 3);
+        assert_eq!(s[0].rebin(4, 10.0, 30.0, false).iter().sum::<u32>(), 3);
+    }
+
+    #[test]
+    fn a_log_histogram_spreads_the_low_values() {
+        // 0..=1000, one pixel each: a linear axis puts a tenth of them in the
+        // first tenth; a log one, far fewer per bin there.
+        let s = compute(&frame16((0..=1000).collect(), 1));
+        let linear = s[0].rebin(10, 0.0, 1000.0, false);
+        let log = s[0].rebin(10, 0.0, 1000.0, true);
+        assert_eq!(log.iter().sum::<u32>(), 1001);
+        assert!(log[0] < linear[0] && log[9] > linear[9], "{log:?} {linear:?}");
+        assert!((log_position(0.0, 0.0, 1000.0)).abs() < 1e-6);
+        assert!((log_position(1000.0, 0.0, 1000.0) - 1.0).abs() < 1e-6);
     }
 }

@@ -7,6 +7,33 @@
       </p>
     }
 
+    <div class="axis-options">
+      <p-selectbutton
+        [options]="rangeOptions"
+        [ngModel]="channels.fullRange()"
+        (ngModelChange)="channels.setFullRange($event)"
+        optionLabel="label"
+        optionValue="value"
+        [allowEmpty]="false"
+        size="small"
+        ariaLabel="Axis range"
+        pTooltip="Data: the axis spans the frame's values. Full: everything the type holds."
+        tooltipPosition="top"
+      />
+      <p-selectbutton
+        [options]="scaleOptions"
+        [ngModel]="channels.logScale()"
+        (ngModelChange)="channels.setLogScale($event)"
+        optionLabel="label"
+        optionValue="value"
+        [allowEmpty]="false"
+        size="small"
+        ariaLabel="Axis scale"
+        pTooltip="Log spreads the low values, for dim signal next to bright spots."
+        tooltipPosition="top"
+      />
+    </div>
+
     @for (ch of settings.channels; track $index; let i = $index) {
       <div class="channel" [class.channel--hidden]="!ch.visible">
         <div class="channel__head">
@@ -27,39 +54,25 @@
           />
           <label class="channel__name" [for]="'ch-visible-' + i">{{ label(i) }}</label>
           <p-button
-            label="Auto"
+            [label]="autoLabel(channels.autoLevels().at(i) ?? -1)"
             size="small"
             [text]="true"
             (onClick)="channels.auto(i)"
-            pTooltip="Fit the window to this channel (0.5–99.5 %)"
+            [pTooltip]="autoHint"
             tooltipPosition="left"
           />
         </div>
 
-        <div class="histogram">
-          <svg
-            [attr.viewBox]="'0 0 ' + histWidth + ' ' + histHeight"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path [attr.d]="histogramPath(i)" [attr.fill]="ch.color" />
-          </svg>
-          <span class="histogram__shade histogram__shade--low" [style.width.%]="markerPercent(i, ch.min)"></span>
-          <span
-            class="histogram__shade histogram__shade--high"
-            [style.width.%]="100 - markerPercent(i, ch.max)"
-          ></span>
-        </div>
-
         @if (channels.ranges()[i]; as range) {
-          <p-slider
-            [range]="true"
-            [min]="range.min"
-            [max]="range.max"
-            [step]="range.step"
-            [ngModel]="[ch.min, ch.max]"
-            (ngModelChange)="onWindow(i, $event)"
-            [ariaLabel]="'Display range of ' + label(i)"
+          <app-channel-histogram
+            [counts]="channels.histograms().at(i) ?? []"
+            [color]="ch.color"
+            [range]="range"
+            [log]="channels.logScale()"
+            [min]="ch.min"
+            [max]="ch.max"
+            [label]="label(i)"
+            (windowChange)="channels.setWindow(i, $event.min, $event.max)"
           />
         }
 
@@ -69,6 +82,7 @@
             <input
               pInputText
               type="number"
+              [step]="step(i)"
               [id]="'ch-min-' + i"
               [ngModel]="ch.min"
               (ngModelChange)="onMin(i, $event)"
@@ -80,6 +94,7 @@
             <input
               pInputText
               type="number"
+              [step]="step(i)"
               [id]="'ch-max-' + i"
               [ngModel]="ch.max"
               (ngModelChange)="onMax(i, $event)"
@@ -118,8 +133,36 @@
       }
     </div>
 
+    <div class="clip-row">
+      <label class="value-field">
+        <span>Clip below %</span>
+        <input pInputText type="number" min="0" max="100" step="0.1" [(ngModel)]="clipLow" (keydown.enter)="applyClip()" />
+      </label>
+      <label class="value-field">
+        <span>Clip above %</span>
+        <input pInputText type="number" min="0" max="100" step="0.1" [(ngModel)]="clipHigh" (keydown.enter)="applyClip()" />
+      </label>
+      <p-button
+        label="Clip"
+        size="small"
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="applyClip()"
+        pTooltip="Every channel's window from the first percentile to the second"
+        tooltipPosition="top"
+      />
+    </div>
+
     <div class="panel-actions">
-      <p-button label="Auto all" size="small" severity="secondary" [outlined]="true" (onClick)="channels.auto()" />
+      <p-button
+        [label]="autoAllLabel(channels.autoAllLevel())"
+        size="small"
+        severity="secondary"
+        [outlined]="true"
+        (onClick)="channels.auto()"
+        [pTooltip]="autoHint"
+        tooltipPosition="top"
+      />
       <p-button
         label="Reset to automatic"
         size="small"
