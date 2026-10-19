@@ -71,19 +71,23 @@ nav:
   - Android tablets: android.md
   - Quickstart: quickstart.md
   - User guide:
-      - Projects and files: guide/projects.md
-      - Annotating: guide/annotating.md
-      - Assisted labelling: guide/assistance.md
-      - Your own Python functions: guide/python-functions.md
-      - "Example: DNA fibers with DNAi": guide/dnai.md
-      - Very large images: guide/large-images.md
-      - The gallery and review: guide/gallery.md
-      - Several annotators: guide/multi-user.md
-      - Inspecting sequences: guide/inspect.md
-      - Annotating in 3D: guide/3D.md
-      - Frame registration: guide/registration.md
-      - Import and export: guide/import-export.md
-      - Keyboard shortcuts: guide/shortcuts.md
+      - The basics:
+          - Projects and files: guide/projects.md
+          - Annotating: guide/annotating.md
+          - Import and export: guide/import-export.md
+          - Keyboard shortcuts: guide/shortcuts.md
+      - Assisted labelling:
+          - Operators and trained models: guide/assistance.md
+          - Your own Python functions: guide/python-functions.md
+          - "Example: DNA fibers with DNAi": guide/dnai.md
+      - Review and teamwork:
+          - The gallery and review: guide/gallery.md
+          - Several annotators: guide/multi-user.md
+      - Large images, sequences and volumes:
+          - Very large images: guide/large-images.md
+          - Inspecting sequences: guide/inspect.md
+          - Annotating in 3D: guide/3D.md
+          - Frame registration: guide/registration.md
   - Experimental features: experimental.md
   - Python library: python.md
   - Troubleshooting: troubleshooting.md
