@@ -350,7 +350,7 @@ fn decode_jpeg_downscaled(bytes: &[u8], max: u32) -> Option<image::DynamicImage>
   }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_frame_thumbnail(
   db: State<DbState>,
   cache: State<ThumbnailCache>,
@@ -431,7 +431,7 @@ fn crop_rgba(raw: &[u8], img_w: u32, img_h: u32, x: u32, y: u32, w: u32, h: u32)
 
 /// A native-resolution RGBA tile of a frame, as raw bytes (`width*height*4`,
 /// row-major).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_frame_tile(
     db: State<DbState>,
     cache: State<FrameImageCache>,

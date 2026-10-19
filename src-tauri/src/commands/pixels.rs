@@ -280,7 +280,7 @@ pub fn render_frame_image(
 /// A native-resolution RGBA tile, rendered with the frame's display settings:
 /// `width*height*4` bytes, transparent outside the frame. Same layout as
 /// `get_frame_tile`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn render_frame_tile(
     db: State<DbState>,
     cache: State<RawFrameCache>,

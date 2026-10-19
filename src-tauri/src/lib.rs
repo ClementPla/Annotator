@@ -39,33 +39,12 @@ fn configure_webview_env() {
             }
         }
 
-        // The DMABUF renderer is the fast path but corrupts on some X11 setups with
-        // proprietary drivers, so it is disabled there by default. An explicit
-        // WEBKIT_DISABLE_DMABUF_RENDERER is never overridden, and
-        // DIDASCALIE_FORCE_DMABUF=1 keeps the fast path.
-        let raw_force = std::env::var("DIDASCALIE_FORCE_DMABUF").ok();
-        let force_dmabuf = raw_force.as_deref() == Some("1");
-        let already_set = std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_some();
-        let x11_with_dri = std::path::Path::new("/dev/dri").exists()
-            && std::env::var("WAYLAND_DISPLAY").is_err()
-            && std::env::var("XDG_SESSION_TYPE").unwrap_or_default() == "x11";
-
-        if force_dmabuf {
-            // SAFETY: set before any webview/thread is spawned.
-            unsafe {
-                std::env::remove_var("WEBKIT_DISABLE_DMABUF_RENDERER");
-            }
-        } else if !already_set && x11_with_dri {
-            // SAFETY: set before any webview/thread is spawned.
-            unsafe {
-                std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-            }
-        }
-
+        // The DMABUF renderer is left on: it is the fast path, and disabling it
+        // made scrolling and panning lag even with the proprietary NVIDIA driver
+        // on X11. Where it corrupts the display, WEBKIT_DISABLE_DMABUF_RENDERER=1
+        // turns it off.
         eprintln!(
-            "[webview] WebKitGTK: DIDASCALIE_FORCE_DMABUF={:?} -> force={} | WEBKIT_FORCE_COMPOSITING_MODE={:?} WEBKIT_DISABLE_DMABUF_RENDERER={:?}",
-            raw_force,
-            force_dmabuf,
+            "[webview] WebKitGTK: WEBKIT_FORCE_COMPOSITING_MODE={:?} WEBKIT_DISABLE_DMABUF_RENDERER={:?}",
             std::env::var("WEBKIT_FORCE_COMPOSITING_MODE").ok(),
             std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").ok(),
         );
